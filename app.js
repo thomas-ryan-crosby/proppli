@@ -422,8 +422,10 @@ function handlePropertyEditSubmit(e) {
     // Show loading modal
     const loadingModal = document.getElementById('loadingModal');
     if (loadingModal) {
-        document.getElementById('loadingModalTitle').textContent = 'Saving Property...';
-        document.getElementById('loadingModalMessage').textContent = 'Please wait while we save your property';
+        const loadingModalTitle = document.getElementById('loadingModalTitle');
+        const loadingModalMessage = document.getElementById('loadingModalMessage');
+        if (loadingModalTitle) loadingModalTitle.textContent = 'Saving Property...';
+        if (loadingModalMessage) loadingModalMessage.textContent = 'Please wait while we save your property';
         loadingModal.classList.add('show');
     }
 
