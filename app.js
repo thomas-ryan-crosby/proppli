@@ -32,9 +32,15 @@ function setupEventListeners() {
     // Property management
     document.getElementById('managePropertiesBtn').addEventListener('click', openPropertyModal);
     document.getElementById('closePropertyModal').addEventListener('click', closePropertyModal);
+    document.getElementById('addPropertyBtn').addEventListener('click', showAddPropertyForm);
     document.getElementById('propertyForm').addEventListener('submit', handlePropertySubmit);
-    document.getElementById('cancelPropertyForm').addEventListener('click', closePropertyModal);
+    document.getElementById('cancelPropertyForm').addEventListener('click', hidePropertyForm);
     document.getElementById('propertySelect').addEventListener('change', handlePropertySelect);
+    
+    // Property edit modal
+    document.getElementById('closePropertyEditModal').addEventListener('click', closePropertyEditModal);
+    document.getElementById('propertyEditForm').addEventListener('submit', handlePropertyEditSubmit);
+    document.getElementById('cancelPropertyEditForm').addEventListener('click', closePropertyEditModal);
 
     // Ticket management
     document.getElementById('createTicketBtn').addEventListener('click', openTicketModal);
@@ -166,6 +172,11 @@ function renderPropertiesList(properties) {
 
 function openPropertyModal() {
     document.getElementById('propertyModal').classList.add('show');
+    hidePropertyForm();
+}
+
+function showAddPropertyForm() {
+    document.getElementById('propertyForm').style.display = 'block';
     document.getElementById('propertyForm').reset();
     document.getElementById('propertyId').value = '';
     editingPropertyId = null;
@@ -175,13 +186,11 @@ function openPropertyModal() {
     }, 100);
 }
 
-function openPropertyModalForAdd() {
-    openPropertyModal();
-    // Scroll to top of modal to show the form
-    const modalBody = document.querySelector('#propertyModal .modal-body');
-    if (modalBody) {
-        modalBody.scrollTop = 0;
-    }
+function hidePropertyForm() {
+    document.getElementById('propertyForm').style.display = 'none';
+    document.getElementById('propertyForm').reset();
+    document.getElementById('propertyId').value = '';
+    editingPropertyId = null;
 }
 
 function closePropertyModal() {
@@ -279,18 +288,16 @@ window.editProperty = function(id) {
     db.collection('properties').doc(id).get().then((doc) => {
         const property = doc.data();
         if (property) {
-            editingPropertyId = id;
-            // Open modal first, then set values (so reset doesn't clear them)
-            document.getElementById('propertyModal').classList.add('show');
-            // Set values after modal is open
-            document.getElementById('propertyId').value = id;
-            document.getElementById('propertyName').value = property.name || '';
-            document.getElementById('propertyAddress').value = property.address || '';
-            document.getElementById('propertyType').value = property.propertyType || '';
-            document.getElementById('propertyDescription').value = property.description || '';
+            // Open edit modal and populate form
+            document.getElementById('propertyEditModal').classList.add('show');
+            document.getElementById('propertyEditId').value = id;
+            document.getElementById('propertyEditName').value = property.name || '';
+            document.getElementById('propertyEditAddress').value = property.address || '';
+            document.getElementById('propertyEditType').value = property.propertyType || '';
+            document.getElementById('propertyEditDescription').value = property.description || '';
             // Focus on property name input
             setTimeout(() => {
-                document.getElementById('propertyName').focus();
+                document.getElementById('propertyEditName').focus();
             }, 100);
         }
     }).catch((error) => {
@@ -298,6 +305,82 @@ window.editProperty = function(id) {
         alert('Error loading property: ' + error.message);
     });
 };
+
+function closePropertyEditModal() {
+    document.getElementById('propertyEditModal').classList.remove('show');
+    document.getElementById('propertyEditForm').reset();
+    document.getElementById('propertyEditId').value = '';
+}
+
+function handlePropertyEditSubmit(e) {
+    e.preventDefault();
+    
+    const id = document.getElementById('propertyEditId').value;
+    const name = document.getElementById('propertyEditName').value.trim();
+    const address = document.getElementById('propertyEditAddress').value.trim();
+    const propertyType = document.getElementById('propertyEditType').value;
+    const description = document.getElementById('propertyEditDescription').value.trim();
+
+    if (!name) {
+        alert('Property name is required');
+        return;
+    }
+    
+    if (!propertyType) {
+        alert('Property type is required');
+        return;
+    }
+
+    // Disable submit button and show loading modal
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
+        submitBtn.classList.add('saving');
+    }
+    
+    // Show loading modal
+    const loadingModal = document.getElementById('loadingModal');
+    if (loadingModal) {
+        document.getElementById('loadingModalTitle').textContent = 'Saving Property...';
+        document.getElementById('loadingModalMessage').textContent = 'Please wait while we save your property';
+        loadingModal.classList.add('show');
+    }
+
+    // Update existing property
+    db.collection('properties').doc(id).get().then((doc) => {
+        const existing = doc.data();
+        const propertyData = {
+            name,
+            address: address || null,
+            propertyType: propertyType,
+            description: description || null,
+            createdAt: existing?.createdAt || firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        return db.collection('properties').doc(id).update(propertyData);
+    }).then(() => {
+        console.log('Property updated successfully');
+        // Hide loading modal
+        if (loadingModal) {
+            loadingModal.classList.remove('show');
+        }
+        closePropertyEditModal();
+    }).catch((error) => {
+        console.error('Error updating property:', error);
+        // Hide loading modal
+        if (loadingModal) {
+            loadingModal.classList.remove('show');
+        }
+        alert('Error saving property: ' + error.message);
+        // Re-enable submit button on error
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save Property';
+            submitBtn.classList.remove('saving');
+        }
+    });
+}
 
 window.deleteProperty = function(id) {
     if (confirm('Are you sure you want to delete this property? This will not delete associated tickets.')) {
