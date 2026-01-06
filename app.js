@@ -481,7 +481,42 @@ function createTicketCard(ticket) {
         <div class="ticket-actions">
             ${!isCompleted ? `
                 <button class="btn-primary btn-small" onclick="markTicketComplete('${ticket.id}')">Mark as Complete</button>
-                <button class="btn-secondary btn-small" onclick="editTicket('${ticket.id}')">Edit</button>
+            ` : ''}
+            <button class="btn-secondary btn-small" onclick="editTicket('${ticket.id}')">Edit</button>
+            <button class="btn-secondary btn-small" onclick="toggleTicketDetails('${ticket.id}')">
+                <span id="toggleIcon-${ticket.id}">▼</span> <span id="toggleText-${ticket.id}">Show Details</span>
+            </button>
+        </div>
+        <div class="ticket-expanded-details" id="expandedDetails-${ticket.id}" style="display: none;">
+            ${ticket.howResolved ? `
+                <div class="expanded-detail-section">
+                    <h4>How Resolved</h4>
+                    <p>${escapeHtml(ticket.howResolved)}</p>
+                </div>
+            ` : ''}
+            ${(ticket.beforePhotoUrl || ticket.afterPhotoUrl) ? `
+                <div class="expanded-detail-section">
+                    <h4>Photos</h4>
+                    <div class="ticket-photos-expanded">
+                        ${ticket.beforePhotoUrl ? `
+                            <div class="photo-item-expanded">
+                                <span class="photo-label">Before</span>
+                                <img src="${escapeHtml(ticket.beforePhotoUrl)}" alt="Before" class="ticket-photo-expanded" onclick="openPhotoModal('${escapeHtml(ticket.beforePhotoUrl)}')">
+                            </div>
+                        ` : ''}
+                        ${ticket.afterPhotoUrl ? `
+                            <div class="photo-item-expanded">
+                                <span class="photo-label">After</span>
+                                <img src="${escapeHtml(ticket.afterPhotoUrl)}" alt="After" class="ticket-photo-expanded" onclick="openPhotoModal('${escapeHtml(ticket.afterPhotoUrl)}')">
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            ` : ''}
+            ${!ticket.howResolved && !ticket.beforePhotoUrl && !ticket.afterPhotoUrl ? `
+                <div class="expanded-detail-section">
+                    <p style="color: #999; text-align: center; padding: 20px;">No additional details available</p>
+                </div>
             ` : ''}
         </div>
     `;
@@ -987,6 +1022,23 @@ function uploadPhoto(file, ticketId, type) {
         );
     });
 }
+
+// Toggle ticket details expand/collapse
+window.toggleTicketDetails = function(ticketId) {
+    const expandedDetails = document.getElementById(`expandedDetails-${ticketId}`);
+    const toggleIcon = document.getElementById(`toggleIcon-${ticketId}`);
+    const toggleText = document.getElementById(`toggleText-${ticketId}`);
+    
+    if (expandedDetails.style.display === 'none') {
+        expandedDetails.style.display = 'block';
+        toggleIcon.textContent = '▲';
+        toggleText.textContent = 'Hide Details';
+    } else {
+        expandedDetails.style.display = 'none';
+        toggleIcon.textContent = '▼';
+        toggleText.textContent = 'Show Details';
+    }
+};
 
 // Photo modal for viewing full-size images
 window.openPhotoModal = function(photoUrl) {
