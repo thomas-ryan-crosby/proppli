@@ -693,6 +693,12 @@ function createTicketCard(ticket) {
                     <p>${escapeHtml(ticket.detailedDescription)}</p>
                 </div>
             ` : ''}
+            ${ticket.workUpdates ? `
+                <div class="expanded-detail-section">
+                    <h4>Work Updates / Notes</h4>
+                    <p style="white-space: pre-wrap;">${escapeHtml(ticket.workUpdates)}</p>
+                </div>
+            ` : ''}
             ${(ticket.beforePhotoUrl || ticket.afterPhotoUrl) ? `
                 <div class="expanded-detail-section">
                     <h4>Photos</h4>
