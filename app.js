@@ -548,7 +548,8 @@ function updateMetrics(tickets) {
 
         const hours = ticket.timeAllocated || 0;
         const billingRate = ticket.billingRate || 0;
-        const cost = hours * billingRate;
+        // Calculate cost based on billing type
+        const cost = ticket.billingType === 'flat' ? billingRate : (hours * billingRate);
 
         if (ticket.status === 'Completed') {
             completedCount++;
@@ -716,12 +717,12 @@ function createTicketCard(ticket, isDeleted = false) {
             </div>
             ${ticket.billingRate ? `
                 <div class="ticket-detail">
-                    <span class="ticket-detail-label">Billing Rate</span>
-                    <span class="ticket-detail-value">$${parseFloat(ticket.billingRate).toFixed(2)}/hr</span>
+                    <span class="ticket-detail-label">${ticket.billingType === 'flat' ? 'Flat Rate' : 'Billing Rate'}</span>
+                    <span class="ticket-detail-value">${ticket.billingType === 'flat' ? '$' + parseFloat(ticket.billingRate).toFixed(2) : '$' + parseFloat(ticket.billingRate).toFixed(2) + '/hr'}</span>
                 </div>
                 <div class="ticket-detail">
-                    <span class="ticket-detail-label">Estimated Cost</span>
-                    <span class="ticket-detail-value" style="font-weight: 600; color: #667eea;">$${((ticket.timeAllocated || 0) * (ticket.billingRate || 0)).toFixed(2)}</span>
+                    <span class="ticket-detail-label">${ticket.status === 'Completed' ? 'Total Cost' : 'Estimated Cost'}</span>
+                    <span class="ticket-detail-value" style="font-weight: 600; color: #667eea;">$${ticket.billingType === 'flat' ? parseFloat(ticket.billingRate).toFixed(2) : ((ticket.timeAllocated || 0) * (ticket.billingRate || 0)).toFixed(2)}</span>
                 </div>
             ` : ''}
             <div class="ticket-detail">
@@ -851,6 +852,15 @@ function openTicketModal(ticketId = null) {
     document.getElementById('ticketForm').reset();
     document.getElementById('ticketId').value = '';
     editingTicketId = null;
+    
+    // Reset billing type to hourly
+    document.getElementById('billingTypeHourly').checked = true;
+    const billingRateLabel = document.getElementById('billingRateLabel');
+    const billingRateInput = document.getElementById('billingRate');
+    if (billingRateLabel && billingRateInput) {
+        billingRateLabel.textContent = 'Billing Rate ($/hour)';
+        billingRateInput.placeholder = 'e.g., 75.00';
+    }
     
     // Reset submit button state
     const submitBtn = document.querySelector('#ticketForm button[type="submit"]');
@@ -995,6 +1005,25 @@ function loadTicketForEdit(ticketId) {
             document.getElementById('workUpdates').value = ticket.workUpdates || '';
             document.getElementById('timeAllocated').value = ticket.timeAllocated || '';
             document.getElementById('billingRate').value = ticket.billingRate || '';
+            // Set billing type (default to hourly if not set for backward compatibility)
+            const billingType = ticket.billingType || 'hourly';
+            if (billingType === 'flat') {
+                document.getElementById('billingTypeFlat').checked = true;
+            } else {
+                document.getElementById('billingTypeHourly').checked = true;
+            }
+            // Update label based on selected type
+            const billingRateLabel = document.getElementById('billingRateLabel');
+            const billingRateInput = document.getElementById('billingRate');
+            if (billingRateLabel && billingRateInput) {
+                if (billingType === 'flat') {
+                    billingRateLabel.textContent = 'Flat Rate Amount ($)';
+                    billingRateInput.placeholder = 'e.g., 500.00';
+                } else {
+                    billingRateLabel.textContent = 'Billing Rate ($/hour)';
+                    billingRateInput.placeholder = 'e.g., 75.00';
+                }
+            }
             document.getElementById('requestedBy').value = ticket.requestedBy || '';
             document.getElementById('managedBy').value = ticket.managedBy || '';
             document.getElementById('ticketStatus').value = ticket.status || 'Not Started';
@@ -1069,6 +1098,8 @@ function handleTicketSubmit(e) {
     const timeAllocated = parseFloat(document.getElementById('timeAllocated').value);
     const billingRateInput = document.getElementById('billingRate');
     const billingRate = billingRateInput && billingRateInput.value ? parseFloat(billingRateInput.value) : null;
+    const billingTypeHourly = document.getElementById('billingTypeHourly');
+    const billingType = billingRateInput && billingRateInput.value && billingTypeHourly && billingTypeHourly.checked ? 'hourly' : (billingRateInput && billingRateInput.value ? 'flat' : null);
     const requestedBy = document.getElementById('requestedBy').value.trim();
     const managedBy = document.getElementById('managedBy').value.trim();
     const status = document.getElementById('ticketStatus').value;
@@ -1139,6 +1170,7 @@ function handleTicketSubmit(e) {
                     workUpdates: workUpdates || null,
                     timeAllocated: timeAllocated && !isNaN(timeAllocated) ? timeAllocated : null,
                     billingRate: billingRate || null,
+                    billingType: billingRate ? billingType : null,
                     requestedBy,
                     managedBy,
                     status,
