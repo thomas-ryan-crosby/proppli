@@ -186,6 +186,9 @@ function openPropertyModalForAdd() {
 
 function closePropertyModal() {
     document.getElementById('propertyModal').classList.remove('show');
+    document.getElementById('propertyForm').reset();
+    document.getElementById('propertyId').value = '';
+    editingPropertyId = null;
 }
 
 function handlePropertySubmit(e) {
