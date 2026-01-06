@@ -801,6 +801,7 @@ function loadTicketForEdit(ticketId) {
                 document.getElementById('tenantName').value = ticket.tenantName || '';
             }
             document.getElementById('workDescription').value = ticket.workDescription || '';
+            document.getElementById('detailedDescription').value = ticket.detailedDescription || '';
             document.getElementById('timeAllocated').value = ticket.timeAllocated || '';
             document.getElementById('billingRate').value = ticket.billingRate || '';
             document.getElementById('requestedBy').value = ticket.requestedBy || '';
@@ -867,6 +868,7 @@ function handleTicketSubmit(e) {
     const floorNumber = document.getElementById('floorNumber').value.trim();
     const tenantName = document.getElementById('tenantName').value.trim();
     const workDescription = document.getElementById('workDescription').value.trim();
+    const detailedDescription = document.getElementById('detailedDescription').value.trim();
     const timeAllocated = parseFloat(document.getElementById('timeAllocated').value);
     const billingRateInput = document.getElementById('billingRate');
     const billingRate = billingRateInput && billingRateInput.value ? parseFloat(billingRateInput.value) : null;
