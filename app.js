@@ -30,30 +30,52 @@ function initializeApp() {
 // Event Listeners
 function setupEventListeners() {
     // Property management
-    document.getElementById('managePropertiesBtn').addEventListener('click', openPropertyModal);
-    document.getElementById('closePropertyModal').addEventListener('click', closePropertyModal);
-    document.getElementById('addPropertyBtn').addEventListener('click', showAddPropertyForm);
-    document.getElementById('propertyForm').addEventListener('submit', handlePropertySubmit);
-    document.getElementById('cancelPropertyForm').addEventListener('click', hidePropertyForm);
-    document.getElementById('propertySelect').addEventListener('change', handlePropertySelect);
+    const managePropertiesBtn = document.getElementById('managePropertiesBtn');
+    const closePropertyModalBtn = document.getElementById('closePropertyModal');
+    const addPropertyBtn = document.getElementById('addPropertyBtn');
+    const propertyForm = document.getElementById('propertyForm');
+    const cancelPropertyFormBtn = document.getElementById('cancelPropertyForm');
+    const propertySelect = document.getElementById('propertySelect');
+    
+    if (managePropertiesBtn) managePropertiesBtn.addEventListener('click', openPropertyModal);
+    if (closePropertyModalBtn) closePropertyModalBtn.addEventListener('click', closePropertyModal);
+    if (addPropertyBtn) addPropertyBtn.addEventListener('click', showAddPropertyForm);
+    if (propertyForm) propertyForm.addEventListener('submit', handlePropertySubmit);
+    if (cancelPropertyFormBtn) cancelPropertyFormBtn.addEventListener('click', hidePropertyForm);
+    if (propertySelect) propertySelect.addEventListener('change', handlePropertySelect);
     
     // Property edit modal
-    document.getElementById('closePropertyEditModal').addEventListener('click', closePropertyEditModal);
-    document.getElementById('propertyEditForm').addEventListener('submit', handlePropertyEditSubmit);
-    document.getElementById('cancelPropertyEditForm').addEventListener('click', closePropertyEditModal);
+    const closePropertyEditModalBtn = document.getElementById('closePropertyEditModal');
+    const propertyEditForm = document.getElementById('propertyEditForm');
+    const cancelPropertyEditFormBtn = document.getElementById('cancelPropertyEditForm');
+    
+    if (closePropertyEditModalBtn) closePropertyEditModalBtn.addEventListener('click', closePropertyEditModal);
+    if (propertyEditForm) propertyEditForm.addEventListener('submit', handlePropertyEditSubmit);
+    if (cancelPropertyEditFormBtn) cancelPropertyEditFormBtn.addEventListener('click', closePropertyEditModal);
 
     // Ticket management
-    document.getElementById('createTicketBtn').addEventListener('click', openTicketModal);
-    document.getElementById('closeTicketModal').addEventListener('click', closeTicketModal);
-    document.getElementById('ticketForm').addEventListener('submit', handleTicketSubmit);
-    document.getElementById('cancelTicketForm').addEventListener('click', closeTicketModal);
-    document.getElementById('ticketStatus').addEventListener('change', handleStatusChange);
+    const createTicketBtn = document.getElementById('createTicketBtn');
+    const closeTicketModalBtn = document.getElementById('closeTicketModal');
+    const ticketForm = document.getElementById('ticketForm');
+    const cancelTicketFormBtn = document.getElementById('cancelTicketForm');
+    const ticketStatus = document.getElementById('ticketStatus');
+    
+    if (createTicketBtn) createTicketBtn.addEventListener('click', openTicketModal);
+    if (closeTicketModalBtn) closeTicketModalBtn.addEventListener('click', closeTicketModal);
+    if (ticketForm) ticketForm.addEventListener('submit', handleTicketSubmit);
+    if (cancelTicketFormBtn) cancelTicketFormBtn.addEventListener('click', closeTicketModal);
+    if (ticketStatus) ticketStatus.addEventListener('change', handleStatusChange);
     
     // File upload handlers
-    document.getElementById('beforePhoto').addEventListener('change', (e) => handleFileSelect(e, 'before'));
-    document.getElementById('afterPhoto').addEventListener('change', (e) => handleFileSelect(e, 'after'));
-    document.getElementById('removeBeforePhoto').addEventListener('click', () => removeFile('before'));
-    document.getElementById('removeAfterPhoto').addEventListener('click', () => removeFile('after'));
+    const beforePhoto = document.getElementById('beforePhoto');
+    const afterPhoto = document.getElementById('afterPhoto');
+    const removeBeforePhotoBtn = document.getElementById('removeBeforePhoto');
+    const removeAfterPhotoBtn = document.getElementById('removeAfterPhoto');
+    
+    if (beforePhoto) beforePhoto.addEventListener('change', (e) => handleFileSelect(e, 'before'));
+    if (afterPhoto) afterPhoto.addEventListener('change', (e) => handleFileSelect(e, 'after'));
+    if (removeBeforePhotoBtn) removeBeforePhotoBtn.addEventListener('click', () => removeFile('before'));
+    if (removeAfterPhotoBtn) removeAfterPhotoBtn.addEventListener('click', () => removeFile('after'));
     
     // Completion modal file handlers (check if elements exist)
     const completionAfterPhoto = document.getElementById('completionAfterPhoto');
@@ -66,16 +88,22 @@ function setupEventListeners() {
     }
 
     // View toggles
-    document.getElementById('viewActiveBtn').addEventListener('click', () => switchView('active'));
-    document.getElementById('viewCompletedBtn').addEventListener('click', () => switchView('completed'));
+    const viewActiveBtn = document.getElementById('viewActiveBtn');
+    const viewCompletedBtn = document.getElementById('viewCompletedBtn');
+    const toggleMetricsBtn = document.getElementById('toggleMetricsBtn');
     
-    // Metrics dashboard toggle
-    document.getElementById('toggleMetricsBtn').addEventListener('click', toggleMetrics);
+    if (viewActiveBtn) viewActiveBtn.addEventListener('click', () => switchView('active'));
+    if (viewCompletedBtn) viewCompletedBtn.addEventListener('click', () => switchView('completed'));
+    if (toggleMetricsBtn) toggleMetricsBtn.addEventListener('click', toggleMetrics);
 
     // Completion modal
-    document.getElementById('closeCompletionModal').addEventListener('click', closeCompletionModal);
-    document.getElementById('completionForm').addEventListener('submit', handleTicketCompletion);
-    document.getElementById('cancelCompletionForm').addEventListener('click', closeCompletionModal);
+    const closeCompletionModalBtn = document.getElementById('closeCompletionModal');
+    const completionForm = document.getElementById('completionForm');
+    const cancelCompletionFormBtn = document.getElementById('cancelCompletionForm');
+    
+    if (closeCompletionModalBtn) closeCompletionModalBtn.addEventListener('click', closeCompletionModal);
+    if (completionForm) completionForm.addEventListener('submit', handleTicketCompletion);
+    if (cancelCompletionFormBtn) cancelCompletionFormBtn.addEventListener('click', closeCompletionModal);
 
     // Close modals when clicking outside
     window.addEventListener('click', (e) => {
