@@ -37,6 +37,12 @@ function setupEventListeners() {
     document.getElementById('ticketForm').addEventListener('submit', handleTicketSubmit);
     document.getElementById('cancelTicketForm').addEventListener('click', closeTicketModal);
     document.getElementById('ticketStatus').addEventListener('change', handleStatusChange);
+    
+    // File upload handlers
+    document.getElementById('beforePhoto').addEventListener('change', (e) => handleFileSelect(e, 'before'));
+    document.getElementById('afterPhoto').addEventListener('change', (e) => handleFileSelect(e, 'after'));
+    document.getElementById('removeBeforePhoto').addEventListener('click', () => removeFile('before'));
+    document.getElementById('removeAfterPhoto').addEventListener('click', () => removeFile('after'));
 
     // View toggles
     document.getElementById('viewActiveBtn').addEventListener('click', () => switchView('active'));
