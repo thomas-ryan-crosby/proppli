@@ -753,8 +753,10 @@ function openTicketModal(ticketId = null) {
 
     // Populate property dropdown
     const ticketPropertySelect = document.getElementById('ticketProperty');
-    if (selectedPropertyId) {
+    if (selectedPropertyId && ticketPropertySelect) {
         ticketPropertySelect.value = selectedPropertyId;
+        // Check property type and show/hide commercial fields
+        updateCommercialFieldsVisibility(selectedPropertyId);
     }
 
     // Set default status
@@ -935,7 +937,12 @@ function handleTicketSubmit(e) {
     e.preventDefault();
     
     const id = document.getElementById('ticketId').value;
-    const propertyId = document.getElementById('ticketProperty').value;
+    const propertyIdInput = document.getElementById('ticketProperty');
+    const propertyId = propertyIdInput ? String(propertyIdInput.value).trim() : '';
+    if (!propertyId) {
+        alert('Please select a property');
+        return;
+    }
     const buildingNumber = document.getElementById('buildingNumber').value.trim();
     const floorNumber = document.getElementById('floorNumber').value.trim();
     const tenantName = document.getElementById('tenantName').value.trim();
