@@ -1036,6 +1036,7 @@ function handleTicketSubmit(e) {
                 floorNumber: floorNumber || null,
                 tenantName: tenantName || null,
                 workDescription,
+                detailedDescription: detailedDescription || null,
                 timeAllocated,
                 billingRate: billingRate || null,
                 requestedBy,
