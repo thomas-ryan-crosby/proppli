@@ -1218,31 +1218,64 @@ function handleTicketCompletion(e) {
         submitBtn.textContent = 'Saving...';
     }
 
-    // Upload after photo if provided
-    const uploadPromise = completionAfterPhotoFile 
-        ? uploadPhoto(completionAfterPhotoFile, editingTicketId, 'after')
-        : Promise.resolve(null);
-
-    uploadPromise.then((afterPhotoUrl) => {
-        const updateData = {
-            status: 'Completed',
-            completedBy: completedBy,
-            howResolved: howResolved || null,
-            dateCompleted: firebase.firestore.FieldValue.serverTimestamp(),
-            lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        };
-
-        if (afterPhotoUrl) {
-            updateData.afterPhotoUrl = afterPhotoUrl;
+    // Check if timeAllocated is set - required before marking complete
+    if (!editingTicketId) {
+        alert('Error: Ticket ID not found');
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Mark as Complete';
         }
+        return;
+    }
+    
+    // Get the ticket to check timeAllocated
+    db.collection('tickets').doc(editingTicketId).get().then((doc) => {
+        const ticket = doc.data();
+        const timeAllocated = ticket?.timeAllocated;
+        
+        if (!timeAllocated || isNaN(timeAllocated) || timeAllocated <= 0) {
+            alert('Time Allocated is required before marking a ticket as complete. Please edit the ticket and add the time allocated first.');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Mark as Complete';
+            }
+            return;
+        }
+        
+        // Continue with completion if timeAllocated is set
+        // Upload after photo if provided
+        const uploadPromise = completionAfterPhotoFile 
+            ? uploadPhoto(completionAfterPhotoFile, editingTicketId, 'after')
+            : Promise.resolve(null);
 
-        return db.collection('tickets').doc(editingTicketId).update(updateData);
-    }).then(() => {
-        closeCompletionModal();
+        uploadPromise.then((afterPhotoUrl) => {
+            const updateData = {
+                status: 'Completed',
+                completedBy: completedBy,
+                howResolved: howResolved || null,
+                dateCompleted: firebase.firestore.FieldValue.serverTimestamp(),
+                lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+
+            if (afterPhotoUrl) {
+                updateData.afterPhotoUrl = afterPhotoUrl;
+            }
+
+            return db.collection('tickets').doc(editingTicketId).update(updateData);
+        }).then(() => {
+            closeCompletionModal();
+        }).catch((error) => {
+            console.error('Error completing ticket:', error);
+            alert('Error completing ticket: ' + error.message);
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Mark as Complete';
+            }
+        });
     }).catch((error) => {
-        console.error('Error completing ticket:', error);
-        alert('Error completing ticket: ' + error.message);
+        console.error('Error checking ticket:', error);
+        alert('Error checking ticket: ' + error.message);
         if (submitBtn) {
             submitBtn.disabled = false;
             submitBtn.textContent = 'Mark as Complete';
