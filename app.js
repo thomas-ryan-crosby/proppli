@@ -793,27 +793,56 @@ function openTicketModal(ticketId = null) {
 // Update commercial fields visibility based on property type
 function updateCommercialFieldsVisibility(propertyId) {
     return new Promise((resolve) => {
-        if (!propertyId) {
-            document.getElementById('commercialFieldsGroup').style.display = 'none';
+        // Ensure propertyId is a string and not empty
+        if (!propertyId || typeof propertyId !== 'string' || propertyId.trim() === '') {
+            const commercialFieldsGroup = document.getElementById('commercialFieldsGroup');
+            if (commercialFieldsGroup) {
+                commercialFieldsGroup.style.display = 'none';
+            }
             resolve();
             return;
         }
         
-        db.collection('properties').doc(propertyId).get().then((doc) => {
+        // Ensure propertyId is a valid string for Firestore
+        const cleanPropertyId = String(propertyId).trim();
+        
+        db.collection('properties').doc(cleanPropertyId).get().then((doc) => {
+            if (!doc.exists) {
+                console.warn('Property not found:', cleanPropertyId);
+                const commercialFieldsGroup = document.getElementById('commercialFieldsGroup');
+                if (commercialFieldsGroup) {
+                    commercialFieldsGroup.style.display = 'none';
+                }
+                resolve();
+                return;
+            }
+            
             const property = doc.data();
+            const commercialFieldsGroup = document.getElementById('commercialFieldsGroup');
+            
             if (property && property.propertyType === 'commercial') {
-                document.getElementById('commercialFieldsGroup').style.display = 'block';
+                if (commercialFieldsGroup) {
+                    commercialFieldsGroup.style.display = 'block';
+                }
             } else {
-                document.getElementById('commercialFieldsGroup').style.display = 'none';
+                if (commercialFieldsGroup) {
+                    commercialFieldsGroup.style.display = 'none';
+                }
                 // Clear the fields when hiding
-                document.getElementById('buildingNumber').value = '';
-                document.getElementById('floorNumber').value = '';
-                document.getElementById('tenantName').value = '';
+                const buildingNumber = document.getElementById('buildingNumber');
+                const floorNumber = document.getElementById('floorNumber');
+                const tenantName = document.getElementById('tenantName');
+                if (buildingNumber) buildingNumber.value = '';
+                if (floorNumber) floorNumber.value = '';
+                if (tenantName) tenantName.value = '';
             }
             resolve();
         }).catch((error) => {
             console.error('Error loading property:', error);
-            document.getElementById('commercialFieldsGroup').style.display = 'none';
+            const commercialFieldsGroup = document.getElementById('commercialFieldsGroup');
+            if (commercialFieldsGroup) {
+                commercialFieldsGroup.style.display = 'none';
+            }
             resolve();
         });
     });
