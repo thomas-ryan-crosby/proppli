@@ -414,6 +414,24 @@ function createTicketCard(ticket) {
         </div>
         <div class="ticket-details">
             ${selectedPropertyId ? '' : `<div class="ticket-detail"><span class="ticket-detail-label">Property</span><span class="ticket-detail-value property-name">Loading...</span></div>`}
+            ${ticket.buildingNumber ? `
+                <div class="ticket-detail">
+                    <span class="ticket-detail-label">Building #</span>
+                    <span class="ticket-detail-value">${escapeHtml(ticket.buildingNumber)}</span>
+                </div>
+            ` : ''}
+            ${ticket.floorNumber ? `
+                <div class="ticket-detail">
+                    <span class="ticket-detail-label">Floor #</span>
+                    <span class="ticket-detail-value">${escapeHtml(ticket.floorNumber)}</span>
+                </div>
+            ` : ''}
+            ${ticket.tenantName ? `
+                <div class="ticket-detail">
+                    <span class="ticket-detail-label">Tenant Name</span>
+                    <span class="ticket-detail-value">${escapeHtml(ticket.tenantName)}</span>
+                </div>
+            ` : ''}
             <div class="ticket-detail">
                 <span class="ticket-detail-label">Time Allocated</span>
                 <span class="ticket-detail-value">${ticket.timeAllocated} hours</span>
@@ -562,6 +580,9 @@ function loadTicketForEdit(ticketId) {
             editingTicketId = ticketId;
             document.getElementById('ticketId').value = ticketId;
             document.getElementById('ticketProperty').value = ticket.propertyId || '';
+            document.getElementById('buildingNumber').value = ticket.buildingNumber || '';
+            document.getElementById('floorNumber').value = ticket.floorNumber || '';
+            document.getElementById('tenantName').value = ticket.tenantName || '';
             document.getElementById('workDescription').value = ticket.workDescription || '';
             document.getElementById('timeAllocated').value = ticket.timeAllocated || '';
             document.getElementById('billingRate').value = ticket.billingRate || '';
@@ -609,6 +630,9 @@ function handleTicketSubmit(e) {
     
     const id = document.getElementById('ticketId').value;
     const propertyId = document.getElementById('ticketProperty').value;
+    const buildingNumber = document.getElementById('buildingNumber').value.trim();
+    const floorNumber = document.getElementById('floorNumber').value.trim();
+    const tenantName = document.getElementById('tenantName').value.trim();
     const workDescription = document.getElementById('workDescription').value.trim();
     const timeAllocated = parseFloat(document.getElementById('timeAllocated').value);
     const billingRateInput = document.getElementById('billingRate');
@@ -657,6 +681,9 @@ function handleTicketSubmit(e) {
                 const existing = doc.data();
                 const ticketData = {
                     propertyId,
+                    buildingNumber: buildingNumber || null,
+                    floorNumber: floorNumber || null,
+                    tenantName: tenantName || null,
                     workDescription,
                     timeAllocated,
                     billingRate: billingRate || null,
@@ -701,6 +728,9 @@ function handleTicketSubmit(e) {
             // Create new - need to get the ID first for photo uploads
             const ticketData = {
                 propertyId,
+                buildingNumber: buildingNumber || null,
+                floorNumber: floorNumber || null,
+                tenantName: tenantName || null,
                 workDescription,
                 timeAllocated,
                 billingRate: billingRate || null,
