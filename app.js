@@ -964,8 +964,14 @@ function handleTicketSubmit(e) {
     const completedBy = document.getElementById('completedBy').value.trim();
     const howResolved = document.getElementById('howResolved').value.trim();
 
-    if (!propertyId || !workDescription || !timeAllocated || !requestedBy || !managedBy) {
+    if (!propertyId || !workDescription || !requestedBy || !managedBy) {
         alert('Please fill in all required fields');
+        return;
+    }
+    
+    // Time allocated is optional when creating/editing, but required when marking complete
+    if (status === 'Completed' && (!timeAllocated || isNaN(timeAllocated) || timeAllocated <= 0)) {
+        alert('Time Allocated is required before marking a ticket as complete');
         return;
     }
 
