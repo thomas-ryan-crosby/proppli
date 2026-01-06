@@ -49,9 +49,15 @@ function setupEventListeners() {
     document.getElementById('removeBeforePhoto').addEventListener('click', () => removeFile('before'));
     document.getElementById('removeAfterPhoto').addEventListener('click', () => removeFile('after'));
     
-    // Completion modal file handlers
-    document.getElementById('completionAfterPhoto').addEventListener('change', (e) => handleCompletionFileSelect(e));
-    document.getElementById('removeCompletionAfterPhoto').addEventListener('click', () => removeCompletionFile());
+    // Completion modal file handlers (check if elements exist)
+    const completionAfterPhoto = document.getElementById('completionAfterPhoto');
+    const removeCompletionAfterPhoto = document.getElementById('removeCompletionAfterPhoto');
+    if (completionAfterPhoto) {
+        completionAfterPhoto.addEventListener('change', (e) => handleCompletionFileSelect(e));
+    }
+    if (removeCompletionAfterPhoto) {
+        removeCompletionAfterPhoto.addEventListener('click', () => removeCompletionFile());
+    }
 
     // View toggles
     document.getElementById('viewActiveBtn').addEventListener('click', () => switchView('active'));
