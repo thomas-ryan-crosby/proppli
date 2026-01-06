@@ -6,6 +6,13 @@ let editingPropertyId = null;
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
+    // Check if Firebase is initialized
+    if (typeof firebase === 'undefined' || !db) {
+        console.error('Firebase is not initialized. Check firebase-config.js');
+        alert('Error: Firebase is not properly configured. Please check the browser console.');
+        return;
+    }
+    console.log('Firebase initialized successfully');
     initializeApp();
 });
 
@@ -154,14 +161,25 @@ function closePropertyModal() {
 
 function handlePropertySubmit(e) {
     e.preventDefault();
+    console.log('Property form submitted');
+    
     const id = document.getElementById('propertyId').value;
     const name = document.getElementById('propertyName').value.trim();
     const address = document.getElementById('propertyAddress').value.trim();
     const description = document.getElementById('propertyDescription').value.trim();
 
+    console.log('Form data:', { id, name, address, description });
+
     if (!name) {
         alert('Property name is required');
         return;
+    }
+
+    // Disable submit button to prevent double submission
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
     }
 
     if (id && editingPropertyId) {
@@ -175,7 +193,19 @@ function handlePropertySubmit(e) {
                 createdAt: existing?.createdAt || firebase.firestore.FieldValue.serverTimestamp(),
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             };
-            db.collection('properties').doc(id).update(propertyData);
+            return db.collection('properties').doc(id).update(propertyData);
+        }).then(() => {
+            console.log('Property updated successfully');
+            closePropertyModal();
+        }).catch((error) => {
+            console.error('Error updating property:', error);
+            alert('Error saving property: ' + error.message);
+            // Re-enable submit button on error
+            const submitBtn = document.querySelector('#propertyForm button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Save Property';
+            }
         });
     } else {
         // Create new
@@ -186,10 +216,22 @@ function handlePropertySubmit(e) {
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
-        db.collection('properties').add(propertyData);
+        db.collection('properties').add(propertyData)
+            .then((docRef) => {
+                console.log('Property created successfully with ID:', docRef.id);
+                closePropertyModal();
+            })
+            .catch((error) => {
+                console.error('Error creating property:', error);
+                alert('Error saving property: ' + error.message);
+                // Re-enable submit button on error
+                const submitBtn = document.querySelector('#propertyForm button[type="submit"]');
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Save Property';
+                }
+            });
     }
-
-    closePropertyModal();
 }
 
 // Make functions globally accessible for onclick handlers
