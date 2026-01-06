@@ -605,12 +605,26 @@ function loadTicketForEdit(ticketId) {
                 document.getElementById('completedByGroup').style.display = 'block';
                 document.getElementById('howResolvedGroup').style.display = 'block';
                 document.getElementById('afterPhotoGroup').style.display = 'block';
+                document.getElementById('retroactiveDatesGroup').style.display = 'block';
                 
                 // Load existing after photo if any
                 if (ticket.afterPhotoUrl) {
                     afterPhotoUrl = ticket.afterPhotoUrl;
                     showPhotoPreview(ticket.afterPhotoUrl, 'after');
                 }
+            }
+            
+            // Load custom dates if they exist (for retroactive tickets)
+            // Note: Firestore timestamps need to be converted to date input format
+            if (ticket.dateCreated && ticket.dateCreated.toDate) {
+                const createdDate = ticket.dateCreated.toDate();
+                const createdDateStr = createdDate.toISOString().split('T')[0];
+                document.getElementById('customDateCreated').value = createdDateStr;
+            }
+            if (ticket.dateCompleted && ticket.dateCompleted.toDate) {
+                const completedDate = ticket.dateCompleted.toDate();
+                const completedDateStr = completedDate.toISOString().split('T')[0];
+                document.getElementById('customDateCompleted').value = completedDateStr;
             }
         }
     });
