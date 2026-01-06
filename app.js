@@ -103,6 +103,11 @@ function loadProperties() {
             select.appendChild(option);
             ticketPropertySelect.appendChild(ticketOption);
         });
+        
+        // Add change listener to ticket property select to show/hide commercial fields
+        ticketPropertySelect.addEventListener('change', function(e) {
+            updateCommercialFieldsVisibility(e.target.value);
+        });
 
         // Restore selected property
         if (selectedPropertyId && properties[selectedPropertyId]) {
@@ -146,6 +151,7 @@ function renderPropertiesList(properties) {
         item.innerHTML = `
             <div class="property-info">
                 <h4>${escapeHtml(property.name)}</h4>
+                <p><strong>Type:</strong> ${property.propertyType === 'commercial' ? 'Commercial' : property.propertyType === 'hoa' ? 'HOA' : property.propertyType === 'residential' ? 'Residential' : 'Not Set'}</p>
                 ${property.address ? `<p>📍 ${escapeHtml(property.address)}</p>` : ''}
                 ${property.description ? `<p>${escapeHtml(property.description)}</p>` : ''}
             </div>
@@ -189,12 +195,18 @@ function handlePropertySubmit(e) {
     const id = document.getElementById('propertyId').value;
     const name = document.getElementById('propertyName').value.trim();
     const address = document.getElementById('propertyAddress').value.trim();
+    const propertyType = document.getElementById('propertyType').value;
     const description = document.getElementById('propertyDescription').value.trim();
 
-    console.log('Form data:', { id, name, address, description });
+    console.log('Form data:', { id, name, address, propertyType, description });
 
     if (!name) {
         alert('Property name is required');
+        return;
+    }
+    
+    if (!propertyType) {
+        alert('Property type is required');
         return;
     }
 
@@ -212,6 +224,7 @@ function handlePropertySubmit(e) {
             const propertyData = {
                 name,
                 address: address || null,
+                propertyType: propertyType,
                 description: description || null,
                 createdAt: existing?.createdAt || firebase.firestore.FieldValue.serverTimestamp(),
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -235,6 +248,7 @@ function handlePropertySubmit(e) {
         const propertyData = {
             name,
             address: address || null,
+            propertyType: propertyType,
             description: description || null,
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -265,6 +279,7 @@ window.editProperty = function(id) {
             document.getElementById('propertyId').value = id;
             document.getElementById('propertyName').value = property.name || '';
             document.getElementById('propertyAddress').value = property.address || '';
+            document.getElementById('propertyType').value = property.propertyType || '';
             document.getElementById('propertyDescription').value = property.description || '';
             editingPropertyId = id;
             openPropertyModal();
@@ -568,7 +583,41 @@ function openTicketModal(ticketId = null) {
     // If editing, load ticket data
     if (ticketId) {
         loadTicketForEdit(ticketId);
+    } else {
+        // For new tickets, check property type
+        if (selectedPropertyId) {
+            updateCommercialFieldsVisibility(selectedPropertyId);
+        }
     }
+}
+
+// Update commercial fields visibility based on property type
+function updateCommercialFieldsVisibility(propertyId) {
+    return new Promise((resolve) => {
+        if (!propertyId) {
+            document.getElementById('commercialFieldsGroup').style.display = 'none';
+            resolve();
+            return;
+        }
+        
+        db.collection('properties').doc(propertyId).get().then((doc) => {
+            const property = doc.data();
+            if (property && property.propertyType === 'commercial') {
+                document.getElementById('commercialFieldsGroup').style.display = 'block';
+            } else {
+                document.getElementById('commercialFieldsGroup').style.display = 'none';
+                // Clear the fields when hiding
+                document.getElementById('buildingNumber').value = '';
+                document.getElementById('floorNumber').value = '';
+                document.getElementById('tenantName').value = '';
+            }
+            resolve();
+        }).catch((error) => {
+            console.error('Error loading property:', error);
+            document.getElementById('commercialFieldsGroup').style.display = 'none';
+            resolve();
+        });
+    });
 }
 
 function closeTicketModal() {

@@ -45,6 +45,15 @@
                                 <input type="text" id="propertyAddress" placeholder="e.g., 123 Main St, City, State">
                             </div>
                             <div class="form-group">
+                                <label for="propertyType">Property Type *</label>
+                                <select id="propertyType" required>
+                                    <option value="">Select property type...</option>
+                                    <option value="commercial">Commercial Property Management</option>
+                                    <option value="hoa">HOA Property Management</option>
+                                    <option value="residential">Residential Property Management</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
                                 <label for="propertyDescription">Description</label>
                                 <textarea id="propertyDescription" rows="3" placeholder="Optional description or notes"></textarea>
                             </div>
@@ -74,17 +83,19 @@
                                 <label for="ticketProperty">Property *</label>
                                 <select id="ticketProperty" required></select>
                             </div>
-                            <div class="form-group">
-                                <label for="buildingNumber">Building #</label>
-                                <input type="text" id="buildingNumber" placeholder="e.g., Building 1">
-                            </div>
-                            <div class="form-group">
-                                <label for="floorNumber">Floor #</label>
-                                <input type="text" id="floorNumber" placeholder="e.g., Floor 2">
-                            </div>
-                            <div class="form-group">
-                                <label for="tenantName">Tenant Name</label>
-                                <input type="text" id="tenantName" placeholder="e.g., ABC Company">
+                            <div id="commercialFieldsGroup" style="display: none;">
+                                <div class="form-group">
+                                    <label for="buildingNumber">Building #</label>
+                                    <input type="text" id="buildingNumber" placeholder="e.g., Building 1">
+                                </div>
+                                <div class="form-group">
+                                    <label for="floorNumber">Floor #</label>
+                                    <input type="text" id="floorNumber" placeholder="e.g., Floor 2">
+                                </div>
+                                <div class="form-group">
+                                    <label for="tenantName">Tenant Name</label>
+                                    <input type="text" id="tenantName" placeholder="e.g., ABC Company">
+                                </div>
                             </div>
                             <div class="form-group">
                                 <label for="workDescription">Work Description *</label>
