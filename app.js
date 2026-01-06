@@ -66,6 +66,29 @@ function setupEventListeners() {
     if (cancelTicketFormBtn) cancelTicketFormBtn.addEventListener('click', closeTicketModal);
     if (ticketStatus) ticketStatus.addEventListener('change', handleStatusChange);
     
+    // Billing type toggle
+    const billingTypeHourly = document.getElementById('billingTypeHourly');
+    const billingTypeFlat = document.getElementById('billingTypeFlat');
+    const billingRateLabel = document.getElementById('billingRateLabel');
+    const billingRateInput = document.getElementById('billingRate');
+    
+    if (billingTypeHourly && billingTypeFlat && billingRateLabel) {
+        billingTypeHourly.addEventListener('change', updateBillingRateLabel);
+        billingTypeFlat.addEventListener('change', updateBillingRateLabel);
+    }
+    
+    function updateBillingRateLabel() {
+        if (billingTypeHourly && billingTypeFlat && billingRateLabel && billingRateInput) {
+            if (billingTypeHourly.checked) {
+                billingRateLabel.textContent = 'Billing Rate ($/hour)';
+                billingRateInput.placeholder = 'e.g., 75.00';
+            } else if (billingTypeFlat.checked) {
+                billingRateLabel.textContent = 'Flat Rate Amount ($)';
+                billingRateInput.placeholder = 'e.g., 500.00';
+            }
+        }
+    }
+    
     // File upload handlers
     const beforePhoto = document.getElementById('beforePhoto');
     const afterPhoto = document.getElementById('afterPhoto');
