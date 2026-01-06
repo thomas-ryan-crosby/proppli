@@ -3,6 +3,11 @@ let selectedPropertyId = localStorage.getItem('selectedPropertyId') || '';
 let currentView = 'active'; // 'active' or 'completed'
 let editingTicketId = null;
 let editingPropertyId = null;
+let beforePhotoFile = null;
+let afterPhotoFile = null;
+let beforePhotoUrl = null;
+let afterPhotoUrl = null;
+let completionAfterPhotoFile = null;
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
@@ -43,6 +48,10 @@ function setupEventListeners() {
     document.getElementById('afterPhoto').addEventListener('change', (e) => handleFileSelect(e, 'after'));
     document.getElementById('removeBeforePhoto').addEventListener('click', () => removeFile('before'));
     document.getElementById('removeAfterPhoto').addEventListener('click', () => removeFile('after'));
+    
+    // Completion modal file handlers
+    document.getElementById('completionAfterPhoto').addEventListener('change', (e) => handleCompletionFileSelect(e));
+    document.getElementById('removeCompletionAfterPhoto').addEventListener('click', () => removeCompletionFile());
 
     // View toggles
     document.getElementById('viewActiveBtn').addEventListener('click', () => switchView('active'));
@@ -490,18 +499,20 @@ function loadTicketForEdit(ticketId) {
             document.getElementById('managedBy').value = ticket.managedBy || '';
             document.getElementById('ticketStatus').value = ticket.status || 'Not Started';
             
+            // Always show before photo if it exists
+            if (ticket.beforePhotoUrl) {
+                beforePhotoUrl = ticket.beforePhotoUrl;
+                showPhotoPreview(ticket.beforePhotoUrl, 'before');
+            }
+            
             if (ticket.status === 'Completed') {
                 document.getElementById('completedBy').value = ticket.completedBy || '';
                 document.getElementById('howResolved').value = ticket.howResolved || '';
                 document.getElementById('completedByGroup').style.display = 'block';
                 document.getElementById('howResolvedGroup').style.display = 'block';
-                document.getElementById('fileUploadGroup').style.display = 'block';
+                document.getElementById('afterPhotoGroup').style.display = 'block';
                 
-                // Load existing photos if any
-                if (ticket.beforePhotoUrl) {
-                    beforePhotoUrl = ticket.beforePhotoUrl;
-                    showPhotoPreview(ticket.beforePhotoUrl, 'before');
-                }
+                // Load existing after photo if any
                 if (ticket.afterPhotoUrl) {
                     afterPhotoUrl = ticket.afterPhotoUrl;
                     showPhotoPreview(ticket.afterPhotoUrl, 'after');
@@ -665,6 +676,11 @@ window.markTicketComplete = function(ticketId) {
     editingTicketId = ticketId;
     document.getElementById('completionModal').classList.add('show');
     document.getElementById('completionCompletedBy').value = '';
+    document.getElementById('completionHowResolved').value = '';
+    document.getElementById('completionAfterPhoto').value = '';
+    document.getElementById('completionAfterPhotoPreview').innerHTML = '';
+    document.getElementById('removeCompletionAfterPhoto').style.display = 'none';
+    completionAfterPhotoFile = null;
     document.getElementById('completionCompletedBy').focus();
 };
 
@@ -676,20 +692,49 @@ function closeCompletionModal() {
 function handleTicketCompletion(e) {
     e.preventDefault();
     const completedBy = document.getElementById('completionCompletedBy').value.trim();
+    const howResolved = document.getElementById('completionHowResolved').value.trim();
 
     if (!completedBy) {
         alert('Please enter who completed the work');
         return;
     }
 
-    db.collection('tickets').doc(editingTicketId).update({
-        status: 'Completed',
-        completedBy: completedBy,
-        dateCompleted: firebase.firestore.FieldValue.serverTimestamp(),
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    // Disable submit button
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
+    }
 
-    closeCompletionModal();
+    // Upload after photo if provided
+    const uploadPromise = completionAfterPhotoFile 
+        ? uploadPhoto(completionAfterPhotoFile, editingTicketId, 'after')
+        : Promise.resolve(null);
+
+    uploadPromise.then((afterPhotoUrl) => {
+        const updateData = {
+            status: 'Completed',
+            completedBy: completedBy,
+            howResolved: howResolved || null,
+            dateCompleted: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        if (afterPhotoUrl) {
+            updateData.afterPhotoUrl = afterPhotoUrl;
+        }
+
+        return db.collection('tickets').doc(editingTicketId).update(updateData);
+    }).then(() => {
+        closeCompletionModal();
+    }).catch((error) => {
+        console.error('Error completing ticket:', error);
+        alert('Error completing ticket: ' + error.message);
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Mark as Complete';
+        }
+    });
 }
 
 window.editTicket = function(ticketId) {
