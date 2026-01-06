@@ -650,6 +650,12 @@ function createTicketCard(ticket) {
                     <p>${escapeHtml(ticket.howResolved)}</p>
                 </div>
             ` : ''}
+            ${ticket.detailedDescription ? `
+                <div class="expanded-detail-section">
+                    <h4>Detailed Description</h4>
+                    <p>${escapeHtml(ticket.detailedDescription)}</p>
+                </div>
+            ` : ''}
             ${(ticket.beforePhotoUrl || ticket.afterPhotoUrl) ? `
                 <div class="expanded-detail-section">
                     <h4>Photos</h4>
@@ -669,7 +675,7 @@ function createTicketCard(ticket) {
                     </div>
                 </div>
             ` : ''}
-            ${!ticket.howResolved && !ticket.beforePhotoUrl && !ticket.afterPhotoUrl ? `
+            ${!ticket.howResolved && !ticket.beforePhotoUrl && !ticket.afterPhotoUrl && !ticket.detailedDescription ? `
                 <div class="expanded-detail-section">
                     <p style="color: #999; text-align: center; padding: 20px;">No additional details available</p>
                 </div>
