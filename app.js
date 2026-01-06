@@ -598,6 +598,8 @@ function handleTicketSubmit(e) {
     const propertyId = document.getElementById('ticketProperty').value;
     const workDescription = document.getElementById('workDescription').value.trim();
     const timeAllocated = parseFloat(document.getElementById('timeAllocated').value);
+    const billingRateInput = document.getElementById('billingRate');
+    const billingRate = billingRateInput && billingRateInput.value ? parseFloat(billingRateInput.value) : null;
     const requestedBy = document.getElementById('requestedBy').value.trim();
     const managedBy = document.getElementById('managedBy').value.trim();
     const status = document.getElementById('ticketStatus').value;
