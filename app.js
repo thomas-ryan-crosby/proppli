@@ -442,31 +442,6 @@ function createTicketCard(ticket) {
                     <span class="ticket-detail-value" style="font-weight: 600; color: #2e7d32;">${escapeHtml(ticket.completedBy)}</span>
                 </div>
             ` : ''}
-            ${isCompleted && ticket.howResolved ? `
-                <div class="ticket-detail" style="grid-column: 1 / -1;">
-                    <span class="ticket-detail-label">How Resolved</span>
-                    <span class="ticket-detail-value">${escapeHtml(ticket.howResolved)}</span>
-                </div>
-            ` : ''}
-            ${isCompleted && (ticket.beforePhotoUrl || ticket.afterPhotoUrl) ? `
-                <div class="ticket-detail" style="grid-column: 1 / -1;">
-                    <span class="ticket-detail-label">Photos</span>
-                    <div class="ticket-photos">
-                        ${ticket.beforePhotoUrl ? `
-                            <div class="photo-item">
-                                <span class="photo-label">Before</span>
-                                <img src="${escapeHtml(ticket.beforePhotoUrl)}" alt="Before" class="ticket-photo" onclick="openPhotoModal('${escapeHtml(ticket.beforePhotoUrl)}')">
-                            </div>
-                        ` : ''}
-                        ${ticket.afterPhotoUrl ? `
-                            <div class="photo-item">
-                                <span class="photo-label">After</span>
-                                <img src="${escapeHtml(ticket.afterPhotoUrl)}" alt="After" class="ticket-photo" onclick="openPhotoModal('${escapeHtml(ticket.afterPhotoUrl)}')">
-                            </div>
-                        ` : ''}
-                    </div>
-                </div>
-            ` : ''}
             <div class="ticket-detail">
                 <span class="ticket-detail-label">Date Created</span>
                 <span class="ticket-detail-value">${formatDate(ticket.dateCreated)}</span>
