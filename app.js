@@ -734,3 +734,114 @@ function formatDate(timestamp) {
         minute: '2-digit'
     });
 }
+
+// File Upload Functions
+function handleFileSelect(event, type) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+        alert('Please select an image file');
+        return;
+    }
+    
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+        alert('File size must be less than 5MB');
+        return;
+    }
+    
+    if (type === 'before') {
+        beforePhotoFile = file;
+    } else {
+        afterPhotoFile = file;
+    }
+    
+    // Show preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        showPhotoPreview(e.target.result, type);
+    };
+    reader.readAsDataURL(file);
+}
+
+function showPhotoPreview(url, type) {
+    const previewId = type === 'before' ? 'beforePhotoPreview' : 'afterPhotoPreview';
+    const removeBtnId = type === 'before' ? 'removeBeforePhoto' : 'removeAfterPhoto';
+    
+    const preview = document.getElementById(previewId);
+    preview.innerHTML = `<img src="${url}" alt="${type} preview" style="max-width: 200px; max-height: 200px; border-radius: 4px; margin-top: 10px;">`;
+    document.getElementById(removeBtnId).style.display = 'inline-block';
+}
+
+function removeFile(type) {
+    if (type === 'before') {
+        beforePhotoFile = null;
+        beforePhotoUrl = null;
+        document.getElementById('beforePhoto').value = '';
+        document.getElementById('beforePhotoPreview').innerHTML = '';
+        document.getElementById('removeBeforePhoto').style.display = 'none';
+    } else {
+        afterPhotoFile = null;
+        afterPhotoUrl = null;
+        document.getElementById('afterPhoto').value = '';
+        document.getElementById('afterPhotoPreview').innerHTML = '';
+        document.getElementById('removeAfterPhoto').style.display = 'none';
+    }
+}
+
+function uploadPhoto(file, ticketId, type) {
+    return new Promise((resolve, reject) => {
+        // Use a temporary ID if creating new ticket
+        const fileName = ticketId === 'temp' 
+            ? `temp_${type}_${Date.now()}_${file.name}`
+            : `${ticketId}_${type}_${Date.now()}_${file.name}`;
+        const storageRef = storage.ref().child(`tickets/${fileName}`);
+        
+        const uploadTask = storageRef.put(file);
+        
+        uploadTask.on('state_changed',
+            (snapshot) => {
+                // Progress tracking (optional)
+                const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                console.log(`Upload ${type} is ${progress}% done`);
+            },
+            (error) => {
+                console.error('Upload error:', error);
+                reject(error);
+            },
+            () => {
+                uploadTask.snapshot.ref.getDownloadURL().then((downloadURL) => {
+                    resolve(downloadURL);
+                }).catch(reject);
+            }
+        );
+    });
+}
+
+// Photo modal for viewing full-size images
+window.openPhotoModal = function(photoUrl) {
+    const modal = document.createElement('div');
+    modal.className = 'modal show';
+    modal.style.zIndex = '2000';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 90vw; max-height: 90vh;">
+            <div class="modal-header">
+                <h2>Photo</h2>
+                <button class="close-btn" onclick="this.closest('.modal').remove()">&times;</button>
+            </div>
+            <div class="modal-body" style="text-align: center; padding: 20px;">
+                <img src="${escapeHtml(photoUrl)}" alt="Full size" style="max-width: 100%; max-height: 70vh; border-radius: 8px;">
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    
+    // Close on background click
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    });
+};
