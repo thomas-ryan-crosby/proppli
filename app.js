@@ -276,14 +276,23 @@ window.editProperty = function(id) {
     db.collection('properties').doc(id).get().then((doc) => {
         const property = doc.data();
         if (property) {
+            editingPropertyId = id;
+            // Open modal first, then set values (so reset doesn't clear them)
+            document.getElementById('propertyModal').classList.add('show');
+            // Set values after modal is open
             document.getElementById('propertyId').value = id;
             document.getElementById('propertyName').value = property.name || '';
             document.getElementById('propertyAddress').value = property.address || '';
             document.getElementById('propertyType').value = property.propertyType || '';
             document.getElementById('propertyDescription').value = property.description || '';
-            editingPropertyId = id;
-            openPropertyModal();
+            // Focus on property name input
+            setTimeout(() => {
+                document.getElementById('propertyName').focus();
+            }, 100);
         }
+    }).catch((error) => {
+        console.error('Error loading property:', error);
+        alert('Error loading property: ' + error.message);
     });
 };
 
