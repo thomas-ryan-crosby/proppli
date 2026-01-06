@@ -658,6 +658,12 @@ function createTicketCard(ticket) {
                 <span class="ticket-detail-label">Date Created</span>
                 <span class="ticket-detail-value">${formatDate(ticket.dateCreated)}</span>
             </div>
+            ${ticket.lastUpdated || ticket.updatedAt ? `
+                <div class="ticket-detail">
+                    <span class="ticket-detail-label">Last Updated</span>
+                    <span class="ticket-detail-value">${formatDate(ticket.lastUpdated || ticket.updatedAt)}</span>
+                </div>
+            ` : ''}
             ${isCompleted ? `
                 <div class="ticket-detail">
                     <span class="ticket-detail-label">Date Completed</span>
@@ -1050,6 +1056,7 @@ function handleTicketSubmit(e) {
                 managedBy,
                 status: status || 'Not Started',
                 dateCreated: firebase.firestore.FieldValue.serverTimestamp(),
+                lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             };
 
@@ -1172,6 +1179,7 @@ function handleTicketCompletion(e) {
             completedBy: completedBy,
             howResolved: howResolved || null,
             dateCompleted: firebase.firestore.FieldValue.serverTimestamp(),
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
 
