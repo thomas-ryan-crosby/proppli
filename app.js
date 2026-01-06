@@ -289,7 +289,47 @@ function loadTickets() {
             tickets[doc.id] = { id: doc.id, ...doc.data() };
         });
         renderTickets(tickets);
+        updateMetrics(tickets);
     });
+}
+
+// Metrics Dashboard
+function updateMetrics(tickets) {
+    let activeCount = 0;
+    let completedCount = 0;
+    let totalHours = 0;
+    let completedHours = 0;
+    let estimatedCost = 0;
+    let totalCost = 0;
+
+    Object.values(tickets).forEach(ticket => {
+        // Filter by selected property if one is selected
+        if (selectedPropertyId && ticket.propertyId !== selectedPropertyId) {
+            return;
+        }
+
+        const hours = ticket.timeAllocated || 0;
+        const billingRate = ticket.billingRate || 0;
+        const cost = hours * billingRate;
+
+        if (ticket.status === 'Completed') {
+            completedCount++;
+            completedHours += hours;
+            totalCost += cost;
+        } else {
+            activeCount++;
+            totalHours += hours;
+            estimatedCost += cost;
+        }
+    });
+
+    // Update metric displays
+    document.getElementById('metricActiveTickets').textContent = activeCount;
+    document.getElementById('metricCompletedTickets').textContent = completedCount;
+    document.getElementById('metricTotalHours').textContent = totalHours.toFixed(1);
+    document.getElementById('metricCompletedHours').textContent = completedHours.toFixed(1);
+    document.getElementById('metricEstimatedCost').textContent = '$' + estimatedCost.toFixed(2);
+    document.getElementById('metricTotalCost').textContent = '$' + totalCost.toFixed(2);
 }
 
 function renderTickets(tickets) {
@@ -501,6 +541,7 @@ function loadTicketForEdit(ticketId) {
             document.getElementById('ticketProperty').value = ticket.propertyId || '';
             document.getElementById('workDescription').value = ticket.workDescription || '';
             document.getElementById('timeAllocated').value = ticket.timeAllocated || '';
+            document.getElementById('billingRate').value = ticket.billingRate || '';
             document.getElementById('requestedBy').value = ticket.requestedBy || '';
             document.getElementById('managedBy').value = ticket.managedBy || '';
             document.getElementById('ticketStatus').value = ticket.status || 'Not Started';
@@ -593,6 +634,7 @@ function handleTicketSubmit(e) {
                     propertyId,
                     workDescription,
                     timeAllocated,
+                    billingRate: billingRate || null,
                     requestedBy,
                     managedBy,
                     status,
@@ -636,6 +678,7 @@ function handleTicketSubmit(e) {
                 propertyId,
                 workDescription,
                 timeAllocated,
+                billingRate: billingRate || null,
                 requestedBy,
                 managedBy,
                 status: status || 'Not Started',
