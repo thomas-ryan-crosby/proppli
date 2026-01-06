@@ -679,6 +679,7 @@ function createTicketCard(ticket) {
             <button class="btn-secondary btn-small" onclick="toggleTicketDetails('${ticket.id}')">
                 <span id="toggleIcon-${ticket.id}">▼</span> <span id="toggleText-${ticket.id}">Show Details</span>
             </button>
+            <button class="btn-danger btn-small" onclick="openDeleteTicketModal('${ticket.id}')">Delete</button>
         </div>
         <div class="ticket-expanded-details" id="expandedDetails-${ticket.id}" style="display: none;">
             ${ticket.howResolved ? `

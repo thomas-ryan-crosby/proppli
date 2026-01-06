@@ -210,6 +210,29 @@
                 </div>
             </div>
 
+            <!-- Delete Ticket Modal -->
+            <div id="deleteTicketModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2>Delete Ticket</h2>
+                        <button class="close-btn" id="closeDeleteTicketModal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="deleteTicketForm">
+                            <div class="form-group">
+                                <label for="deleteReason">Reason for Deletion *</label>
+                                <textarea id="deleteReason" rows="4" required placeholder="Please provide a reason for deleting this ticket..."></textarea>
+                                <small style="color: #666; font-size: 12px;">This ticket will be moved to the deleted section and permanently removed after 30 days.</small>
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="btn-danger">Delete Ticket</button>
+                                <button type="button" class="btn-secondary" id="cancelDeleteTicketForm">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
             <!-- Completion Modal -->
             <div id="completionModal" class="modal">
                 <div class="modal-content">
