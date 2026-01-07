@@ -104,8 +104,7 @@ function showPage(page) {
     if (page === 'properties') {
         loadProperties();
     } else if (page === 'tenants') {
-        // Load tenants when implemented
-        console.log('Tenants page - to be implemented');
+        loadTenants();
     } else if (page === 'maintenance') {
         loadTickets();
     }

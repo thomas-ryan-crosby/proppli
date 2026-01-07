@@ -624,6 +624,97 @@
                     </div>
                 </div>
             </main>
+            
+            <!-- Tenant Modal -->
+            <div id="tenantModal" class="modal">
+                <div class="modal-content" style="max-width: 800px;">
+                    <div class="modal-header">
+                        <h2 id="tenantModalTitle">Add Tenant</h2>
+                        <button class="close-btn" id="closeTenantModal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="tenantForm">
+                            <input type="hidden" id="tenantId">
+                            
+                            <!-- Basic Information -->
+                            <h3 style="margin: 20px 0 15px 0; color: #667eea; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px;">Basic Information</h3>
+                            
+                            <div class="form-group">
+                                <label for="tenantName">Tenant Name *</label>
+                                <input type="text" id="tenantName" required placeholder="e.g., John Smith, ABC Company">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="tenantType">Tenant Type *</label>
+                                <select id="tenantType" required>
+                                    <option value="">Select tenant type...</option>
+                                    <option value="Commercial">Commercial</option>
+                                    <option value="Residential">Residential</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="tenantStatus">Status *</label>
+                                <select id="tenantStatus" required>
+                                    <option value="Active">Active</option>
+                                    <option value="Past">Past</option>
+                                    <option value="Prospect">Prospect</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="tenantMailingAddress">Mailing Address</label>
+                                <input type="text" id="tenantMailingAddress" placeholder="e.g., 123 Main St, City, State ZIP">
+                            </div>
+                            
+                            <!-- Commercial Specific Fields -->
+                            <div id="commercialTenantFields" style="display: none;">
+                                <h3 style="margin: 20px 0 15px 0; color: #667eea; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px;">Commercial Information</h3>
+                                
+                                <div class="form-group">
+                                    <label for="tenantTaxId">Tax ID / EIN</label>
+                                    <input type="text" id="tenantTaxId" placeholder="e.g., 12-3456789">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="tenantBusinessType">Business Type</label>
+                                    <input type="text" id="tenantBusinessType" placeholder="e.g., Retail, Office, Restaurant">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="tenantNumberOfEmployees">Number of Employees</label>
+                                    <input type="number" id="tenantNumberOfEmployees" min="0" step="1" placeholder="e.g., 25">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="tenantWebsite">Website</label>
+                                    <input type="url" id="tenantWebsite" placeholder="e.g., https://example.com">
+                                </div>
+                            </div>
+                            
+                            <!-- Residential Specific Fields -->
+                            <div id="residentialTenantFields" style="display: none;">
+                                <h3 style="margin: 20px 0 15px 0; color: #667eea; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px;">Residential Information</h3>
+                                
+                                <div class="form-group">
+                                    <label for="tenantDateOfBirth">Date of Birth</label>
+                                    <input type="date" id="tenantDateOfBirth">
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="tenantNotes">Notes</label>
+                                <textarea id="tenantNotes" rows="3" placeholder="Additional notes about the tenant..."></textarea>
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button type="submit" class="btn-primary">Save Tenant</button>
+                                <button type="button" class="btn-secondary" id="cancelTenantForm">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
