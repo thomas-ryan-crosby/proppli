@@ -3265,12 +3265,12 @@ async function renderTenantsTableView(tenants) {
             
             html += `
                 <tr data-tenant-id="${tenant.id}">
-                    <td class="tenant-name-cell">${escapeHtml(tenant.tenantName || 'Unnamed Tenant')}</td>
-                    <td>${typeBadge}</td>
-                    <td class="tenant-status-cell">${statusBadge}</td>
-                    <td class="tenant-contacts-cell"><span style="color: #999;">Loading...</span></td>
-                    <td class="tenant-occupancies-cell">${occupanciesHtml}</td>
-                    <td class="tenant-actions-cell">
+                    <td class="tenant-name-cell" style="vertical-align: top;">${escapeHtml(tenant.tenantName || 'Unnamed Tenant')}</td>
+                    <td style="vertical-align: top;">${typeBadge}</td>
+                    <td class="tenant-status-cell" style="vertical-align: top;">${statusBadge}</td>
+                    <td class="tenant-contacts-cell" style="vertical-align: top;"><span style="color: #999;">Loading...</span></td>
+                    <td class="tenant-occupancies-cell" style="vertical-align: top;">${occupanciesHtml}</td>
+                    <td class="tenant-actions-cell" style="vertical-align: top;">
                         <button class="btn-primary btn-small" onclick="viewTenantDetail('${tenant.id}')">View</button>
                         <button class="btn-secondary btn-small" onclick="editTenant('${tenant.id}')">Edit</button>
                         <button class="btn-danger btn-small" onclick="deleteTenant('${tenant.id}')">Delete</button>
