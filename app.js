@@ -3682,6 +3682,12 @@ window.addOccupancy = function(tenantId) {
     document.getElementById('occupancyTenantId').value = tenantId;
     document.getElementById('occupancyForm').reset();
     
+    // Reset unit select
+    const unitSelect = document.getElementById('occupancyUnitId');
+    if (unitSelect) {
+        unitSelect.innerHTML = '<option value="">No Unit (Property Level)</option>';
+    }
+    
     const submitBtn = document.querySelector('#occupancyForm button[type="submit"]');
     if (submitBtn) {
         submitBtn.disabled = false;
@@ -3689,21 +3695,37 @@ window.addOccupancy = function(tenantId) {
         submitBtn.classList.remove('saving');
     }
     
+    // Load properties first, then show modal and set up event listener
     loadPropertiesForOccupancy().then(() => {
+        const propertySelect = document.getElementById('occupancyPropertyId');
+        if (propertySelect) {
+            // Remove any existing change listeners by cloning
+            const newPropertySelect = propertySelect.cloneNode(true);
+            propertySelect.parentNode.replaceChild(newPropertySelect, propertySelect);
+            
+            // Add change listener to load units when property changes
+            newPropertySelect.addEventListener('change', function() {
+                const selectedPropertyId = this.value;
+                if (selectedPropertyId) {
+                    loadUnitsForOccupancy(selectedPropertyId);
+                } else {
+                    const unitSelect = document.getElementById('occupancyUnitId');
+                    if (unitSelect) {
+                        unitSelect.innerHTML = '<option value="">No Unit (Property Level)</option>';
+                    }
+                }
+            });
+        }
+        
         document.getElementById('occupancyModal').classList.add('show');
         setTimeout(() => {
-            document.getElementById('occupancyPropertyId').focus();
+            const propertySelect = document.getElementById('occupancyPropertyId');
+            if (propertySelect) propertySelect.focus();
         }, 100);
+    }).catch((error) => {
+        console.error('Error loading properties:', error);
+        alert('Error loading properties. Please try again.');
     });
-    
-    const propertySelect = document.getElementById('occupancyPropertyId');
-    if (propertySelect) {
-        const newPropertySelect = propertySelect.cloneNode(true);
-        propertySelect.parentNode.replaceChild(newPropertySelect, propertySelect);
-        newPropertySelect.addEventListener('change', function() {
-            loadUnitsForOccupancy(this.value);
-        });
-    }
 };
 
 window.editOccupancy = function(occupancyId) {
