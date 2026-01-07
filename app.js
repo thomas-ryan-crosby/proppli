@@ -1114,8 +1114,8 @@ function handlePropertySubmit(e) {
             address: address || null,
             propertyType: propertyType,
             status: status,
-            squareFootage: squareFootage,
-            yearBuilt: yearBuilt,
+            squareFootage: propertyType === 'hoa' ? null : squareFootage, // HOA doesn't need square footage
+            yearBuilt: propertyType === 'hoa' ? null : yearBuilt, // HOA doesn't need year built
             numberOfUnits: numberOfUnits,
             lotSize: lotSize,
             numberOfFloors: numberOfFloors,
