@@ -3401,6 +3401,11 @@ async function loadContactsForTableView(tenants) {
                 contactsCell.innerHTML = contactItems.length > 0 
                     ? contactItems.join('') 
                     : '<span style="color: #999;">No contacts</span>';
+                
+                // Remove any flex display that might interfere
+                contactsCell.style.display = '';
+                contactsCell.style.flexDirection = '';
+                contactsCell.style.gap = '';
             }
         }
     });

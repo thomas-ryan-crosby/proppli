@@ -1195,6 +1195,7 @@ hr {
 .tenants-table {
     width: 100%;
     border-collapse: collapse;
+    table-layout: auto;
 }
 
 .tenants-table thead {
@@ -1210,6 +1211,7 @@ hr {
     font-size: 0.9rem;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    vertical-align: top;
 }
 
 .tenants-table tbody tr {
@@ -1229,41 +1231,41 @@ hr {
     padding: 15px 20px;
     color: #4a4a4a;
     font-size: 0.95rem;
-    vertical-align: middle;
+    vertical-align: top;
+    text-align: left;
 }
 
 .tenants-table .tenant-name-cell {
     font-weight: 600;
     color: #1a1a1a;
+    vertical-align: top;
 }
 
 .tenants-table .tenant-status-cell {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    vertical-align: top;
 }
 
 .tenants-table .tenant-contacts-cell {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
     min-width: 200px;
+    vertical-align: top;
 }
 
 .tenants-table .contact-info {
     font-size: 0.9rem;
     color: #4a4a4a;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    line-height: 1.4;
+    margin-bottom: 6px;
+    line-height: 1.5;
+    white-space: nowrap;
+}
+
+.tenants-table .contact-info:last-child {
+    margin-bottom: 0;
 }
 
 .tenants-table .contact-info a {
     color: #667eea;
     text-decoration: none;
     font-weight: 500;
-    word-break: break-all;
 }
 
 .tenants-table .contact-info a:hover {
@@ -1272,9 +1274,7 @@ hr {
 }
 
 .tenants-table .tenant-occupancies-cell {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+    vertical-align: top;
 }
 
 .tenants-table .occupancy-info {
@@ -1283,15 +1283,27 @@ hr {
     padding: 6px 10px;
     background: #f0f0f0;
     border-radius: 6px;
-    display: inline-block;
+    display: block;
     font-weight: 500;
     white-space: nowrap;
+    margin-bottom: 6px;
+}
+
+.tenants-table .occupancy-info:last-child {
+    margin-bottom: 0;
 }
 
 .tenants-table .tenant-actions-cell {
-    display: flex;
-    gap: 8px;
     white-space: nowrap;
+    vertical-align: top;
+}
+
+.tenants-table .tenant-actions-cell .btn-small {
+    margin-right: 8px;
+}
+
+.tenants-table .tenant-actions-cell .btn-small:last-child {
+    margin-right: 0;
 }
 
 .tenants-table .btn-small {
