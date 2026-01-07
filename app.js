@@ -3754,11 +3754,36 @@ window.editOccupancy = function(occupancyId) {
             }
             
             loadPropertiesForOccupancy().then(() => {
-                document.getElementById('occupancyPropertyId').value = occupancy.propertyId;
-                return loadUnitsForOccupancy(occupancy.propertyId);
+                const propertySelect = document.getElementById('occupancyPropertyId');
+                if (propertySelect) {
+                    propertySelect.value = occupancy.propertyId;
+                    
+                    // Set up change listener for property select
+                    const newPropertySelect = propertySelect.cloneNode(true);
+                    propertySelect.parentNode.replaceChild(newPropertySelect, propertySelect);
+                    newPropertySelect.value = occupancy.propertyId;
+                    
+                    newPropertySelect.addEventListener('change', function() {
+                        const selectedPropertyId = this.value;
+                        if (selectedPropertyId) {
+                            loadUnitsForOccupancy(selectedPropertyId);
+                        } else {
+                            const unitSelect = document.getElementById('occupancyUnitId');
+                            if (unitSelect) {
+                                unitSelect.innerHTML = '<option value="">No Unit (Property Level)</option>';
+                            }
+                        }
+                    });
+                    
+                    return loadUnitsForOccupancy(occupancy.propertyId);
+                }
+                return Promise.resolve();
             }).then(() => {
                 if (occupancy.unitId) {
-                    document.getElementById('occupancyUnitId').value = occupancy.unitId;
+                    const unitSelect = document.getElementById('occupancyUnitId');
+                    if (unitSelect) {
+                        unitSelect.value = occupancy.unitId;
+                    }
                 }
                 
                 const submitBtn = document.querySelector('#occupancyForm button[type="submit"]');
