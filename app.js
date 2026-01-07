@@ -860,7 +860,7 @@ function loadBuildingsForUnitSelect(propertyId) {
         });
 }
 
-window.addUnit = function(propertyId) {
+window.addUnit = function(propertyId, buildingId = null) {
     currentPropertyIdForDetail = propertyId;
     editingUnitId = null;
     document.getElementById('unitModalTitle').textContent = 'Add Unit/Space';
@@ -868,13 +868,28 @@ window.addUnit = function(propertyId) {
     document.getElementById('unitPropertyId').value = propertyId;
     document.getElementById('unitForm').reset();
     
-    // Load buildings for the select dropdown
-    loadBuildingsForUnitSelect(propertyId);
+    // Reset button state
+    const submitBtn = document.querySelector('#unitForm button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Save Unit';
+        submitBtn.classList.remove('saving');
+    }
     
-    document.getElementById('unitModal').classList.add('show');
-    setTimeout(() => {
-        document.getElementById('unitNumber').focus();
-    }, 100);
+    // Load buildings for the select dropdown
+    loadBuildingsForUnitSelect(propertyId).then(() => {
+        if (buildingId) {
+            document.getElementById('unitBuildingId').value = buildingId;
+        }
+        document.getElementById('unitModal').classList.add('show');
+        setTimeout(() => {
+            document.getElementById('unitNumber').focus();
+        }, 100);
+    });
+};
+
+window.addUnitToBuilding = function(propertyId, buildingId) {
+    addUnit(propertyId, buildingId);
 };
 
 window.editUnit = function(unitId) {
@@ -894,17 +909,24 @@ window.editUnit = function(unitId) {
             document.getElementById('unitStatus').value = unit.status || 'Vacant';
             document.getElementById('unitMonthlyRent').value = unit.monthlyRent || '';
             
+            // Reset button state
+            const submitBtn = document.querySelector('#unitForm button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Save Unit';
+                submitBtn.classList.remove('saving');
+            }
+            
             // Load buildings and set selected building
             loadBuildingsForUnitSelect(unit.propertyId).then(() => {
                 if (unit.buildingId) {
                     document.getElementById('unitBuildingId').value = unit.buildingId;
                 }
+                document.getElementById('unitModal').classList.add('show');
+                setTimeout(() => {
+                    document.getElementById('unitNumber').focus();
+                }, 100);
             });
-            
-            document.getElementById('unitModal').classList.add('show');
-            setTimeout(() => {
-                document.getElementById('unitNumber').focus();
-            }, 100);
         }
     }).catch((error) => {
         console.error('Error loading unit:', error);
@@ -933,6 +955,18 @@ window.deleteUnit = function(unitId) {
 function handleUnitSubmit(e) {
     e.preventDefault();
     
+    // Get submit button early for state management
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    
+    // Helper function to reset button state
+    const resetButtonState = () => {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save Unit';
+            submitBtn.classList.remove('saving');
+        }
+    };
+    
     const id = document.getElementById('unitId').value;
     const propertyId = document.getElementById('unitPropertyId').value;
     const unitNumber = document.getElementById('unitNumber').value.trim();
@@ -945,31 +979,44 @@ function handleUnitSubmit(e) {
     const status = document.getElementById('unitStatus').value;
     const monthlyRent = parseFloat(document.getElementById('unitMonthlyRent').value) || null;
 
+    // Validation - ensure button is enabled if validation fails
     if (!unitNumber) {
         alert('Unit number/identifier is required');
+        resetButtonState();
         return;
     }
     
     if (!unitType) {
         alert('Unit type is required');
+        resetButtonState();
         return;
     }
     
     if (!status) {
         alert('Unit status is required');
+        resetButtonState();
         return;
     }
     
     if (!propertyId) {
         alert('Property ID is missing');
+        resetButtonState();
         return;
     }
 
-    const submitBtn = e.target.querySelector('button[type="submit"]');
+    // Disable submit button (only after validation passes)
     if (submitBtn) {
         submitBtn.disabled = true;
         submitBtn.textContent = 'Saving...';
+        submitBtn.classList.add('saving');
     }
+    
+    // Set a timeout safety mechanism (30 seconds)
+    const timeoutId = setTimeout(() => {
+        console.error('Unit save operation timed out');
+        resetButtonState();
+        alert('The save operation is taking longer than expected. Please check your connection and try again.');
+    }, 30000);
 
     const unitData = {
         propertyId: propertyId,
@@ -992,37 +1039,37 @@ function handleUnitSubmit(e) {
             unitData.createdAt = existing?.createdAt || firebase.firestore.FieldValue.serverTimestamp();
             return db.collection('units').doc(id).update(unitData);
         }).then(() => {
+            clearTimeout(timeoutId);
             console.log('Unit updated successfully');
+            resetButtonState();
             closeUnitModal();
             if (currentPropertyIdForDetail) {
                 loadUnits(currentPropertyIdForDetail);
             }
         }).catch((error) => {
+            clearTimeout(timeoutId);
             console.error('Error updating unit:', error);
             alert('Error saving unit: ' + error.message);
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Save Unit';
-            }
+            resetButtonState();
         });
     } else {
         // Create new
         unitData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
         db.collection('units').add(unitData)
             .then((docRef) => {
+                clearTimeout(timeoutId);
                 console.log('Unit created successfully with ID:', docRef.id);
+                resetButtonState();
                 closeUnitModal();
                 if (currentPropertyIdForDetail) {
                     loadUnits(currentPropertyIdForDetail);
                 }
             })
             .catch((error) => {
+                clearTimeout(timeoutId);
                 console.error('Error creating unit:', error);
                 alert('Error saving unit: ' + error.message);
-                if (submitBtn) {
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = 'Save Unit';
-                }
+                resetButtonState();
             });
     }
 }
@@ -1036,6 +1083,14 @@ function closeUnitModal() {
     document.getElementById('unitId').value = '';
     document.getElementById('unitPropertyId').value = '';
     editingUnitId = null;
+    
+    // Reset button state
+    const submitBtn = document.querySelector('#unitForm button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Save Unit';
+        submitBtn.classList.remove('saving');
+    }
 }
 
 function openPropertyModal() {
