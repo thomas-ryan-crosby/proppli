@@ -315,6 +315,25 @@ function setupEventListeners() {
     if (closeUnitModalBtn) closeUnitModalBtn.addEventListener('click', closeUnitModal);
     if (cancelUnitFormBtn) cancelUnitFormBtn.addEventListener('click', closeUnitModal);
     
+    // Tenant management
+    const addTenantBtn = document.getElementById('addTenantBtn');
+    const tenantForm = document.getElementById('tenantForm');
+    const closeTenantModalBtn = document.getElementById('closeTenantModal');
+    const cancelTenantFormBtn = document.getElementById('cancelTenantForm');
+    const tenantTypeSelect = document.getElementById('tenantType');
+    
+    if (addTenantBtn) {
+        addTenantBtn.addEventListener('click', () => {
+            showAddTenantForm();
+        });
+    }
+    if (tenantForm) tenantForm.addEventListener('submit', handleTenantSubmit);
+    if (closeTenantModalBtn) closeTenantModalBtn.addEventListener('click', closeTenantModal);
+    if (cancelTenantFormBtn) cancelTenantFormBtn.addEventListener('click', closeTenantModal);
+    if (tenantTypeSelect) {
+        tenantTypeSelect.addEventListener('change', updateTenantTypeFields);
+    }
+    
     // Also close building modal when clicking outside
     window.addEventListener('click', (e) => {
         if (e.target.classList.contains('modal')) {
@@ -334,6 +353,7 @@ function setupEventListeners() {
             closeDeleteTicketModal();
             closeBuildingModal();
             closeUnitModal();
+            closeTenantModal();
         }
     });
 }
