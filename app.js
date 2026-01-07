@@ -867,13 +867,29 @@ function openPropertyModal() {
 }
 
 function showAddPropertyForm() {
-    document.getElementById('propertyForm').style.display = 'block';
-    document.getElementById('propertyForm').reset();
+    // Open the modal first
+    const modal = document.getElementById('propertyModal');
+    if (modal) {
+        modal.classList.add('show');
+    }
+    
+    // Show and reset the form
+    const form = document.getElementById('propertyForm');
+    if (form) {
+        form.style.display = 'block';
+        form.reset();
+    }
+    
     document.getElementById('propertyId').value = '';
     editingPropertyId = null;
+    
+    // Reset field visibility
+    updatePropertyTypeFields();
+    
     // Focus on property name input for quick entry
     setTimeout(() => {
-        document.getElementById('propertyName').focus();
+        const nameInput = document.getElementById('propertyName');
+        if (nameInput) nameInput.focus();
     }, 100);
 }
 
