@@ -3278,3 +3278,620 @@ function handleTenantSubmit(e) {
     }
 }
 
+
+// Tenant Detail View
+let currentTenantIdForDetail = null;
+let editingContactId = null;
+let editingOccupancyId = null;
+
+window.viewTenantDetail = function(tenantId) {
+    currentTenantIdForDetail = tenantId;
+    const tenantsList = document.querySelector('.tenants-page-content .section');
+    const tenantDetailView = document.getElementById('tenantDetailView');
+    if (tenantsList) tenantsList.style.display = 'none';
+    if (tenantDetailView) {
+        tenantDetailView.style.display = 'block';
+        tenantDetailView.setAttribute('data-tenant-id', tenantId);
+        db.collection('tenants').doc(tenantId).get().then((doc) => {
+            const tenant = doc.data();
+            if (tenant) {
+                const nameElement = document.getElementById('tenantDetailName');
+                if (nameElement) nameElement.textContent = tenant.tenantName || 'Unnamed Tenant';
+            }
+        });
+        loadContacts(tenantId);
+        loadOccupancies(tenantId);
+    }
+};
+
+window.backToTenants = function() {
+    const tenantsList = document.querySelector('.tenants-page-content .section');
+    const tenantDetailView = document.getElementById('tenantDetailView');
+    if (tenantsList) tenantsList.style.display = 'block';
+    if (tenantDetailView) tenantDetailView.style.display = 'none';
+};
+
+// Contact Management
+function loadContacts(tenantId) {
+    const contactsList = document.getElementById('contactsList');
+    if (!contactsList) return;
+    
+    db.collection('tenantContacts')
+        .where('tenantId', '==', tenantId)
+        .get()
+        .then((querySnapshot) => {
+            contactsList.innerHTML = '';
+            
+            if (querySnapshot.empty) {
+                contactsList.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">No contacts yet. Add one to get started.</p>';
+                return;
+            }
+            
+            querySnapshot.forEach((doc) => {
+                const contact = { id: doc.id, ...doc.data() };
+                const contactItem = document.createElement('div');
+                contactItem.className = 'unit-item';
+                
+                const classifications = contact.classifications || [];
+                const classificationBadges = classifications.map(c => `<span class="status-badge" style="background: #9b59b6; font-size: 11px;">${c}</span>`).join(' ');
+                
+                contactItem.innerHTML = `
+                    <div class="unit-info">
+                        <h4>${escapeHtml(contact.contactName)} ${classificationBadges}</h4>
+                        ${contact.contactTitle ? `<p><strong>Title:</strong> ${escapeHtml(contact.contactTitle)}</p>` : ''}
+                        ${contact.contactEmail ? `<p><strong>Email:</strong> <a href="mailto:${escapeHtml(contact.contactEmail)}">${escapeHtml(contact.contactEmail)}</a></p>` : ''}
+                        ${contact.contactPhone ? `<p><strong>Phone:</strong> <a href="tel:${escapeHtml(contact.contactPhone)}">${escapeHtml(contact.contactPhone)}</a></p>` : ''}
+                        ${contact.notes ? `<p><strong>Notes:</strong> ${escapeHtml(contact.notes)}</p>` : ''}
+                    </div>
+                    <div class="unit-item-actions">
+                        <button class="btn-secondary btn-small" onclick="editContact('${contact.id}')">Edit</button>
+                        <button class="btn-danger btn-small" onclick="deleteContact('${contact.id}')">Delete</button>
+                    </div>
+                `;
+                contactsList.appendChild(contactItem);
+            });
+        })
+        .catch((error) => {
+            console.error('Error loading contacts:', error);
+            contactsList.innerHTML = '<p style="color: #e74c3c; text-align: center; padding: 20px;">Error loading contacts. Please try again.</p>';
+        });
+}
+
+window.addContact = function(tenantId) {
+    editingContactId = null;
+    document.getElementById('contactModalTitle').textContent = 'Add Contact';
+    document.getElementById('contactId').value = '';
+    document.getElementById('contactTenantId').value = tenantId;
+    document.getElementById('contactForm').reset();
+    
+    const submitBtn = document.querySelector('#contactForm button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Save Contact';
+        submitBtn.classList.remove('saving');
+    }
+    
+    document.getElementById('contactModal').classList.add('show');
+    setTimeout(() => {
+        document.getElementById('contactName').focus();
+    }, 100);
+};
+
+window.editContact = function(contactId) {
+    db.collection('tenantContacts').doc(contactId).get().then((doc) => {
+        const contact = doc.data();
+        if (contact) {
+            editingContactId = contactId;
+            document.getElementById('contactModalTitle').textContent = 'Edit Contact';
+            document.getElementById('contactId').value = contactId;
+            document.getElementById('contactTenantId').value = contact.tenantId;
+            document.getElementById('contactName').value = contact.contactName || '';
+            document.getElementById('contactEmail').value = contact.contactEmail || '';
+            document.getElementById('contactPhone').value = contact.contactPhone || '';
+            document.getElementById('contactTitle').value = contact.contactTitle || '';
+            document.getElementById('contactNotes').value = contact.notes || '';
+            
+            const classifications = contact.classifications || [];
+            document.getElementById('contactPrimary').checked = classifications.includes('Primary');
+            document.getElementById('contactSecondary').checked = classifications.includes('Secondary');
+            document.getElementById('contactLeasing').checked = classifications.includes('Leasing');
+            document.getElementById('contactBilling').checked = classifications.includes('Billing');
+            
+            const submitBtn = document.querySelector('#contactForm button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Save Contact';
+                submitBtn.classList.remove('saving');
+            }
+            
+            document.getElementById('contactModal').classList.add('show');
+            setTimeout(() => {
+                document.getElementById('contactName').focus();
+            }, 100);
+        }
+    }).catch((error) => {
+        console.error('Error loading contact:', error);
+        alert('Error loading contact: ' + error.message);
+    });
+};
+
+window.deleteContact = function(contactId) {
+    if (!confirm('Are you sure you want to delete this contact? This action cannot be undone.')) {
+        return;
+    }
+    
+    db.collection('tenantContacts').doc(contactId).delete()
+        .then(() => {
+            console.log('Contact deleted successfully');
+            if (currentTenantIdForDetail) {
+                loadContacts(currentTenantIdForDetail);
+            }
+        })
+        .catch((error) => {
+            console.error('Error deleting contact:', error);
+            alert('Error deleting contact: ' + error.message);
+        });
+};
+
+function closeContactModal() {
+    const modal = document.getElementById('contactModal');
+    if (modal) {
+        modal.classList.remove('show');
+    }
+    document.getElementById('contactForm').reset();
+    document.getElementById('contactId').value = '';
+    document.getElementById('contactTenantId').value = '';
+    editingContactId = null;
+    
+    const submitBtn = document.querySelector('#contactForm button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Save Contact';
+        submitBtn.classList.remove('saving');
+    }
+}
+
+function handleContactSubmit(e) {
+    e.preventDefault();
+    
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const resetButtonState = () => {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save Contact';
+            submitBtn.classList.remove('saving');
+        }
+    };
+    
+    const id = document.getElementById('contactId').value;
+    const tenantId = document.getElementById('contactTenantId').value;
+    const contactName = document.getElementById('contactName').value.trim();
+    const contactEmail = document.getElementById('contactEmail').value.trim();
+    const contactPhone = document.getElementById('contactPhone').value.trim();
+    const contactTitle = document.getElementById('contactTitle').value.trim();
+    const contactNotes = document.getElementById('contactNotes').value.trim();
+    
+    const classifications = [];
+    if (document.getElementById('contactPrimary').checked) classifications.push('Primary');
+    if (document.getElementById('contactSecondary').checked) classifications.push('Secondary');
+    if (document.getElementById('contactLeasing').checked) classifications.push('Leasing');
+    if (document.getElementById('contactBilling').checked) classifications.push('Billing');
+    
+    if (!contactName) {
+        alert('Contact name is required');
+        resetButtonState();
+        return;
+    }
+    
+    if (classifications.length === 0) {
+        alert('Please select at least one contact classification');
+        resetButtonState();
+        return;
+    }
+    
+    if (!tenantId) {
+        alert('Tenant ID is missing');
+        resetButtonState();
+        return;
+    }
+    
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
+        submitBtn.classList.add('saving');
+    }
+    
+    const timeoutId = setTimeout(() => {
+        console.error('Contact save operation timed out');
+        resetButtonState();
+        alert('The save operation is taking longer than expected. Please check your connection and try again.');
+    }, 30000);
+    
+    const contactData = {
+        tenantId,
+        contactName,
+        contactEmail: contactEmail || null,
+        contactPhone: contactPhone || null,
+        contactTitle: contactTitle || null,
+        classifications,
+        notes: contactNotes || null,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    
+    if (id && editingContactId) {
+        db.collection('tenantContacts').doc(id).get().then((doc) => {
+            const existing = doc.data();
+            contactData.createdAt = existing?.createdAt || firebase.firestore.FieldValue.serverTimestamp();
+            return db.collection('tenantContacts').doc(id).update(contactData);
+        }).then(() => {
+            clearTimeout(timeoutId);
+            console.log('Contact updated successfully');
+            resetButtonState();
+            closeContactModal();
+            if (currentTenantIdForDetail) {
+                loadContacts(currentTenantIdForDetail);
+            }
+        }).catch((error) => {
+            clearTimeout(timeoutId);
+            console.error('Error updating contact:', error);
+            alert('Error saving contact: ' + error.message);
+            resetButtonState();
+        });
+    } else {
+        contactData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+        db.collection('tenantContacts').add(contactData)
+            .then((docRef) => {
+                clearTimeout(timeoutId);
+                console.log('Contact created successfully with ID:', docRef.id);
+                resetButtonState();
+                closeContactModal();
+                if (currentTenantIdForDetail) {
+                    loadContacts(currentTenantIdForDetail);
+                }
+            })
+            .catch((error) => {
+                clearTimeout(timeoutId);
+                console.error('Error creating contact:', error);
+                alert('Error saving contact: ' + error.message);
+                resetButtonState();
+            });
+    }
+}
+
+// Occupancy Management
+function loadOccupancies(tenantId) {
+    const occupanciesList = document.getElementById('occupanciesList');
+    if (!occupanciesList) return;
+    
+    db.collection('occupancies')
+        .where('tenantId', '==', tenantId)
+        .get()
+        .then((querySnapshot) => {
+            occupanciesList.innerHTML = '';
+            
+            if (querySnapshot.empty) {
+                occupanciesList.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">No occupancies yet. Add one to get started.</p>';
+                return;
+            }
+            
+            Promise.all([
+                db.collection('properties').get(),
+                db.collection('units').get()
+            ]).then(([propertiesSnapshot, unitsSnapshot]) => {
+                const propertiesMap = {};
+                const unitsMap = {};
+                
+                propertiesSnapshot.forEach((doc) => {
+                    propertiesMap[doc.id] = doc.data();
+                });
+                
+                unitsSnapshot.forEach((doc) => {
+                    unitsMap[doc.id] = doc.data();
+                });
+                
+                querySnapshot.forEach((doc) => {
+                    const occupancy = { id: doc.id, ...doc.data() };
+                    const occupancyItem = document.createElement('div');
+                    occupancyItem.className = 'unit-item';
+                    
+                    const property = propertiesMap[occupancy.propertyId];
+                    const unit = occupancy.unitId ? unitsMap[occupancy.unitId] : null;
+                    const propertyName = property ? property.name : 'Unknown Property';
+                    const unitName = unit ? unit.unitNumber : null;
+                    
+                    const moveInDate = occupancy.moveInDate?.toDate ? occupancy.moveInDate.toDate().toLocaleDateString() : 'N/A';
+                    const moveOutDate = occupancy.moveOutDate?.toDate ? occupancy.moveOutDate.toDate().toLocaleDateString() : (occupancy.status === 'Active' ? 'Current' : 'N/A');
+                    const statusBadge = occupancy.status ? `<span class="status-badge status-${occupancy.status.toLowerCase()}">${occupancy.status}</span>` : '';
+                    
+                    occupancyItem.innerHTML = `
+                        <div class="unit-info">
+                            <h4>${escapeHtml(propertyName)} ${statusBadge}</h4>
+                            ${unitName ? `<p><strong>Unit:</strong> ${escapeHtml(unitName)}</p>` : '<p><strong>Type:</strong> Property Level</p>'}
+                            <p><strong>Move-In:</strong> ${moveInDate}</p>
+                            <p><strong>Move-Out:</strong> ${moveOutDate}</p>
+                            ${occupancy.notes ? `<p><strong>Notes:</strong> ${escapeHtml(occupancy.notes)}</p>` : ''}
+                        </div>
+                        <div class="unit-item-actions">
+                            <button class="btn-secondary btn-small" onclick="editOccupancy('${occupancy.id}')">Edit</button>
+                            <button class="btn-danger btn-small" onclick="deleteOccupancy('${occupancy.id}')">Delete</button>
+                        </div>
+                    `;
+                    occupanciesList.appendChild(occupancyItem);
+                });
+            });
+        })
+        .catch((error) => {
+            console.error('Error loading occupancies:', error);
+            occupanciesList.innerHTML = '<p style="color: #e74c3c; text-align: center; padding: 20px;">Error loading occupancies. Please try again.</p>';
+        });
+}
+
+function loadPropertiesForOccupancy() {
+    const propertySelect = document.getElementById('occupancyPropertyId');
+    if (!propertySelect) return Promise.resolve();
+    
+    propertySelect.innerHTML = '<option value="">Select property...</option>';
+    
+    return db.collection('properties')
+        .get()
+        .then((querySnapshot) => {
+            querySnapshot.forEach((doc) => {
+                const property = doc.data();
+                const option = document.createElement('option');
+                option.value = doc.id;
+                option.textContent = property.name || 'Unnamed Property';
+                propertySelect.appendChild(option);
+            });
+        })
+        .catch((error) => {
+            console.error('Error loading properties for occupancy:', error);
+        });
+}
+
+function loadUnitsForOccupancy(propertyId) {
+    const unitSelect = document.getElementById('occupancyUnitId');
+    if (!unitSelect) return Promise.resolve();
+    
+    unitSelect.innerHTML = '<option value="">No Unit (Property Level)</option>';
+    
+    if (!propertyId) return Promise.resolve();
+    
+    return db.collection('units')
+        .where('propertyId', '==', propertyId)
+        .get()
+        .then((querySnapshot) => {
+            querySnapshot.forEach((doc) => {
+                const unit = doc.data();
+                const option = document.createElement('option');
+                option.value = doc.id;
+                option.textContent = unit.unitNumber || 'Unnamed Unit';
+                unitSelect.appendChild(option);
+            });
+        })
+        .catch((error) => {
+            console.error('Error loading units for occupancy:', error);
+        });
+}
+
+window.addOccupancy = function(tenantId) {
+    editingOccupancyId = null;
+    document.getElementById('occupancyModalTitle').textContent = 'Add Occupancy';
+    document.getElementById('occupancyId').value = '';
+    document.getElementById('occupancyTenantId').value = tenantId;
+    document.getElementById('occupancyForm').reset();
+    
+    const submitBtn = document.querySelector('#occupancyForm button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Save Occupancy';
+        submitBtn.classList.remove('saving');
+    }
+    
+    loadPropertiesForOccupancy().then(() => {
+        document.getElementById('occupancyModal').classList.add('show');
+        setTimeout(() => {
+            document.getElementById('occupancyPropertyId').focus();
+        }, 100);
+    });
+    
+    const propertySelect = document.getElementById('occupancyPropertyId');
+    if (propertySelect) {
+        const newPropertySelect = propertySelect.cloneNode(true);
+        propertySelect.parentNode.replaceChild(newPropertySelect, propertySelect);
+        newPropertySelect.addEventListener('change', function() {
+            loadUnitsForOccupancy(this.value);
+        });
+    }
+};
+
+window.editOccupancy = function(occupancyId) {
+    db.collection('occupancies').doc(occupancyId).get().then((doc) => {
+        const occupancy = doc.data();
+        if (occupancy) {
+            editingOccupancyId = occupancyId;
+            document.getElementById('occupancyModalTitle').textContent = 'Edit Occupancy';
+            document.getElementById('occupancyId').value = occupancyId;
+            document.getElementById('occupancyTenantId').value = occupancy.tenantId;
+            document.getElementById('occupancyStatus').value = occupancy.status || 'Active';
+            document.getElementById('occupancyNotes').value = occupancy.notes || '';
+            
+            if (occupancy.moveInDate) {
+                const moveIn = occupancy.moveInDate.toDate ? occupancy.moveInDate.toDate() : new Date(occupancy.moveInDate);
+                document.getElementById('occupancyMoveInDate').value = moveIn.toISOString().split('T')[0];
+            }
+            if (occupancy.moveOutDate) {
+                const moveOut = occupancy.moveOutDate.toDate ? occupancy.moveOutDate.toDate() : new Date(occupancy.moveOutDate);
+                document.getElementById('occupancyMoveOutDate').value = moveOut.toISOString().split('T')[0];
+            }
+            
+            loadPropertiesForOccupancy().then(() => {
+                document.getElementById('occupancyPropertyId').value = occupancy.propertyId;
+                return loadUnitsForOccupancy(occupancy.propertyId);
+            }).then(() => {
+                if (occupancy.unitId) {
+                    document.getElementById('occupancyUnitId').value = occupancy.unitId;
+                }
+                
+                const submitBtn = document.querySelector('#occupancyForm button[type="submit"]');
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Save Occupancy';
+                    submitBtn.classList.remove('saving');
+                }
+                
+                document.getElementById('occupancyModal').classList.add('show');
+            });
+        }
+    }).catch((error) => {
+        console.error('Error loading occupancy:', error);
+        alert('Error loading occupancy: ' + error.message);
+    });
+};
+
+window.deleteOccupancy = function(occupancyId) {
+    if (!confirm('Are you sure you want to delete this occupancy? This action cannot be undone.')) {
+        return;
+    }
+    
+    db.collection('occupancies').doc(occupancyId).delete()
+        .then(() => {
+            console.log('Occupancy deleted successfully');
+            if (currentTenantIdForDetail) {
+                loadOccupancies(currentTenantIdForDetail);
+            }
+        })
+        .catch((error) => {
+            console.error('Error deleting occupancy:', error);
+            alert('Error deleting occupancy: ' + error.message);
+        });
+};
+
+function closeOccupancyModal() {
+    const modal = document.getElementById('occupancyModal');
+    if (modal) {
+        modal.classList.remove('show');
+    }
+    document.getElementById('occupancyForm').reset();
+    document.getElementById('occupancyId').value = '';
+    document.getElementById('occupancyTenantId').value = '';
+    editingOccupancyId = null;
+    
+    const submitBtn = document.querySelector('#occupancyForm button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Save Occupancy';
+        submitBtn.classList.remove('saving');
+    }
+}
+
+function handleOccupancySubmit(e) {
+    e.preventDefault();
+    
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const resetButtonState = () => {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save Occupancy';
+            submitBtn.classList.remove('saving');
+        }
+    };
+    
+    const id = document.getElementById('occupancyId').value;
+    const tenantId = document.getElementById('occupancyTenantId').value;
+    const propertyId = document.getElementById('occupancyPropertyId').value;
+    const unitId = document.getElementById('occupancyUnitId').value || null;
+    const moveInDateStr = document.getElementById('occupancyMoveInDate').value;
+    const moveOutDateStr = document.getElementById('occupancyMoveOutDate').value;
+    const status = document.getElementById('occupancyStatus').value;
+    const notes = document.getElementById('occupancyNotes').value.trim();
+    
+    if (!tenantId) {
+        alert('Tenant ID is missing');
+        resetButtonState();
+        return;
+    }
+    
+    if (!propertyId) {
+        alert('Property is required');
+        resetButtonState();
+        return;
+    }
+    
+    if (!moveInDateStr) {
+        alert('Move-in date is required');
+        resetButtonState();
+        return;
+    }
+    
+    if (!status) {
+        alert('Status is required');
+        resetButtonState();
+        return;
+    }
+    
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
+        submitBtn.classList.add('saving');
+    }
+    
+    const timeoutId = setTimeout(() => {
+        console.error('Occupancy save operation timed out');
+        resetButtonState();
+        alert('The save operation is taking longer than expected. Please check your connection and try again.');
+    }, 30000);
+    
+    const moveInDate = firebase.firestore.Timestamp.fromDate(new Date(moveInDateStr));
+    const moveOutDate = moveOutDateStr ? firebase.firestore.Timestamp.fromDate(new Date(moveOutDateStr)) : null;
+    
+    const occupancyData = {
+        tenantId,
+        propertyId,
+        unitId,
+        moveInDate,
+        moveOutDate,
+        status,
+        notes: notes || null,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    
+    if (id && editingOccupancyId) {
+        db.collection('occupancies').doc(id).get().then((doc) => {
+            const existing = doc.data();
+            occupancyData.createdAt = existing?.createdAt || firebase.firestore.FieldValue.serverTimestamp();
+            return db.collection('occupancies').doc(id).update(occupancyData);
+        }).then(() => {
+            clearTimeout(timeoutId);
+            console.log('Occupancy updated successfully');
+            resetButtonState();
+            closeOccupancyModal();
+            if (currentTenantIdForDetail) {
+                loadOccupancies(currentTenantIdForDetail);
+            }
+        }).catch((error) => {
+            clearTimeout(timeoutId);
+            console.error('Error updating occupancy:', error);
+            alert('Error saving occupancy: ' + error.message);
+            resetButtonState();
+        });
+    } else {
+        occupancyData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+        db.collection('occupancies').add(occupancyData)
+            .then((docRef) => {
+                clearTimeout(timeoutId);
+                console.log('Occupancy created successfully with ID:', docRef.id);
+                resetButtonState();
+                closeOccupancyModal();
+                if (currentTenantIdForDetail) {
+                    loadOccupancies(currentTenantIdForDetail);
+                }
+            })
+            .catch((error) => {
+                clearTimeout(timeoutId);
+                console.error('Error creating occupancy:', error);
+                alert('Error saving occupancy: ' + error.message);
+                resetButtonState();
+            });
+    }
+}
+
