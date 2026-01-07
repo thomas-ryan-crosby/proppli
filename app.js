@@ -483,6 +483,15 @@ window.addBuilding = function(propertyId) {
     document.getElementById('buildingId').value = '';
     document.getElementById('buildingPropertyId').value = propertyId;
     document.getElementById('buildingForm').reset();
+    
+    // Reset button state
+    const submitBtn = document.querySelector('#buildingForm button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Save Building';
+        submitBtn.classList.remove('saving');
+    }
+    
     document.getElementById('buildingModal').classList.add('show');
     setTimeout(() => {
         document.getElementById('buildingName').focus();
@@ -501,6 +510,15 @@ window.editBuilding = function(buildingId) {
             document.getElementById('buildingAddress').value = building.buildingAddress || '';
             document.getElementById('buildingNumberOfFloors').value = building.numberOfFloors || '';
             document.getElementById('buildingNumberOfUnits').value = building.numberOfUnits || '';
+            
+            // Reset button state
+            const submitBtn = document.querySelector('#buildingForm button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Save Building';
+                submitBtn.classList.remove('saving');
+            }
+            
             document.getElementById('buildingModal').classList.add('show');
             setTimeout(() => {
                 document.getElementById('buildingName').focus();
@@ -533,6 +551,18 @@ window.deleteBuilding = function(buildingId) {
 function handleBuildingSubmit(e) {
     e.preventDefault();
     
+    // Get submit button early for state management
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    
+    // Helper function to reset button state
+    const resetButtonState = () => {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save Building';
+            submitBtn.classList.remove('saving');
+        }
+    };
+    
     const id = document.getElementById('buildingId').value;
     const propertyId = document.getElementById('buildingPropertyId').value;
     const buildingName = document.getElementById('buildingName').value.trim();
@@ -540,21 +570,32 @@ function handleBuildingSubmit(e) {
     const numberOfFloors = parseInt(document.getElementById('buildingNumberOfFloors').value) || null;
     const numberOfUnits = parseInt(document.getElementById('buildingNumberOfUnits').value) || null;
 
+    // Validation - ensure button is enabled if validation fails
     if (!buildingName) {
         alert('Building name/number is required');
+        resetButtonState();
         return;
     }
     
     if (!propertyId) {
         alert('Property ID is missing');
+        resetButtonState();
         return;
     }
 
-    const submitBtn = e.target.querySelector('button[type="submit"]');
+    // Disable submit button (only after validation passes)
     if (submitBtn) {
         submitBtn.disabled = true;
         submitBtn.textContent = 'Saving...';
+        submitBtn.classList.add('saving');
     }
+    
+    // Set a timeout safety mechanism (30 seconds)
+    const timeoutId = setTimeout(() => {
+        console.error('Building save operation timed out');
+        resetButtonState();
+        alert('The save operation is taking longer than expected. Please check your connection and try again.');
+    }, 30000);
 
     const buildingData = {
         propertyId: propertyId,
@@ -572,37 +613,37 @@ function handleBuildingSubmit(e) {
             buildingData.createdAt = existing?.createdAt || firebase.firestore.FieldValue.serverTimestamp();
             return db.collection('buildings').doc(id).update(buildingData);
         }).then(() => {
+            clearTimeout(timeoutId);
             console.log('Building updated successfully');
+            resetButtonState();
             closeBuildingModal();
             if (currentPropertyIdForDetail) {
                 loadBuildings(currentPropertyIdForDetail);
             }
         }).catch((error) => {
+            clearTimeout(timeoutId);
             console.error('Error updating building:', error);
             alert('Error saving building: ' + error.message);
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Save Building';
-            }
+            resetButtonState();
         });
     } else {
         // Create new
         buildingData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
         db.collection('buildings').add(buildingData)
             .then((docRef) => {
+                clearTimeout(timeoutId);
                 console.log('Building created successfully with ID:', docRef.id);
+                resetButtonState();
                 closeBuildingModal();
                 if (currentPropertyIdForDetail) {
                     loadBuildings(currentPropertyIdForDetail);
                 }
             })
             .catch((error) => {
+                clearTimeout(timeoutId);
                 console.error('Error creating building:', error);
                 alert('Error saving building: ' + error.message);
-                if (submitBtn) {
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = 'Save Building';
-                }
+                resetButtonState();
             });
     }
 }
@@ -616,6 +657,14 @@ function closeBuildingModal() {
     document.getElementById('buildingId').value = '';
     document.getElementById('buildingPropertyId').value = '';
     editingBuildingId = null;
+    
+    // Reset button state
+    const submitBtn = document.querySelector('#buildingForm button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Save Building';
+        submitBtn.classList.remove('saving');
+    }
 }
 
 // Unit Management
