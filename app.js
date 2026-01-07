@@ -290,6 +290,32 @@ function setupEventListeners() {
         });
     });
     
+    // Unit management
+    const addUnitBtn = document.getElementById('addUnitBtn');
+    const unitForm = document.getElementById('unitForm');
+    const closeUnitModalBtn = document.getElementById('closeUnitModal');
+    const cancelUnitFormBtn = document.getElementById('cancelUnitForm');
+    
+    if (addUnitBtn) {
+        addUnitBtn.addEventListener('click', () => {
+            let propertyId = currentPropertyIdForDetail;
+            if (!propertyId) {
+                const propertyDetailView = document.getElementById('propertyDetailView');
+                if (propertyDetailView) {
+                    propertyId = propertyDetailView.getAttribute('data-property-id');
+                }
+            }
+            if (propertyId) {
+                window.addUnit(propertyId);
+            } else {
+                alert('Error: Property context is missing. Please go back to properties and try again.');
+            }
+        });
+    }
+    if (unitForm) unitForm.addEventListener('submit', handleUnitSubmit);
+    if (closeUnitModalBtn) closeUnitModalBtn.addEventListener('click', closeUnitModal);
+    if (cancelUnitFormBtn) cancelUnitFormBtn.addEventListener('click', closeUnitModal);
+    
     // Also close building modal when clicking outside
     window.addEventListener('click', (e) => {
         if (e.target.classList.contains('modal')) {
