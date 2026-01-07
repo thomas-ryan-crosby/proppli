@@ -715,6 +715,162 @@
                     </div>
                 </div>
             </div>
+            
+            <!-- Tenant Detail View -->
+            <div id="tenantDetailView" style="display: none;">
+                <div class="property-detail-header">
+                    <button id="backToTenantsBtn" class="btn-secondary">← Back to Tenants</button>
+                    <h3 id="tenantDetailName"></h3>
+                </div>
+                <div class="property-detail-tabs">
+                    <button class="tab-btn active" data-tab="contacts">Contacts</button>
+                    <button class="tab-btn" data-tab="occupancies">Occupancies</button>
+                </div>
+                <div id="contactsTab" class="tab-content active">
+                    <div class="section-header">
+                        <h4>Contacts</h4>
+                        <button id="addContactBtn" class="btn-primary btn-small">+ Add Contact</button>
+                    </div>
+                    <div id="contactsList" class="contacts-list"></div>
+                </div>
+                <div id="occupanciesTab" class="tab-content">
+                    <div class="section-header">
+                        <h4>Occupancies</h4>
+                        <button id="addOccupancyBtn" class="btn-primary btn-small">+ Add Occupancy</button>
+                    </div>
+                    <div id="occupanciesList" class="occupancies-list"></div>
+                </div>
+            </div>
+            
+            <!-- Contact Modal -->
+            <div id="contactModal" class="modal">
+                <div class="modal-content" style="max-width: 600px;">
+                    <div class="modal-header">
+                        <h2 id="contactModalTitle">Add Contact</h2>
+                        <button class="close-btn" id="closeContactModal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="contactForm">
+                            <input type="hidden" id="contactId">
+                            <input type="hidden" id="contactTenantId">
+                            
+                            <div class="form-group">
+                                <label for="contactName">Contact Name *</label>
+                                <input type="text" id="contactName" required placeholder="e.g., John Doe">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="contactEmail">Email</label>
+                                <input type="email" id="contactEmail" placeholder="e.g., john@example.com">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="contactPhone">Phone</label>
+                                <input type="tel" id="contactPhone" placeholder="e.g., (555) 123-4567">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="contactTitle">Title/Position</label>
+                                <input type="text" id="contactTitle" placeholder="e.g., Property Manager, CEO">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Contact Classifications *</label>
+                                <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
+                                    <label style="display: flex; align-items: center; gap: 8px; font-weight: normal;">
+                                        <input type="checkbox" id="contactPrimary" value="Primary">
+                                        <span>Primary Contact</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 8px; font-weight: normal;">
+                                        <input type="checkbox" id="contactSecondary" value="Secondary">
+                                        <span>Secondary Contact</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 8px; font-weight: normal;">
+                                        <input type="checkbox" id="contactLeasing" value="Leasing">
+                                        <span>Leasing Contact</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 8px; font-weight: normal;">
+                                        <input type="checkbox" id="contactBilling" value="Billing">
+                                        <span>Billing Contact</span>
+                                    </label>
+                                </div>
+                                <small style="color: #666; font-size: 12px;">Select one or more classifications</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="contactNotes">Notes</label>
+                                <textarea id="contactNotes" rows="2" placeholder="Additional notes about this contact..."></textarea>
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button type="submit" class="btn-primary">Save Contact</button>
+                                <button type="button" class="btn-secondary" id="cancelContactForm">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Occupancy Modal -->
+            <div id="occupancyModal" class="modal">
+                <div class="modal-content" style="max-width: 600px;">
+                    <div class="modal-header">
+                        <h2 id="occupancyModalTitle">Add Occupancy</h2>
+                        <button class="close-btn" id="closeOccupancyModal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="occupancyForm">
+                            <input type="hidden" id="occupancyId">
+                            <input type="hidden" id="occupancyTenantId">
+                            
+                            <div class="form-group">
+                                <label for="occupancyPropertyId">Property *</label>
+                                <select id="occupancyPropertyId" required>
+                                    <option value="">Select property...</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="occupancyUnitId">Unit/Space (Optional)</label>
+                                <select id="occupancyUnitId">
+                                    <option value="">No Unit (Property Level)</option>
+                                </select>
+                                <small style="color: #666; font-size: 12px;">Select a unit if this occupancy is for a specific unit</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="occupancyMoveInDate">Move-In Date *</label>
+                                <input type="date" id="occupancyMoveInDate" required>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="occupancyMoveOutDate">Move-Out Date</label>
+                                <input type="date" id="occupancyMoveOutDate">
+                                <small style="color: #666; font-size: 12px;">Leave blank if currently occupied</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="occupancyStatus">Status *</label>
+                                <select id="occupancyStatus" required>
+                                    <option value="Active">Active</option>
+                                    <option value="Past">Past</option>
+                                    <option value="Pending">Pending</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="occupancyNotes">Notes</label>
+                                <textarea id="occupancyNotes" rows="2" placeholder="Additional notes about this occupancy..."></textarea>
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button type="submit" class="btn-primary">Save Occupancy</button>
+                                <button type="button" class="btn-secondary" id="cancelOccupancyForm">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 

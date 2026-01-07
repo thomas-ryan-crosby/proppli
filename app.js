@@ -334,6 +334,85 @@ function setupEventListeners() {
         tenantTypeSelect.addEventListener('change', updateTenantTypeFields);
     }
     
+    // Tenant detail view
+    const backToTenantsBtn = document.getElementById('backToTenantsBtn');
+    if (backToTenantsBtn) {
+        backToTenantsBtn.addEventListener('click', backToTenants);
+    }
+    
+    // Contact management
+    const addContactBtn = document.getElementById('addContactBtn');
+    const contactForm = document.getElementById('contactForm');
+    const closeContactModalBtn = document.getElementById('closeContactModal');
+    const cancelContactFormBtn = document.getElementById('cancelContactForm');
+    
+    if (addContactBtn) {
+        addContactBtn.addEventListener('click', () => {
+            let tenantId = currentTenantIdForDetail;
+            if (!tenantId) {
+                const tenantDetailView = document.getElementById('tenantDetailView');
+                if (tenantDetailView) {
+                    tenantId = tenantDetailView.getAttribute('data-tenant-id');
+                }
+            }
+            if (tenantId) {
+                window.addContact(tenantId);
+            } else {
+                alert('Error: Tenant context is missing.');
+            }
+        });
+    }
+    if (contactForm) contactForm.addEventListener('submit', handleContactSubmit);
+    if (closeContactModalBtn) closeContactModalBtn.addEventListener('click', closeContactModal);
+    if (cancelContactFormBtn) cancelContactFormBtn.addEventListener('click', closeContactModal);
+    
+    // Occupancy management
+    const addOccupancyBtn = document.getElementById('addOccupancyBtn');
+    const occupancyForm = document.getElementById('occupancyForm');
+    const closeOccupancyModalBtn = document.getElementById('closeOccupancyModal');
+    const cancelOccupancyFormBtn = document.getElementById('cancelOccupancyForm');
+    
+    if (addOccupancyBtn) {
+        addOccupancyBtn.addEventListener('click', () => {
+            let tenantId = currentTenantIdForDetail;
+            if (!tenantId) {
+                const tenantDetailView = document.getElementById('tenantDetailView');
+                if (tenantDetailView) {
+                    tenantId = tenantDetailView.getAttribute('data-tenant-id');
+                }
+            }
+            if (tenantId) {
+                window.addOccupancy(tenantId);
+            } else {
+                alert('Error: Tenant context is missing.');
+            }
+        });
+    }
+    if (occupancyForm) occupancyForm.addEventListener('submit', handleOccupancySubmit);
+    if (closeOccupancyModalBtn) closeOccupancyModalBtn.addEventListener('click', closeOccupancyModal);
+    if (cancelOccupancyFormBtn) cancelOccupancyFormBtn.addEventListener('click', closeOccupancyModal);
+    
+    // Tab switching for tenant detail view
+    const tenantTabButtons = document.querySelectorAll('#tenantDetailView .tab-btn');
+    tenantTabButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const tabName = this.getAttribute('data-tab');
+            
+            // Remove active class from all tabs and tab contents in tenant detail view
+            document.querySelectorAll('#tenantDetailView .tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('#tenantDetailView .tab-content').forEach(c => c.classList.remove('active'));
+            
+            // Add active class to clicked tab
+            this.classList.add('active');
+            
+            // Show corresponding tab content
+            const tabContent = document.getElementById(tabName + 'Tab');
+            if (tabContent) {
+                tabContent.classList.add('active');
+            }
+        });
+    });
+    
     // Also close building modal when clicking outside
     window.addEventListener('click', (e) => {
         if (e.target.classList.contains('modal')) {
@@ -354,6 +433,8 @@ function setupEventListeners() {
             closeBuildingModal();
             closeUnitModal();
             closeTenantModal();
+            closeContactModal();
+            closeOccupancyModal();
         }
     });
 }
@@ -2899,24 +2980,26 @@ function renderTenantsList(tenants) {
     Object.keys(tenants).forEach(id => {
         const tenant = tenants[id];
         const card = document.createElement('div');
-        card.className = 'property-card';
+        card.className = 'tenant-card';
         const statusBadge = tenant.status ? `<span class="status-badge status-${tenant.status.toLowerCase()}">${tenant.status}</span>` : '';
-        const typeBadge = tenant.tenantType ? `<span class="status-badge" style="background: #3498db;">${tenant.tenantType}</span>` : '';
+        const typeBadge = tenant.tenantType ? `<span class="status-badge type-badge">${tenant.tenantType}</span>` : '';
         
         card.innerHTML = `
-            <div class="property-card-header">
+            <div class="tenant-card-header">
                 <h3>${escapeHtml(tenant.tenantName || 'Unnamed Tenant')}</h3>
                 <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                     ${statusBadge}
                     ${typeBadge}
                 </div>
             </div>
-            <div class="property-card-body">
-                ${tenant.mailingAddress ? `<p><strong>Address:</strong> ${escapeHtml(tenant.mailingAddress)}</p>` : ''}
-                ${tenant.tenantType === 'Commercial' && tenant.businessType ? `<p><strong>Business Type:</strong> ${escapeHtml(tenant.businessType)}</p>` : ''}
-                ${tenant.notes ? `<p><strong>Notes:</strong> ${escapeHtml(tenant.notes.substring(0, 100))}${tenant.notes.length > 100 ? '...' : ''}</p>` : ''}
+            <div class="tenant-card-body">
+                ${tenant.mailingAddress ? `<p><strong>📍 Address:</strong> ${escapeHtml(tenant.mailingAddress)}</p>` : ''}
+                ${tenant.tenantType === 'Commercial' && tenant.businessType ? `<p><strong>🏢 Business Type:</strong> ${escapeHtml(tenant.businessType)}</p>` : ''}
+                ${tenant.tenantType === 'Commercial' && tenant.website ? `<p><strong>🌐 Website:</strong> <a href="${escapeHtml(tenant.website)}" target="_blank" style="color: #667eea;">${escapeHtml(tenant.website)}</a></p>` : ''}
+                ${tenant.notes ? `<p><strong>📝 Notes:</strong> ${escapeHtml(tenant.notes.substring(0, 100))}${tenant.notes.length > 100 ? '...' : ''}</p>` : ''}
             </div>
-            <div class="property-card-actions">
+            <div class="tenant-card-actions">
+                <button class="btn-secondary btn-small" onclick="viewTenantDetail('${id}')">View Details</button>
                 <button class="btn-secondary btn-small" onclick="editTenant('${id}')">Edit</button>
                 <button class="btn-danger btn-small" onclick="deleteTenant('${id}')">Delete</button>
             </div>
