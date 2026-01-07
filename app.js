@@ -924,10 +924,19 @@ function updatePropertyTypeFields() {
 }
 
 function closePropertyModal() {
-    document.getElementById('propertyModal').classList.remove('show');
-    document.getElementById('propertyForm').reset();
+    const modal = document.getElementById('propertyModal');
+    if (modal) {
+        modal.classList.remove('show');
+    }
+    const form = document.getElementById('propertyForm');
+    if (form) {
+        form.style.display = 'none';
+        form.reset();
+    }
     document.getElementById('propertyId').value = '';
     editingPropertyId = null;
+    // Reset field visibility
+    updatePropertyTypeFields();
 }
 
 function handlePropertySubmit(e) {
@@ -1030,8 +1039,8 @@ function handlePropertySubmit(e) {
                 address: address || null,
                 propertyType: propertyType,
                 status: status,
-                squareFootage: squareFootage,
-                yearBuilt: yearBuilt,
+                squareFootage: propertyType === 'hoa' ? null : squareFootage, // HOA doesn't need square footage
+                yearBuilt: propertyType === 'hoa' ? null : yearBuilt, // HOA doesn't need year built
                 numberOfUnits: numberOfUnits,
                 lotSize: lotSize,
                 numberOfFloors: numberOfFloors,
@@ -1082,7 +1091,8 @@ function handlePropertySubmit(e) {
             if (loadingModal) {
                 loadingModal.classList.remove('show');
             }
-            hidePropertyForm();
+            // Close modal and reset form
+            closePropertyModal();
         }).catch((error) => {
             console.error('Error updating property:', error);
             // Hide loading modal
