@@ -244,6 +244,7 @@ function setupEventListeners() {
             closeCompletionModal();
             closeDeleteTicketModal();
             closeBuildingModal();
+            closeUnitModal();
         }
     });
 }
@@ -574,12 +575,264 @@ function closeBuildingModal() {
     editingBuildingId = null;
 }
 
+// Unit Management
+let editingUnitId = null;
+
 function loadUnits(propertyId) {
-    // To be implemented
     const unitsList = document.getElementById('unitsList');
-    if (unitsList) {
-        unitsList.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">No units yet. Add one to get started.</p>';
+    if (!unitsList) return;
+    
+    db.collection('units')
+        .where('propertyId', '==', propertyId)
+        .get()
+        .then((querySnapshot) => {
+            const units = {};
+            querySnapshot.forEach((doc) => {
+                units[doc.id] = { id: doc.id, ...doc.data() };
+            });
+            renderUnitsList(units, propertyId);
+        })
+        .catch((error) => {
+            console.error('Error loading units:', error);
+            unitsList.innerHTML = '<p style="color: #e74c3c; text-align: center; padding: 20px;">Error loading units. Please try again.</p>';
+        });
+}
+
+function renderUnitsList(units, propertyId) {
+    const unitsList = document.getElementById('unitsList');
+    if (!unitsList) return;
+    
+    unitsList.innerHTML = '';
+
+    if (Object.keys(units).length === 0) {
+        unitsList.innerHTML = '<p style="color: #999; text-align: center; padding: 20px; grid-column: 1 / -1;">No units yet. Add one to get started.</p>';
+        return;
     }
+
+    Object.keys(units).forEach(id => {
+        const unit = units[id];
+        const item = document.createElement('div');
+        item.className = 'unit-item';
+        const statusBadge = unit.status ? `<span class="status-badge status-${unit.status.toLowerCase().replace(' ', '-')}">${unit.status}</span>` : '';
+        item.innerHTML = `
+            <div class="unit-info">
+                <h4>${escapeHtml(unit.unitNumber)} ${statusBadge}</h4>
+                <p><strong>Type:</strong> ${unit.unitType || 'Not Set'}</p>
+                ${unit.squareFootage ? `<p><strong>Square Footage:</strong> ${unit.squareFootage.toLocaleString()} sq ft</p>` : ''}
+                ${unit.floorNumber ? `<p><strong>Floor:</strong> ${unit.floorNumber}</p>` : ''}
+                ${unit.numberOfBedrooms ? `<p><strong>Bedrooms:</strong> ${unit.numberOfBedrooms}</p>` : ''}
+                ${unit.numberOfBathrooms ? `<p><strong>Bathrooms:</strong> ${unit.numberOfBathrooms}</p>` : ''}
+                ${unit.monthlyRent ? `<p><strong>Monthly Rent:</strong> $${unit.monthlyRent.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>` : ''}
+            </div>
+            <div class="unit-item-actions">
+                <button class="btn-secondary btn-small" onclick="editUnit('${id}')">Edit</button>
+                <button class="btn-danger btn-small" onclick="deleteUnit('${id}')">Delete</button>
+            </div>
+        `;
+        unitsList.appendChild(item);
+    });
+}
+
+function loadBuildingsForUnitSelect(propertyId) {
+    const buildingSelect = document.getElementById('unitBuildingId');
+    if (!buildingSelect) return Promise.resolve();
+    
+    // Clear existing options except first
+    buildingSelect.innerHTML = '<option value="">No Building (Property Level)</option>';
+    
+    return db.collection('buildings')
+        .where('propertyId', '==', propertyId)
+        .get()
+        .then((querySnapshot) => {
+            querySnapshot.forEach((doc) => {
+                const building = doc.data();
+                const option = document.createElement('option');
+                option.value = doc.id;
+                option.textContent = building.buildingName || 'Unnamed Building';
+                buildingSelect.appendChild(option);
+            });
+        })
+        .catch((error) => {
+            console.error('Error loading buildings for unit select:', error);
+        });
+}
+
+window.addUnit = function(propertyId) {
+    currentPropertyIdForDetail = propertyId;
+    editingUnitId = null;
+    document.getElementById('unitModalTitle').textContent = 'Add Unit/Space';
+    document.getElementById('unitId').value = '';
+    document.getElementById('unitPropertyId').value = propertyId;
+    document.getElementById('unitForm').reset();
+    
+    // Load buildings for the select dropdown
+    loadBuildingsForUnitSelect(propertyId);
+    
+    document.getElementById('unitModal').classList.add('show');
+    setTimeout(() => {
+        document.getElementById('unitNumber').focus();
+    }, 100);
+};
+
+window.editUnit = function(unitId) {
+    db.collection('units').doc(unitId).get().then((doc) => {
+        const unit = doc.data();
+        if (unit) {
+            editingUnitId = unitId;
+            document.getElementById('unitModalTitle').textContent = 'Edit Unit/Space';
+            document.getElementById('unitId').value = unitId;
+            document.getElementById('unitPropertyId').value = unit.propertyId;
+            document.getElementById('unitNumber').value = unit.unitNumber || '';
+            document.getElementById('unitType').value = unit.unitType || '';
+            document.getElementById('unitSquareFootage').value = unit.squareFootage || '';
+            document.getElementById('unitFloorNumber').value = unit.floorNumber || '';
+            document.getElementById('unitNumberOfBedrooms').value = unit.numberOfBedrooms || '';
+            document.getElementById('unitNumberOfBathrooms').value = unit.numberOfBathrooms || '';
+            document.getElementById('unitStatus').value = unit.status || 'Vacant';
+            document.getElementById('unitMonthlyRent').value = unit.monthlyRent || '';
+            
+            // Load buildings and set selected building
+            loadBuildingsForUnitSelect(unit.propertyId).then(() => {
+                if (unit.buildingId) {
+                    document.getElementById('unitBuildingId').value = unit.buildingId;
+                }
+            });
+            
+            document.getElementById('unitModal').classList.add('show');
+            setTimeout(() => {
+                document.getElementById('unitNumber').focus();
+            }, 100);
+        }
+    }).catch((error) => {
+        console.error('Error loading unit:', error);
+        alert('Error loading unit: ' + error.message);
+    });
+};
+
+window.deleteUnit = function(unitId) {
+    if (!confirm('Are you sure you want to delete this unit? This action cannot be undone.')) {
+        return;
+    }
+    
+    db.collection('units').doc(unitId).delete()
+        .then(() => {
+            console.log('Unit deleted successfully');
+            if (currentPropertyIdForDetail) {
+                loadUnits(currentPropertyIdForDetail);
+            }
+        })
+        .catch((error) => {
+            console.error('Error deleting unit:', error);
+            alert('Error deleting unit: ' + error.message);
+        });
+};
+
+function handleUnitSubmit(e) {
+    e.preventDefault();
+    
+    const id = document.getElementById('unitId').value;
+    const propertyId = document.getElementById('unitPropertyId').value;
+    const unitNumber = document.getElementById('unitNumber').value.trim();
+    const unitType = document.getElementById('unitType').value;
+    const buildingId = document.getElementById('unitBuildingId').value || null;
+    const squareFootage = parseFloat(document.getElementById('unitSquareFootage').value) || null;
+    const floorNumber = parseInt(document.getElementById('unitFloorNumber').value) || null;
+    const numberOfBedrooms = parseInt(document.getElementById('unitNumberOfBedrooms').value) || null;
+    const numberOfBathrooms = parseFloat(document.getElementById('unitNumberOfBathrooms').value) || null;
+    const status = document.getElementById('unitStatus').value;
+    const monthlyRent = parseFloat(document.getElementById('unitMonthlyRent').value) || null;
+
+    if (!unitNumber) {
+        alert('Unit number/identifier is required');
+        return;
+    }
+    
+    if (!unitType) {
+        alert('Unit type is required');
+        return;
+    }
+    
+    if (!status) {
+        alert('Unit status is required');
+        return;
+    }
+    
+    if (!propertyId) {
+        alert('Property ID is missing');
+        return;
+    }
+
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
+    }
+
+    const unitData = {
+        propertyId: propertyId,
+        buildingId: buildingId,
+        unitNumber: unitNumber,
+        unitType: unitType,
+        squareFootage: squareFootage,
+        floorNumber: floorNumber,
+        numberOfBedrooms: numberOfBedrooms,
+        numberOfBathrooms: numberOfBathrooms,
+        status: status,
+        monthlyRent: monthlyRent,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    if (id && editingUnitId) {
+        // Update existing
+        db.collection('units').doc(id).get().then((doc) => {
+            const existing = doc.data();
+            unitData.createdAt = existing?.createdAt || firebase.firestore.FieldValue.serverTimestamp();
+            return db.collection('units').doc(id).update(unitData);
+        }).then(() => {
+            console.log('Unit updated successfully');
+            closeUnitModal();
+            if (currentPropertyIdForDetail) {
+                loadUnits(currentPropertyIdForDetail);
+            }
+        }).catch((error) => {
+            console.error('Error updating unit:', error);
+            alert('Error saving unit: ' + error.message);
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Save Unit';
+            }
+        });
+    } else {
+        // Create new
+        unitData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+        db.collection('units').add(unitData)
+            .then((docRef) => {
+                console.log('Unit created successfully with ID:', docRef.id);
+                closeUnitModal();
+                if (currentPropertyIdForDetail) {
+                    loadUnits(currentPropertyIdForDetail);
+                }
+            })
+            .catch((error) => {
+                console.error('Error creating unit:', error);
+                alert('Error saving unit: ' + error.message);
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Save Unit';
+                }
+            });
+    }
+}
+
+function closeUnitModal() {
+    const modal = document.getElementById('unitModal');
+    if (modal) {
+        modal.classList.remove('show');
+    }
+    document.getElementById('unitForm').reset();
+    document.getElementById('unitId').value = '';
+    document.getElementById('unitPropertyId').value = '';
+    editingUnitId = null;
 }
 
 function openPropertyModal() {

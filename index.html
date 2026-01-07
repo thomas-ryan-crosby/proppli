@@ -526,6 +526,82 @@
                             </div>
                             <div id="unitsList" class="units-list"></div>
                         </div>
+                        
+                        <!-- Unit Modal -->
+                        <div id="unitModal" class="modal">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h2 id="unitModalTitle">Add Unit/Space</h2>
+                                    <button class="close-btn" id="closeUnitModal">&times;</button>
+                                </div>
+                                <div class="modal-body">
+                                    <form id="unitForm">
+                                        <input type="hidden" id="unitId">
+                                        <input type="hidden" id="unitPropertyId">
+                                        <div class="form-group">
+                                            <label for="unitNumber">Unit Number/Identifier *</label>
+                                            <input type="text" id="unitNumber" required placeholder="e.g., 101, Suite A, Unit 1A">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="unitType">Unit Type *</label>
+                                            <select id="unitType" required>
+                                                <option value="">Select unit type...</option>
+                                                <option value="Apartment">Apartment</option>
+                                                <option value="Office">Office</option>
+                                                <option value="Retail">Retail</option>
+                                                <option value="Storage">Storage</option>
+                                                <option value="Parking">Parking</option>
+                                                <option value="Other">Other</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="unitBuildingId">Building (Optional)</label>
+                                            <select id="unitBuildingId">
+                                                <option value="">No Building (Property Level)</option>
+                                            </select>
+                                            <small style="color: #666; font-size: 12px;">Select a building if this unit belongs to a specific building</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="unitSquareFootage">Square Footage</label>
+                                            <input type="number" id="unitSquareFootage" min="0" step="1" placeholder="e.g., 800">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="unitFloorNumber">Floor Number</label>
+                                            <input type="number" id="unitFloorNumber" min="0" step="1" placeholder="e.g., 2">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="unitNumberOfBedrooms">Number of Bedrooms</label>
+                                            <input type="number" id="unitNumberOfBedrooms" min="0" step="1" placeholder="e.g., 2">
+                                            <small style="color: #666; font-size: 12px;">For residential units</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="unitNumberOfBathrooms">Number of Bathrooms</label>
+                                            <input type="number" id="unitNumberOfBathrooms" min="0" step="0.5" placeholder="e.g., 1.5">
+                                            <small style="color: #666; font-size: 12px;">For residential units</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="unitStatus">Unit Status *</label>
+                                            <select id="unitStatus" required>
+                                                <option value="Vacant">Vacant</option>
+                                                <option value="Occupied">Occupied</option>
+                                                <option value="Maintenance">Maintenance</option>
+                                                <option value="Reserved">Reserved</option>
+                                                <option value="Not Available">Not Available</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="unitMonthlyRent">Monthly Rent/Base Rate</label>
+                                            <input type="number" id="unitMonthlyRent" min="0" step="0.01" placeholder="e.g., 1500.00">
+                                            <small style="color: #666; font-size: 12px;">For quick reference</small>
+                                        </div>
+                                        <div class="form-actions">
+                                            <button type="submit" class="btn-primary">Save Unit</button>
+                                            <button type="button" class="btn-secondary" id="cancelUnitForm">Cancel</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </main>
