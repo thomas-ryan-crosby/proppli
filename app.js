@@ -195,6 +195,47 @@ function setupEventListeners() {
     const viewDeletedBtn = document.getElementById('viewDeletedBtn');
     if (viewDeletedBtn) viewDeletedBtn.addEventListener('click', () => switchView('deleted'));
 
+    // Building management
+    const addBuildingBtn = document.getElementById('addBuildingBtn');
+    const buildingForm = document.getElementById('buildingForm');
+    const closeBuildingModalBtn = document.getElementById('closeBuildingModal');
+    const cancelBuildingFormBtn = document.getElementById('cancelBuildingForm');
+    
+    if (addBuildingBtn) {
+        addBuildingBtn.addEventListener('click', () => {
+            // Get propertyId from the current detail view or data attribute
+            let propertyId = currentPropertyIdForDetail;
+            
+            // Fallback: try to get from property detail view data attribute
+            if (!propertyId) {
+                const propertyDetailView = document.getElementById('propertyDetailView');
+                if (propertyDetailView) {
+                    propertyId = propertyDetailView.getAttribute('data-property-id');
+                }
+            }
+            
+            if (propertyId) {
+                window.addBuilding(propertyId);
+            } else {
+                alert('Error: Property context is missing. Please go back to properties and try again.');
+                console.error('Cannot add building: currentPropertyIdForDetail is', currentPropertyIdForDetail);
+            }
+        });
+    }
+    if (buildingForm) buildingForm.addEventListener('submit', handleBuildingSubmit);
+    if (closeBuildingModalBtn) closeBuildingModalBtn.addEventListener('click', closeBuildingModal);
+    if (cancelBuildingFormBtn) cancelBuildingFormBtn.addEventListener('click', closeBuildingModal);
+    
+    // Also close building modal when clicking outside
+    window.addEventListener('click', (e) => {
+        if (e.target.classList.contains('modal')) {
+            const buildingModal = document.getElementById('buildingModal');
+            if (buildingModal && e.target === buildingModal) {
+                closeBuildingModal();
+            }
+        }
+    });
+
     // Close modals when clicking outside
     window.addEventListener('click', (e) => {
         if (e.target.classList.contains('modal')) {
@@ -202,6 +243,7 @@ function setupEventListeners() {
             closeTicketModal();
             closeCompletionModal();
             closeDeleteTicketModal();
+            closeBuildingModal();
         }
     });
 }
