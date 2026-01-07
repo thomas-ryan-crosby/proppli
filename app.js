@@ -2866,3 +2866,313 @@ window.openPhotoModal = function(photoUrl) {
         }
     });
 };
+// Tenant Management
+let editingTenantId = null;
+
+function loadTenants() {
+    db.collection('tenants').onSnapshot((snapshot) => {
+        const tenants = {};
+        snapshot.forEach((doc) => {
+            tenants[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        renderTenantsList(tenants);
+    }, (error) => {
+        console.error('Error loading tenants:', error);
+        const tenantsList = document.getElementById('tenantsList');
+        if (tenantsList) {
+            tenantsList.innerHTML = '<p style="color: #e74c3c; text-align: center; padding: 20px;">Error loading tenants. Please try again.</p>';
+        }
+    });
+}
+
+function renderTenantsList(tenants) {
+    const tenantsList = document.getElementById('tenantsList');
+    if (!tenantsList) return;
+    
+    tenantsList.innerHTML = '';
+    
+    if (Object.keys(tenants).length === 0) {
+        tenantsList.innerHTML = '<p style="color: #999; text-align: center; padding: 40px; grid-column: 1 / -1;">No tenants yet. Add one to get started.</p>';
+        return;
+    }
+    
+    Object.keys(tenants).forEach(id => {
+        const tenant = tenants[id];
+        const card = document.createElement('div');
+        card.className = 'property-card';
+        const statusBadge = tenant.status ? `<span class="status-badge status-${tenant.status.toLowerCase()}">${tenant.status}</span>` : '';
+        const typeBadge = tenant.tenantType ? `<span class="status-badge" style="background: #3498db;">${tenant.tenantType}</span>` : '';
+        
+        card.innerHTML = `
+            <div class="property-card-header">
+                <h3>${escapeHtml(tenant.tenantName || 'Unnamed Tenant')}</h3>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    ${statusBadge}
+                    ${typeBadge}
+                </div>
+            </div>
+            <div class="property-card-body">
+                ${tenant.mailingAddress ? `<p><strong>Address:</strong> ${escapeHtml(tenant.mailingAddress)}</p>` : ''}
+                ${tenant.tenantType === 'Commercial' && tenant.businessType ? `<p><strong>Business Type:</strong> ${escapeHtml(tenant.businessType)}</p>` : ''}
+                ${tenant.notes ? `<p><strong>Notes:</strong> ${escapeHtml(tenant.notes.substring(0, 100))}${tenant.notes.length > 100 ? '...' : ''}</p>` : ''}
+            </div>
+            <div class="property-card-actions">
+                <button class="btn-secondary btn-small" onclick="editTenant('${id}')">Edit</button>
+                <button class="btn-danger btn-small" onclick="deleteTenant('${id}')">Delete</button>
+            </div>
+        `;
+        tenantsList.appendChild(card);
+    });
+}
+
+function showAddTenantForm() {
+    editingTenantId = null;
+    document.getElementById('tenantModalTitle').textContent = 'Add Tenant';
+    document.getElementById('tenantId').value = '';
+    document.getElementById('tenantForm').reset();
+    
+    // Reset button state
+    const submitBtn = document.querySelector('#tenantForm button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Save Tenant';
+        submitBtn.classList.remove('saving');
+    }
+    
+    // Reset field visibility
+    updateTenantTypeFields();
+    
+    document.getElementById('tenantModal').classList.add('show');
+    setTimeout(() => {
+        document.getElementById('tenantName').focus();
+    }, 100);
+}
+
+function updateTenantTypeFields() {
+    const tenantType = document.getElementById('tenantType')?.value || '';
+    const commercialFields = document.getElementById('commercialTenantFields');
+    const residentialFields = document.getElementById('residentialTenantFields');
+    
+    if (commercialFields) {
+        commercialFields.style.display = tenantType === 'Commercial' ? 'block' : 'none';
+    }
+    if (residentialFields) {
+        residentialFields.style.display = tenantType === 'Residential' ? 'block' : 'none';
+    }
+}
+
+function closeTenantModal() {
+    const modal = document.getElementById('tenantModal');
+    if (modal) {
+        modal.classList.remove('show');
+    }
+    document.getElementById('tenantForm').reset();
+    document.getElementById('tenantId').value = '';
+    editingTenantId = null;
+    
+    // Reset button state
+    const submitBtn = document.querySelector('#tenantForm button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Save Tenant';
+        submitBtn.classList.remove('saving');
+    }
+    
+    // Reset field visibility
+    updateTenantTypeFields();
+}
+
+window.editTenant = function(tenantId) {
+    db.collection('tenants').doc(tenantId).get().then((doc) => {
+        const tenant = doc.data();
+        if (tenant) {
+            editingTenantId = tenantId;
+            document.getElementById('tenantModalTitle').textContent = 'Edit Tenant';
+            document.getElementById('tenantId').value = tenantId;
+            document.getElementById('tenantName').value = tenant.tenantName || '';
+            document.getElementById('tenantType').value = tenant.tenantType || '';
+            document.getElementById('tenantStatus').value = tenant.status || 'Active';
+            document.getElementById('tenantMailingAddress').value = tenant.mailingAddress || '';
+            document.getElementById('tenantNotes').value = tenant.notes || '';
+            
+            // Commercial fields
+            document.getElementById('tenantTaxId').value = tenant.taxId || '';
+            document.getElementById('tenantBusinessType').value = tenant.businessType || '';
+            document.getElementById('tenantNumberOfEmployees').value = tenant.numberOfEmployees || '';
+            document.getElementById('tenantWebsite').value = tenant.website || '';
+            
+            // Residential fields
+            if (tenant.dateOfBirth) {
+                const dob = tenant.dateOfBirth.toDate ? tenant.dateOfBirth.toDate() : new Date(tenant.dateOfBirth);
+                document.getElementById('tenantDateOfBirth').value = dob.toISOString().split('T')[0];
+            } else {
+                document.getElementById('tenantDateOfBirth').value = '';
+            }
+            
+            // Reset button state
+            const submitBtn = document.querySelector('#tenantForm button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Save Tenant';
+                submitBtn.classList.remove('saving');
+            }
+            
+            // Update field visibility
+            updateTenantTypeFields();
+            
+            document.getElementById('tenantModal').classList.add('show');
+            setTimeout(() => {
+                document.getElementById('tenantName').focus();
+            }, 100);
+        }
+    }).catch((error) => {
+        console.error('Error loading tenant:', error);
+        alert('Error loading tenant: ' + error.message);
+    });
+};
+
+window.deleteTenant = function(tenantId) {
+    if (!confirm('Are you sure you want to delete this tenant? This action cannot be undone.')) {
+        return;
+    }
+    
+    db.collection('tenants').doc(tenantId).delete()
+        .then(() => {
+            console.log('Tenant deleted successfully');
+            loadTenants();
+        })
+        .catch((error) => {
+            console.error('Error deleting tenant:', error);
+            alert('Error deleting tenant: ' + error.message);
+        });
+};
+
+function handleTenantSubmit(e) {
+    e.preventDefault();
+    
+    // Get submit button early for state management
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    
+    // Helper function to reset button state
+    const resetButtonState = () => {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save Tenant';
+            submitBtn.classList.remove('saving');
+        }
+    };
+    
+    const id = document.getElementById('tenantId').value;
+    const tenantName = document.getElementById('tenantName').value.trim();
+    const tenantType = document.getElementById('tenantType').value;
+    const status = document.getElementById('tenantStatus').value;
+    const mailingAddress = document.getElementById('tenantMailingAddress').value.trim();
+    const notes = document.getElementById('tenantNotes').value.trim();
+    
+    // Commercial specific fields
+    const taxId = document.getElementById('tenantTaxId')?.value.trim() || null;
+    const businessType = document.getElementById('tenantBusinessType')?.value.trim() || null;
+    const numberOfEmployees = parseInt(document.getElementById('tenantNumberOfEmployees')?.value) || null;
+    const website = document.getElementById('tenantWebsite')?.value.trim() || null;
+    
+    // Residential specific fields
+    const dateOfBirthStr = document.getElementById('tenantDateOfBirth')?.value || null;
+    const dateOfBirth = dateOfBirthStr ? firebase.firestore.Timestamp.fromDate(new Date(dateOfBirthStr)) : null;
+    
+    // Validation
+    if (!tenantName) {
+        alert('Tenant name is required');
+        resetButtonState();
+        return;
+    }
+    
+    if (!tenantType) {
+        alert('Tenant type is required');
+        resetButtonState();
+        return;
+    }
+    
+    if (!status) {
+        alert('Status is required');
+        resetButtonState();
+        return;
+    }
+    
+    // Disable submit button (only after validation passes)
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
+        submitBtn.classList.add('saving');
+    }
+    
+    // Set a timeout safety mechanism (30 seconds)
+    const timeoutId = setTimeout(() => {
+        console.error('Tenant save operation timed out');
+        resetButtonState();
+        alert('The save operation is taking longer than expected. Please check your connection and try again.');
+    }, 30000);
+    
+    const tenantData = {
+        tenantName,
+        tenantType,
+        status,
+        mailingAddress: mailingAddress || null,
+        notes: notes || null,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    
+    // Add type-specific fields
+    if (tenantType === 'Commercial') {
+        tenantData.taxId = taxId;
+        tenantData.businessType = businessType;
+        tenantData.numberOfEmployees = numberOfEmployees;
+        tenantData.website = website;
+        // Clear residential fields
+        tenantData.dateOfBirth = null;
+    } else if (tenantType === 'Residential') {
+        tenantData.dateOfBirth = dateOfBirth;
+        // Clear commercial fields
+        tenantData.taxId = null;
+        tenantData.businessType = null;
+        tenantData.numberOfEmployees = null;
+        tenantData.website = null;
+    }
+    
+    if (id && editingTenantId) {
+        // Update existing
+        db.collection('tenants').doc(id).get().then((doc) => {
+            const existing = doc.data();
+            tenantData.createdAt = existing?.createdAt || firebase.firestore.FieldValue.serverTimestamp();
+            return db.collection('tenants').doc(id).update(tenantData);
+        }).then(() => {
+            clearTimeout(timeoutId);
+            console.log('Tenant updated successfully');
+            resetButtonState();
+            closeTenantModal();
+            loadTenants();
+        }).catch((error) => {
+            clearTimeout(timeoutId);
+            console.error('Error updating tenant:', error);
+            alert('Error saving tenant: ' + error.message);
+            resetButtonState();
+        });
+    } else {
+        // Create new
+        tenantData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+        db.collection('tenants').add(tenantData)
+            .then((docRef) => {
+                clearTimeout(timeoutId);
+                console.log('Tenant created successfully with ID:', docRef.id);
+                resetButtonState();
+                closeTenantModal();
+                loadTenants();
+            })
+            .catch((error) => {
+                clearTimeout(timeoutId);
+                console.error('Error creating tenant:', error);
+                alert('Error saving tenant: ' + error.message);
+                resetButtonState();
+            });
+    }
+}
+
