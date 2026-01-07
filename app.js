@@ -74,6 +74,13 @@ function setupEventListeners() {
     if (cancelTicketFormBtn) cancelTicketFormBtn.addEventListener('click', closeTicketModal);
     if (ticketStatus) ticketStatus.addEventListener('change', handleStatusChange);
     
+    // Handle assignedTo field changes - auto-update status if assigned
+    const assignedToField = document.getElementById('assignedTo');
+    if (assignedToField) {
+        assignedToField.addEventListener('change', handleAssignedToChange);
+        assignedToField.addEventListener('blur', handleAssignedToChange);
+    }
+    
     // Billing type toggle
     const billingTypeHourly = document.getElementById('billingTypeHourly');
     const billingTypeFlat = document.getElementById('billingTypeFlat');
@@ -1048,7 +1055,11 @@ function openTicketModal(ticketId = null) {
     }
 
     // Set default status
-    document.getElementById('ticketStatus').value = 'New (Unassigned)';
+    const statusField = document.getElementById('ticketStatus');
+    if (statusField) {
+        statusField.value = 'New (Unassigned)';
+        statusField.setAttribute('data-previous-status', 'New (Unassigned)');
+    }
     document.getElementById('completedByGroup').style.display = 'none';
     document.getElementById('howResolvedGroup').style.display = 'none';
     document.getElementById('afterPhotoGroup').style.display = 'none';
@@ -1195,8 +1206,13 @@ function loadTicketForEdit(ticketId) {
             }
             document.getElementById('requestedBy').value = ticket.requestedBy || '';
             document.getElementById('managedBy').value = ticket.managedBy || '';
-            document.getElementById('assignedTo').value = ticket.assignedTo || '';
-            document.getElementById('ticketStatus').value = ticket.status || 'New (Unassigned)';
+            const assignedToField = document.getElementById('assignedTo');
+            const statusField = document.getElementById('ticketStatus');
+            if (assignedToField) assignedToField.value = ticket.assignedTo || '';
+            if (statusField) {
+                statusField.value = ticket.status || 'New (Unassigned)';
+                statusField.setAttribute('data-previous-status', ticket.status || 'New (Unassigned)');
+            }
             
             // Always show before photo if it exists
             if (ticket.beforePhotoUrl) {
@@ -1240,7 +1256,32 @@ function loadTicketForEdit(ticketId) {
 }
 
 function handleStatusChange(e) {
-    if (e.target.value === 'Completed') {
+    const newStatus = e.target.value;
+    const statusField = e.target;
+    const assignedToField = document.getElementById('assignedTo');
+    const assignedToValue = assignedToField ? assignedToField.value.trim() : '';
+    
+    // Get previous status from attribute or current value
+    const previousStatus = statusField.getAttribute('data-previous-status') || statusField.value;
+    
+    // If changing to "New (Unassigned)" and there's an assigned person, warn and clear it
+    if (newStatus === 'New (Unassigned)' && assignedToValue) {
+        const assignedPerson = assignedToValue;
+        if (!confirm(`Changing status to "New (Unassigned)" will remove the assigned person (${assignedPerson}). Continue?`)) {
+            // Revert to previous status
+            statusField.value = previousStatus;
+            return;
+        }
+        // Clear assignedTo field
+        if (assignedToField) {
+            assignedToField.value = '';
+        }
+    }
+    
+    // Store current status for potential revert (store the new status after confirmation)
+    statusField.setAttribute('data-previous-status', newStatus);
+    
+    if (newStatus === 'Completed') {
         document.getElementById('completedByGroup').style.display = 'block';
         document.getElementById('howResolvedGroup').style.display = 'block';
         document.getElementById('afterPhotoGroup').style.display = 'block';
@@ -1250,6 +1291,23 @@ function handleStatusChange(e) {
         document.getElementById('howResolvedGroup').style.display = 'none';
         document.getElementById('afterPhotoGroup').style.display = 'none';
         document.getElementById('retroactiveDatesGroup').style.display = 'none';
+    }
+}
+
+function handleAssignedToChange(e) {
+    const assignedToValue = e.target.value.trim();
+    const statusField = document.getElementById('ticketStatus');
+    const currentStatus = statusField ? statusField.value : '';
+    
+    // If assignedTo is set and status is "New (Unassigned)", automatically change to "Not Started"
+    if (assignedToValue && currentStatus === 'New (Unassigned)') {
+        if (statusField) {
+            statusField.value = 'Not Started';
+            statusField.setAttribute('data-previous-status', 'Not Started');
+            // Trigger status change handler to update UI
+            const changeEvent = new Event('change');
+            statusField.dispatchEvent(changeEvent);
+        }
     }
 }
 
@@ -1295,6 +1353,18 @@ function handleTicketSubmit(e) {
     if (status === 'Completed' && !completedBy) {
         alert('Please enter who completed the work');
         return;
+    }
+    
+    // Validate: "New (Unassigned)" status cannot have an assigned person
+    if (status === 'New (Unassigned)' && assignedTo) {
+        alert('A ticket with status "New (Unassigned)" cannot have an assigned person. Please either change the status or remove the assigned person.');
+        return;
+    }
+    
+    // Auto-update status if assignedTo is set but status is "New (Unassigned)"
+    let finalStatus = status;
+    if (assignedTo && status === 'New (Unassigned)') {
+        finalStatus = 'Not Started';
     }
     
     // Disable submit button and show loading modal
@@ -1349,7 +1419,7 @@ function handleTicketSubmit(e) {
                     requestedBy,
                     managedBy,
                     assignedTo: assignedTo || null,
-                    status,
+                    status: finalStatus,
                     // Always update the lastUpdated timestamp
                     lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -1428,7 +1498,7 @@ function handleTicketSubmit(e) {
                 requestedBy,
                 managedBy,
                 assignedTo: assignedTo || null,
-                status: status || 'New (Unassigned)',
+                status: finalStatus || 'New (Unassigned)',
                 dateCreated: firebase.firestore.FieldValue.serverTimestamp(),
                 lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
