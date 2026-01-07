@@ -3129,10 +3129,11 @@ async function renderTenantsTableView(tenants) {
         return;
     }
     
-    // Load occupancies and buildings to group by building
-    const [occupanciesSnapshot, buildingsSnapshot, propertiesSnapshot] = await Promise.all([
+    // Load occupancies, buildings, units, and properties to group by building
+    const [occupanciesSnapshot, buildingsSnapshot, unitsSnapshot, propertiesSnapshot] = await Promise.all([
         db.collection('occupancies').get(),
         db.collection('buildings').get(),
+        db.collection('units').get(),
         db.collection('properties').get()
     ]);
     
@@ -3148,6 +3149,11 @@ async function renderTenantsTableView(tenants) {
     const buildingsMap = {};
     buildingsSnapshot.forEach(doc => {
         buildingsMap[doc.id] = { id: doc.id, ...doc.data() };
+    });
+    
+    const unitsMap = {};
+    unitsSnapshot.forEach(doc => {
+        unitsMap[doc.id] = { id: doc.id, ...doc.data() };
     });
     
     const propertiesMap = {};
@@ -3225,8 +3231,14 @@ async function renderTenantsTableView(tenants) {
             let occupanciesHtml = '<span style="color: #999;">No occupancies</span>';
             if (occupancies.length > 0) {
                 occupanciesHtml = occupancies.map(occ => {
-                    // We need to get unit info
-                    return `<span class="occupancy-info">Unit</span>`;
+                    if (occ.unitId && unitsMap[occ.unitId]) {
+                        const unit = unitsMap[occ.unitId];
+                        return `<span class="occupancy-info">Unit ${escapeHtml(unit.unitNumber || 'N/A')}</span>`;
+                    } else if (occ.unitId) {
+                        return `<span class="occupancy-info">Unit (ID: ${occ.unitId.substring(0, 8)}...)</span>`;
+                    } else {
+                        return `<span class="occupancy-info">Property Level</span>`;
+                    }
                 }).join('');
             }
             
