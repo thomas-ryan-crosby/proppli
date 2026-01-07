@@ -144,10 +144,15 @@
                             <div class="form-group">
                                 <label for="ticketStatus">Status</label>
                                 <select id="ticketStatus">
+                                    <option value="New (Unassigned)">New (Unassigned)</option>
                                     <option value="Not Started">Not Started</option>
                                     <option value="In Progress">In Progress</option>
                                     <option value="Completed">Completed</option>
                                 </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="assignedTo">Assigned To</label>
+                                <input type="text" id="assignedTo" placeholder="Enter name of person assigned to this ticket">
                             </div>
                             <div class="form-group" id="retroactiveDatesGroup" style="display: none;">
                                 <label style="font-weight: 600; color: #667eea;">Retroactive Ticket Dates (Optional)</label>
@@ -253,6 +258,11 @@
                     </div>
                     <div class="modal-body">
                         <form id="completionForm">
+                            <div class="form-group">
+                                <label for="completionTimeAllocated">Time Allocated (hours) *</label>
+                                <input type="number" id="completionTimeAllocated" step="0.25" min="0" required placeholder="e.g., 2.5">
+                                <small style="color: #666; font-size: 12px;">Enter the time allocated for this ticket</small>
+                            </div>
                             <div class="form-group">
                                 <label for="completionCompletedBy">Completed By *</label>
                                 <input type="text" id="completionCompletedBy" required>

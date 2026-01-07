@@ -258,6 +258,11 @@ header h1 {
     text-transform: uppercase;
 }
 
+.status-new-unassigned {
+    background: #e3f2fd;
+    color: #1565c0;
+}
+
 .status-not-started {
     background: #ffebee;
     color: #c62828;

@@ -684,13 +684,24 @@ function createTicketCard(ticket, isDeleted = false) {
     });
 
     const isCompleted = ticket.status === 'Completed';
-    const statusClass = `status-${ticket.status.toLowerCase().replace(' ', '-')}`;
+    // Generate status class - handle "New (Unassigned)" specially
+    let statusClass = ticket.status.toLowerCase().replace(/\s+/g, '-').replace(/[()]/g, '');
+    if (statusClass === 'new-unassigned') {
+        statusClass = 'new-unassigned';
+    }
+    statusClass = `status-${statusClass}`;
 
     card.innerHTML = `
         <div class="ticket-header">
             <div class="ticket-title">${escapeHtml(ticket.workDescription)}</div>
             <span class="ticket-status ${statusClass}">${escapeHtml(ticket.status)}</span>
         </div>
+        ${ticket.assignedTo ? `
+            <div style="text-align: center; padding: 10px 0; margin-bottom: 15px; background: #f8f9fa; border-radius: 6px; border: 1px solid #e0e0e0;">
+                <span style="font-size: 12px; color: #666; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Assigned To:</span>
+                <div style="font-size: 16px; color: #333; font-weight: 600; margin-top: 4px;">${escapeHtml(ticket.assignedTo)}</div>
+            </div>
+        ` : ''}
         <div class="ticket-details">
             ${selectedPropertyId ? '' : `<div class="ticket-detail"><span class="ticket-detail-label">Property</span><span class="ticket-detail-value property-name">Loading...</span></div>`}
             ${ticket.buildingNumber ? `
@@ -879,7 +890,7 @@ function openTicketModal(ticketId = null) {
     }
 
     // Set default status
-    document.getElementById('ticketStatus').value = 'Not Started';
+    document.getElementById('ticketStatus').value = 'New (Unassigned)';
     document.getElementById('completedByGroup').style.display = 'none';
     document.getElementById('howResolvedGroup').style.display = 'none';
     document.getElementById('afterPhotoGroup').style.display = 'none';
@@ -1026,7 +1037,8 @@ function loadTicketForEdit(ticketId) {
             }
             document.getElementById('requestedBy').value = ticket.requestedBy || '';
             document.getElementById('managedBy').value = ticket.managedBy || '';
-            document.getElementById('ticketStatus').value = ticket.status || 'Not Started';
+            document.getElementById('assignedTo').value = ticket.assignedTo || '';
+            document.getElementById('ticketStatus').value = ticket.status || 'New (Unassigned)';
             
             // Always show before photo if it exists
             if (ticket.beforePhotoUrl) {
@@ -1051,15 +1063,19 @@ function loadTicketForEdit(ticketId) {
             
             // Load custom dates if they exist (for retroactive tickets)
             // Note: Firestore timestamps need to be converted to date input format
-            if (ticket.dateCreated && ticket.dateCreated.toDate) {
-                const createdDate = ticket.dateCreated.toDate();
-                const createdDateStr = createdDate.toISOString().split('T')[0];
-                document.getElementById('customDateCreated').value = createdDateStr;
-            }
-            if (ticket.dateCompleted && ticket.dateCompleted.toDate) {
-                const completedDate = ticket.dateCompleted.toDate();
-                const completedDateStr = completedDate.toISOString().split('T')[0];
-                document.getElementById('customDateCompleted').value = completedDateStr;
+            // Only load custom dates if status is Completed (when retroactive dates group is visible)
+            // For normal editing, we preserve the original dateCreated without loading it into customDateCreated
+            if (ticket.status === 'Completed') {
+                if (ticket.dateCreated && ticket.dateCreated.toDate) {
+                    const createdDate = ticket.dateCreated.toDate();
+                    const createdDateStr = createdDate.toISOString().split('T')[0];
+                    document.getElementById('customDateCreated').value = createdDateStr;
+                }
+                if (ticket.dateCompleted && ticket.dateCompleted.toDate) {
+                    const completedDate = ticket.dateCompleted.toDate();
+                    const completedDateStr = completedDate.toISOString().split('T')[0];
+                    document.getElementById('customDateCompleted').value = completedDateStr;
+                }
             }
         }
     });
@@ -1102,6 +1118,7 @@ function handleTicketSubmit(e) {
     const billingType = billingRateInput && billingRateInput.value && billingTypeHourly && billingTypeHourly.checked ? 'hourly' : (billingRateInput && billingRateInput.value ? 'flat' : null);
     const requestedBy = document.getElementById('requestedBy').value.trim();
     const managedBy = document.getElementById('managedBy').value.trim();
+    const assignedTo = document.getElementById('assignedTo').value.trim();
     const status = document.getElementById('ticketStatus').value;
     const completedBy = document.getElementById('completedBy').value.trim();
     const howResolved = document.getElementById('howResolved').value.trim();
@@ -1173,18 +1190,20 @@ function handleTicketSubmit(e) {
                     billingType: billingRate ? billingType : null,
                     requestedBy,
                     managedBy,
+                    assignedTo: assignedTo || null,
                     status,
                     // Always update the lastUpdated timestamp
                     lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 };
                 
-                // ONLY include dateCreated if a custom date is explicitly provided
+                // ONLY include dateCreated if a custom date is explicitly provided AND status is Completed
                 // Otherwise, DO NOT include it in the update to preserve the existing value
-                if (customDateCreated) {
+                // This prevents the creation date from being reset when editing non-completed tickets
+                if (customDateCreated && status === 'Completed') {
                     ticketData.dateCreated = firebase.firestore.Timestamp.fromDate(new Date(customDateCreated));
                 }
-                // If no custom date, we don't include dateCreated at all - Firestore will preserve existing value
+                // If no custom date or status is not Completed, we don't include dateCreated at all - Firestore will preserve existing value
 
                 // Always save before photo if it exists (can be uploaded for any status)
                 if (beforeUrl) ticketData.beforePhotoUrl = beforeUrl;
@@ -1250,7 +1269,8 @@ function handleTicketSubmit(e) {
                 billingRate: billingRate || null,
                 requestedBy,
                 managedBy,
-                status: status || 'Not Started',
+                assignedTo: assignedTo || null,
+                status: status || 'New (Unassigned)',
                 dateCreated: firebase.firestore.FieldValue.serverTimestamp(),
                 lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -1332,6 +1352,16 @@ function handleTicketSubmit(e) {
 
 window.markTicketComplete = function(ticketId) {
     editingTicketId = ticketId;
+    // Load ticket data to populate time allocated
+    db.collection('tickets').doc(ticketId).get().then((doc) => {
+        const ticket = doc.data();
+        if (ticket) {
+            document.getElementById('completionTimeAllocated').value = ticket.timeAllocated || '';
+        }
+    }).catch((error) => {
+        console.error('Error loading ticket:', error);
+    });
+    
     document.getElementById('completionModal').classList.add('show');
     document.getElementById('completionCompletedBy').value = '';
     document.getElementById('completionHowResolved').value = '';
@@ -1339,7 +1369,7 @@ window.markTicketComplete = function(ticketId) {
     document.getElementById('completionAfterPhotoPreview').innerHTML = '';
     document.getElementById('removeCompletionAfterPhoto').style.display = 'none';
     completionAfterPhotoFile = null;
-    document.getElementById('completionCompletedBy').focus();
+    document.getElementById('completionTimeAllocated').focus();
 };
 
 function closeCompletionModal() {
@@ -1349,8 +1379,14 @@ function closeCompletionModal() {
 
 function handleTicketCompletion(e) {
     e.preventDefault();
+    const timeAllocated = parseFloat(document.getElementById('completionTimeAllocated').value);
     const completedBy = document.getElementById('completionCompletedBy').value.trim();
     const howResolved = document.getElementById('completionHowResolved').value.trim();
+
+    if (!timeAllocated || isNaN(timeAllocated) || timeAllocated <= 0) {
+        alert('Please enter a valid time allocated (in hours)');
+        return;
+    }
 
     if (!completedBy) {
         alert('Please enter who completed the work');
@@ -1364,7 +1400,6 @@ function handleTicketCompletion(e) {
         submitBtn.textContent = 'Saving...';
     }
 
-    // Check if timeAllocated is set - required before marking complete
     if (!editingTicketId) {
         alert('Error: Ticket ID not found');
         if (submitBtn) {
@@ -1374,54 +1409,32 @@ function handleTicketCompletion(e) {
         return;
     }
     
-    // Get the ticket to check timeAllocated
-    db.collection('tickets').doc(editingTicketId).get().then((doc) => {
-        const ticket = doc.data();
-        const timeAllocated = ticket?.timeAllocated;
-        
-        if (!timeAllocated || isNaN(timeAllocated) || timeAllocated <= 0) {
-            alert('Time Allocated is required before marking a ticket as complete. Please edit the ticket and add the time allocated first.');
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Mark as Complete';
-            }
-            return;
+    // Upload after photo if provided
+    const uploadPromise = completionAfterPhotoFile 
+        ? uploadPhoto(completionAfterPhotoFile, editingTicketId, 'after')
+        : Promise.resolve(null);
+
+    uploadPromise.then((afterPhotoUrl) => {
+        const updateData = {
+            status: 'Completed',
+            timeAllocated: timeAllocated,
+            completedBy: completedBy,
+            howResolved: howResolved || null,
+            dateCompleted: firebase.firestore.FieldValue.serverTimestamp(),
+            lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        if (afterPhotoUrl) {
+            updateData.afterPhotoUrl = afterPhotoUrl;
         }
-        
-        // Continue with completion if timeAllocated is set
-        // Upload after photo if provided
-        const uploadPromise = completionAfterPhotoFile 
-            ? uploadPhoto(completionAfterPhotoFile, editingTicketId, 'after')
-            : Promise.resolve(null);
 
-        uploadPromise.then((afterPhotoUrl) => {
-            const updateData = {
-                status: 'Completed',
-                completedBy: completedBy,
-                howResolved: howResolved || null,
-                dateCompleted: firebase.firestore.FieldValue.serverTimestamp(),
-                lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            };
-
-            if (afterPhotoUrl) {
-                updateData.afterPhotoUrl = afterPhotoUrl;
-            }
-
-            return db.collection('tickets').doc(editingTicketId).update(updateData);
-        }).then(() => {
-            closeCompletionModal();
-        }).catch((error) => {
-            console.error('Error completing ticket:', error);
-            alert('Error completing ticket: ' + error.message);
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Mark as Complete';
-            }
-        });
+        return db.collection('tickets').doc(editingTicketId).update(updateData);
+    }).then(() => {
+        closeCompletionModal();
     }).catch((error) => {
-        console.error('Error checking ticket:', error);
-        alert('Error checking ticket: ' + error.message);
+        console.error('Error completing ticket:', error);
+        alert('Error completing ticket: ' + error.message);
         if (submitBtn) {
             submitBtn.disabled = false;
             submitBtn.textContent = 'Mark as Complete';
