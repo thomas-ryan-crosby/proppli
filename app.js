@@ -1,6 +1,7 @@
 // Global state
 let selectedPropertyId = localStorage.getItem('selectedPropertyId') || '';
 let currentView = 'active'; // 'active' or 'completed'
+let currentPage = localStorage.getItem('currentPage') || 'maintenance'; // 'maintenance', 'properties', 'tenants'
 let editingTicketId = null;
 let editingPropertyId = null;
 let beforePhotoFile = null;
@@ -23,21 +24,71 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function initializeApp() {
     setupEventListeners();
+    setupNavigation();
     loadProperties();
     loadTickets();
+    showPage(currentPage);
+}
+
+// Navigation
+function setupNavigation() {
+    const navLinks = document.querySelectorAll('.nav-link');
+    navLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
+            const page = e.target.getAttribute('data-page');
+            switchPage(page);
+        });
+    });
+}
+
+function switchPage(page) {
+    currentPage = page;
+    localStorage.setItem('currentPage', page);
+    showPage(page);
+    
+    // Update active nav link
+    document.querySelectorAll('.nav-link').forEach(link => {
+        link.classList.remove('active');
+        if (link.getAttribute('data-page') === page) {
+            link.classList.add('active');
+        }
+    });
+}
+
+function showPage(page) {
+    // Hide all pages
+    document.querySelectorAll('.page').forEach(p => {
+        p.classList.remove('active');
+        p.style.display = 'none';
+    });
+    
+    // Show selected page
+    const pageElement = document.getElementById(page + 'Page');
+    if (pageElement) {
+        pageElement.classList.add('active');
+        pageElement.style.display = 'block';
+    }
+    
+    // Load page-specific data
+    if (page === 'properties') {
+        loadProperties();
+    } else if (page === 'tenants') {
+        // Load tenants when implemented
+        console.log('Tenants page - to be implemented');
+    } else if (page === 'maintenance') {
+        loadTickets();
+    }
 }
 
 // Event Listeners
 function setupEventListeners() {
-    // Property management
-    const managePropertiesBtn = document.getElementById('managePropertiesBtn');
+    // Property management (on Properties page)
     const closePropertyModalBtn = document.getElementById('closePropertyModal');
     const addPropertyBtn = document.getElementById('addPropertyBtn');
     const propertyForm = document.getElementById('propertyForm');
     const cancelPropertyFormBtn = document.getElementById('cancelPropertyForm');
     const propertySelect = document.getElementById('propertySelect');
     
-    if (managePropertiesBtn) managePropertiesBtn.addEventListener('click', openPropertyModal);
     if (closePropertyModalBtn) closePropertyModalBtn.addEventListener('click', closePropertyModal);
     if (addPropertyBtn) addPropertyBtn.addEventListener('click', showAddPropertyForm);
     if (propertyForm) propertyForm.addEventListener('submit', handlePropertySubmit);
@@ -211,10 +262,12 @@ function loadProperties() {
 
 function renderPropertiesList(properties) {
     const list = document.getElementById('propertiesList');
+    if (!list) return;
+    
     list.innerHTML = '';
 
     if (Object.keys(properties).length === 0) {
-        list.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">No properties yet. Create one above!</p>';
+        list.innerHTML = '<p style="color: #999; text-align: center; padding: 20px; grid-column: 1 / -1;">No properties yet. Create one above!</p>';
         return;
     }
 
@@ -230,9 +283,10 @@ function renderPropertiesList(properties) {
                 ${property.address ? `<p>📍 ${escapeHtml(property.address)}</p>` : ''}
                 ${property.squareFootage ? `<p><strong>Square Footage:</strong> ${property.squareFootage.toLocaleString()} sq ft</p>` : ''}
                 ${property.numberOfUnits ? `<p><strong>Units/Spaces:</strong> ${property.numberOfUnits}</p>` : ''}
-                ${property.description ? `<p>${escapeHtml(property.description)}</p>` : ''}
+                ${property.description ? `<p style="margin-top: 10px; color: #666;">${escapeHtml(property.description)}</p>` : ''}
             </div>
             <div class="property-item-actions">
+                <button class="btn-primary btn-small" onclick="viewPropertyDetail('${id}')">View Details</button>
                 <button class="btn-secondary btn-small" onclick="editProperty('${id}')">Edit</button>
                 <button class="btn-danger btn-small" onclick="deleteProperty('${id}')">Delete</button>
             </div>
@@ -241,9 +295,62 @@ function renderPropertiesList(properties) {
     });
 }
 
+// View property detail (for buildings and units)
+window.viewPropertyDetail = function(propertyId) {
+    // Hide properties list, show detail view
+    const propertiesList = document.querySelector('.properties-page-content .section');
+    const propertyDetailView = document.getElementById('propertyDetailView');
+    
+    if (propertiesList) propertiesList.style.display = 'none';
+    if (propertyDetailView) {
+        propertyDetailView.style.display = 'block';
+        
+        // Load property name
+        db.collection('properties').doc(propertyId).get().then((doc) => {
+            const property = doc.data();
+            if (property) {
+                const nameElement = document.getElementById('propertyDetailName');
+                if (nameElement) nameElement.textContent = property.name;
+            }
+        });
+        
+        // Load buildings and units
+        loadBuildings(propertyId);
+        loadUnits(propertyId);
+    }
+};
+
+window.backToProperties = function() {
+    const propertiesList = document.querySelector('.properties-page-content .section');
+    const propertyDetailView = document.getElementById('propertyDetailView');
+    
+    if (propertiesList) propertiesList.style.display = 'block';
+    if (propertyDetailView) propertyDetailView.style.display = 'none';
+};
+
+// Placeholder functions for buildings and units
+function loadBuildings(propertyId) {
+    // To be implemented
+    const buildingsList = document.getElementById('buildingsList');
+    if (buildingsList) {
+        buildingsList.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">No buildings yet. Add one to get started.</p>';
+    }
+}
+
+function loadUnits(propertyId) {
+    // To be implemented
+    const unitsList = document.getElementById('unitsList');
+    if (unitsList) {
+        unitsList.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">No units yet. Add one to get started.</p>';
+    }
+}
+
 function openPropertyModal() {
-    document.getElementById('propertyModal').classList.add('show');
-    hidePropertyForm();
+    const modal = document.getElementById('propertyModal');
+    if (modal) {
+        modal.classList.add('show');
+        hidePropertyForm();
+    }
 }
 
 function showAddPropertyForm() {

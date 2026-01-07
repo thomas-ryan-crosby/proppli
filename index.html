@@ -12,152 +12,33 @@
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1>🔧 Maintenance Tracker</h1>
-            <div class="header-actions">
-                <div class="property-selector">
-                    <label for="propertySelect">Property:</label>
-                    <select id="propertySelect">
-                        <option value="">Select a property...</option>
-                    </select>
-                    <button id="managePropertiesBtn" class="btn-secondary">Manage Properties</button>
-                </div>
+        <!-- Navigation Bar -->
+        <nav class="main-nav">
+            <div class="nav-brand">
+                <h1>🏢 Property Management</h1>
             </div>
-        </header>
+            <div class="nav-links">
+                <button class="nav-link active" data-page="maintenance">🔧 Maintenance</button>
+                <button class="nav-link" data-page="properties">🏘️ Properties</button>
+                <button class="nav-link" data-page="tenants">👥 Tenants</button>
+            </div>
+        </nav>
 
-        <main>
-            <!-- Property Management Modal -->
-            <div id="propertyModal" class="modal">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h2>Manage Properties</h2>
-                        <button class="close-btn" id="closePropertyModal">&times;</button>
-                    </div>
-                    <div class="modal-body">
-                        <div style="margin-bottom: 20px;">
-                            <button id="addPropertyBtn" class="btn-primary">+ Add Property</button>
-                        </div>
-                        <form id="propertyForm" style="display: none;">
-                            <input type="hidden" id="propertyId">
-                            <div class="form-group">
-                                <label for="propertyName">Property Name *</label>
-                                <input type="text" id="propertyName" required placeholder="e.g., Oakwood Apartments">
-                            </div>
-                            <div class="form-group">
-                                <label for="propertyAddress">Address</label>
-                                <input type="text" id="propertyAddress" placeholder="e.g., 123 Main St, City, State">
-                            </div>
-                            <div class="form-group">
-                                <label for="propertyType">Property Type *</label>
-                                <select id="propertyType" required>
-                                    <option value="">Select property type...</option>
-                                    <option value="commercial">Commercial Property Management</option>
-                                    <option value="hoa">HOA Property Management</option>
-                                    <option value="residential">Residential Property Management</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="propertyStatus">Property Status *</label>
-                                <select id="propertyStatus" required>
-                                    <option value="Active">Active</option>
-                                    <option value="Inactive">Inactive</option>
-                                    <option value="Under Development">Under Development</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="propertySquareFootage">Square Footage *</label>
-                                <input type="number" id="propertySquareFootage" min="0" step="1" required placeholder="e.g., 5000">
-                            </div>
-                            <div class="form-group">
-                                <label for="propertyYearBuilt">Year Built *</label>
-                                <input type="number" id="propertyYearBuilt" min="1800" max="2100" step="1" required placeholder="e.g., 2020">
-                            </div>
-                            <div class="form-group">
-                                <label for="propertyNumberOfUnits">Number of Units/Spaces *</label>
-                                <input type="number" id="propertyNumberOfUnits" min="0" step="1" required placeholder="e.g., 10">
-                            </div>
-                            <div class="form-group">
-                                <label for="propertyLotSize">Lot Size</label>
-                                <input type="number" id="propertyLotSize" min="0" step="0.01" placeholder="e.g., 0.5 (acres)">
-                                <small style="color: #666; font-size: 12px;">Optional: Enter in acres or square feet</small>
-                            </div>
-                            <div class="form-group">
-                                <label for="propertyNumberOfFloors">Number of Floors/Stories</label>
-                                <input type="number" id="propertyNumberOfFloors" min="1" step="1" placeholder="e.g., 3">
-                            </div>
-                            <div class="form-group">
-                                <label for="propertyParkingSpaces">Parking Spaces</label>
-                                <input type="number" id="propertyParkingSpaces" min="0" step="1" placeholder="e.g., 20">
-                            </div>
-                            <div class="form-group">
-                                <label for="propertyTaxId">Property Tax ID / Assessor Parcel Number</label>
-                                <input type="text" id="propertyTaxId" placeholder="e.g., 123-456-789">
-                            </div>
-                            <div class="form-group">
-                                <label for="propertyOwnerName">Property Owner Name</label>
-                                <input type="text" id="propertyOwnerName" placeholder="e.g., ABC Properties LLC">
-                            </div>
-                            <div class="form-group">
-                                <label for="propertyOwnerContact">Property Owner Contact</label>
-                                <input type="text" id="propertyOwnerContact" placeholder="e.g., owner@example.com or phone number">
-                            </div>
-                            <!-- Commercial Specific Fields -->
-                            <div id="commercialPropertyFields" style="display: none;">
-                                <div class="form-group">
-                                    <label for="propertyBuildingNumber">Building Number</label>
-                                    <input type="text" id="propertyBuildingNumber" placeholder="e.g., Building A">
-                                </div>
-                                <div class="form-group">
-                                    <label for="propertyNumberOfBuildings">Number of Buildings</label>
-                                    <input type="number" id="propertyNumberOfBuildings" min="1" step="1" placeholder="e.g., 3">
-                                </div>
-                                <div class="form-group">
-                                    <label for="propertyTotalLeasableSqFt">Total Leasable Square Footage</label>
-                                    <input type="number" id="propertyTotalLeasableSqFt" min="0" step="1" placeholder="e.g., 45000">
-                                </div>
-                                <div class="form-group">
-                                    <label for="propertyCommonAreaSqFt">Common Area Square Footage</label>
-                                    <input type="number" id="propertyCommonAreaSqFt" min="0" step="1" placeholder="e.g., 5000">
-                                </div>
-                            </div>
-                            <!-- Residential Specific Fields -->
-                            <div id="residentialPropertyFields" style="display: none;">
-                                <div class="form-group">
-                                    <label for="propertyNumberOfBedrooms">Number of Bedrooms</label>
-                                    <input type="number" id="propertyNumberOfBedrooms" min="0" step="1" placeholder="e.g., 3">
-                                    <small style="color: #666; font-size: 12px;">For single-family properties</small>
-                                </div>
-                                <div class="form-group">
-                                    <label for="propertyNumberOfBathrooms">Number of Bathrooms</label>
-                                    <input type="number" id="propertyNumberOfBathrooms" min="0" step="0.5" placeholder="e.g., 2.5">
-                                    <small style="color: #666; font-size: 12px;">For single-family properties</small>
-                                </div>
-                                <div class="form-group">
-                                    <label for="propertySubtype">Property Subtype</label>
-                                    <select id="propertySubtype">
-                                        <option value="">Select subtype...</option>
-                                        <option value="Single-Family">Single-Family</option>
-                                        <option value="Multi-Family">Multi-Family</option>
-                                        <option value="Apartment Complex">Apartment Complex</option>
-                                        <option value="Condo">Condo</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label for="propertyDescription">Description</label>
-                                <textarea id="propertyDescription" rows="3" placeholder="Optional description or notes"></textarea>
-                            </div>
-                            <div class="form-actions">
-                                <button type="submit" class="btn-primary">Save Property</button>
-                                <button type="button" class="btn-secondary" id="cancelPropertyForm">Cancel</button>
-                            </div>
-                        </form>
-                        <hr>
-                        <h3>Existing Properties</h3>
-                        <div id="propertiesList"></div>
+        <!-- Maintenance Tracker Page -->
+        <div id="maintenancePage" class="page active">
+            <header>
+                <h2>Maintenance Tracker</h2>
+                <div class="header-actions">
+                    <div class="property-selector">
+                        <label for="propertySelect">Property:</label>
+                        <select id="propertySelect">
+                            <option value="">Select a property...</option>
+                        </select>
                     </div>
                 </div>
-            </div>
+            </header>
+
+            <main>
 
             <!-- Ticket Creation Modal -->
             <div id="ticketModal" class="modal">
@@ -437,7 +318,200 @@
                     <div id="deletedTicketsList" class="tickets-list"></div>
                 </div>
             </div>
-        </main>
+            </main>
+        </div>
+
+        <!-- Properties Page -->
+        <div id="propertiesPage" class="page" style="display: none;">
+            <header>
+                <h2>Property Management</h2>
+                <div class="header-actions">
+                    <button id="addPropertyBtn" class="btn-primary">+ Add Property</button>
+                </div>
+            </header>
+
+            <main>
+                <div class="properties-page-content">
+                    <!-- Property List -->
+                    <div class="section">
+                        <h3>Properties</h3>
+                        <div id="propertiesList" class="properties-grid"></div>
+                    </div>
+
+                    <!-- Property Form (Modal) -->
+                    <div id="propertyModal" class="modal">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h2>Manage Property</h2>
+                                <button class="close-btn" id="closePropertyModal">&times;</button>
+                            </div>
+                            <div class="modal-body">
+                                <form id="propertyForm" style="display: none;">
+                                    <input type="hidden" id="propertyId">
+                                    <div class="form-group">
+                                        <label for="propertyName">Property Name *</label>
+                                        <input type="text" id="propertyName" required placeholder="e.g., Oakwood Apartments">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="propertyAddress">Address</label>
+                                        <input type="text" id="propertyAddress" placeholder="e.g., 123 Main St, City, State">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="propertyType">Property Type *</label>
+                                        <select id="propertyType" required>
+                                            <option value="">Select property type...</option>
+                                            <option value="commercial">Commercial Property Management</option>
+                                            <option value="hoa">HOA Property Management</option>
+                                            <option value="residential">Residential Property Management</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="propertyStatus">Property Status *</label>
+                                        <select id="propertyStatus" required>
+                                            <option value="Active">Active</option>
+                                            <option value="Inactive">Inactive</option>
+                                            <option value="Under Development">Under Development</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="propertySquareFootage">Square Footage *</label>
+                                        <input type="number" id="propertySquareFootage" min="0" step="1" required placeholder="e.g., 5000">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="propertyYearBuilt">Year Built *</label>
+                                        <input type="number" id="propertyYearBuilt" min="1800" max="2100" step="1" required placeholder="e.g., 2020">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="propertyNumberOfUnits">Number of Units/Spaces *</label>
+                                        <input type="number" id="propertyNumberOfUnits" min="0" step="1" required placeholder="e.g., 10">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="propertyLotSize">Lot Size</label>
+                                        <input type="number" id="propertyLotSize" min="0" step="0.01" placeholder="e.g., 0.5 (acres)">
+                                        <small style="color: #666; font-size: 12px;">Optional: Enter in acres or square feet</small>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="propertyNumberOfFloors">Number of Floors/Stories</label>
+                                        <input type="number" id="propertyNumberOfFloors" min="1" step="1" placeholder="e.g., 3">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="propertyParkingSpaces">Parking Spaces</label>
+                                        <input type="number" id="propertyParkingSpaces" min="0" step="1" placeholder="e.g., 20">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="propertyTaxId">Property Tax ID / Assessor Parcel Number</label>
+                                        <input type="text" id="propertyTaxId" placeholder="e.g., 123-456-789">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="propertyOwnerName">Property Owner Name</label>
+                                        <input type="text" id="propertyOwnerName" placeholder="e.g., ABC Properties LLC">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="propertyOwnerContact">Property Owner Contact</label>
+                                        <input type="text" id="propertyOwnerContact" placeholder="e.g., owner@example.com or phone number">
+                                    </div>
+                                    <!-- Commercial Specific Fields -->
+                                    <div id="commercialPropertyFields" style="display: none;">
+                                        <div class="form-group">
+                                            <label for="propertyBuildingNumber">Building Number</label>
+                                            <input type="text" id="propertyBuildingNumber" placeholder="e.g., Building A">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="propertyNumberOfBuildings">Number of Buildings</label>
+                                            <input type="number" id="propertyNumberOfBuildings" min="1" step="1" placeholder="e.g., 3">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="propertyTotalLeasableSqFt">Total Leasable Square Footage</label>
+                                            <input type="number" id="propertyTotalLeasableSqFt" min="0" step="1" placeholder="e.g., 45000">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="propertyCommonAreaSqFt">Common Area Square Footage</label>
+                                            <input type="number" id="propertyCommonAreaSqFt" min="0" step="1" placeholder="e.g., 5000">
+                                        </div>
+                                    </div>
+                                    <!-- Residential Specific Fields -->
+                                    <div id="residentialPropertyFields" style="display: none;">
+                                        <div class="form-group">
+                                            <label for="propertyNumberOfBedrooms">Number of Bedrooms</label>
+                                            <input type="number" id="propertyNumberOfBedrooms" min="0" step="1" placeholder="e.g., 3">
+                                            <small style="color: #666; font-size: 12px;">For single-family properties</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="propertyNumberOfBathrooms">Number of Bathrooms</label>
+                                            <input type="number" id="propertyNumberOfBathrooms" min="0" step="0.5" placeholder="e.g., 2.5">
+                                            <small style="color: #666; font-size: 12px;">For single-family properties</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="propertySubtype">Property Subtype</label>
+                                            <select id="propertySubtype">
+                                                <option value="">Select subtype...</option>
+                                                <option value="Single-Family">Single-Family</option>
+                                                <option value="Multi-Family">Multi-Family</option>
+                                                <option value="Apartment Complex">Apartment Complex</option>
+                                                <option value="Condo">Condo</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="propertyDescription">Description</label>
+                                        <textarea id="propertyDescription" rows="3" placeholder="Optional description or notes"></textarea>
+                                    </div>
+                                    <div class="form-actions">
+                                        <button type="submit" class="btn-primary">Save Property</button>
+                                        <button type="button" class="btn-secondary" id="cancelPropertyForm">Cancel</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Property Detail View (for buildings and units) -->
+                    <div id="propertyDetailView" style="display: none;">
+                        <div class="property-detail-header">
+                            <button id="backToPropertiesBtn" class="btn-secondary">← Back to Properties</button>
+                            <h3 id="propertyDetailName"></h3>
+                        </div>
+                        <div class="property-detail-tabs">
+                            <button class="tab-btn active" data-tab="buildings">Buildings</button>
+                            <button class="tab-btn" data-tab="units">Units/Spaces</button>
+                        </div>
+                        <div id="buildingsTab" class="tab-content active">
+                            <div class="section-header">
+                                <h4>Buildings</h4>
+                                <button id="addBuildingBtn" class="btn-primary btn-small">+ Add Building</button>
+                            </div>
+                            <div id="buildingsList" class="buildings-list"></div>
+                        </div>
+                        <div id="unitsTab" class="tab-content">
+                            <div class="section-header">
+                                <h4>Units/Spaces</h4>
+                                <button id="addUnitBtn" class="btn-primary btn-small">+ Add Unit</button>
+                            </div>
+                            <div id="unitsList" class="units-list"></div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- Tenants Page -->
+        <div id="tenantsPage" class="page" style="display: none;">
+            <header>
+                <h2>Tenant Management</h2>
+                <div class="header-actions">
+                    <button id="addTenantBtn" class="btn-primary">+ Add Tenant</button>
+                </div>
+            </header>
+
+            <main>
+                <div class="tenants-page-content">
+                    <div class="section">
+                        <h3>Tenants</h3>
+                        <div id="tenantsList" class="tenants-grid"></div>
+                    </div>
+                </div>
+            </main>
+        </div>
     </div>
 
     <!-- Firebase Config - Create firebase-config.js from firebase-config.example.js -->
