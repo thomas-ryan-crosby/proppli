@@ -32,7 +32,9 @@ A simple, user-friendly maintenance tracking system for HOA and Property Managem
 
 ### 2. Configure Firebase in the Project
 
-**IMPORTANT:** The `firebase-config.js` file is not included in the repository for security reasons. You must create it.
+**IMPORTANT:** The Firebase config files are not included in the repository for security reasons. You must create them.
+
+#### Production Database (for main branch)
 
 1. Copy `firebase-config.example.js` to `firebase-config.js`:
    ```bash
@@ -45,7 +47,26 @@ A simple, user-friendly maintenance tracking system for HOA and Property Managem
 
 2. Open `firebase-config.js`
 
-3. Replace the placeholder values with your Firebase configuration:
+3. Replace the placeholder values with your **production Firebase project** configuration
+
+#### Test Database (for development branch)
+
+1. Copy `firebase-config.example.js` to `firebase-config.test.js`:
+   ```bash
+   cp firebase-config.example.js firebase-config.test.js
+   ```
+
+2. Open `firebase-config.test.js`
+
+3. Replace the placeholder values with your **test Firebase project** configuration (`maintenance-tracker-test`)
+
+4. Update the project ID and other values to match your test project
+
+**Note:** See `DATABASE_SETUP.md` for detailed information about which database is used by which branch.
+
+#### Configuration Values
+
+Replace the placeholder values with your Firebase configuration:
 
 ```javascript
 const firebaseConfig = {

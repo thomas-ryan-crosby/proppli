@@ -551,8 +551,56 @@
         </div>
     </div>
 
-    <!-- Firebase Config - Create firebase-config.js from firebase-config.example.js -->
-    <script src="firebase-config.js"></script>
+    <!-- Firebase Config - Automatically selects test or production based on environment -->
+    <script>
+        // Auto-detect environment and load appropriate Firebase config
+        (function() {
+            const isLocal = window.location.hostname === 'localhost' || 
+                           window.location.hostname === '127.0.0.1';
+            const urlParams = new URLSearchParams(window.location.search);
+            const forceTest = urlParams.get('test') === 'true';
+            const forceProd = urlParams.get('prod') === 'true';
+            
+            // Determine which config to use
+            let useTestConfig = false;
+            
+            if (forceProd) {
+                useTestConfig = false;
+                console.log('🔵 Using PRODUCTION database (forced via ?prod=true)');
+            } else if (forceTest) {
+                useTestConfig = true;
+                console.log('🟡 Using TEST database (forced via ?test=true)');
+            } else if (isLocal) {
+                // Local development defaults to test database
+                useTestConfig = true;
+                console.log('🟡 Using TEST database (localhost detected)');
+            } else {
+                // Production/GitHub Pages - check if we're on main branch or dev branch
+                // For GitHub Pages, main branch uses production, dev branch uses test
+                // This is determined by which branch is deployed
+                // Default to production for safety
+                useTestConfig = false;
+                console.log('🔵 Using PRODUCTION database (production environment)');
+            }
+            
+            const configFile = useTestConfig ? 'firebase-config.test.js' : 'firebase-config.js';
+            const script = document.createElement('script');
+            script.src = configFile;
+            script.onerror = function() {
+                console.error('❌ Firebase config file not found:', configFile);
+                // Fallback to production config
+                if (useTestConfig) {
+                    console.warn('⚠️ Falling back to production config');
+                    const fallback = document.createElement('script');
+                    fallback.src = 'firebase-config.js';
+                    document.head.appendChild(fallback);
+                } else {
+                    alert('Error: Firebase configuration file is missing. Please check the setup.');
+                }
+            };
+            document.head.appendChild(script);
+        })();
+    </script>
     <script src="app.js?v=2.0"></script>
     <script>
         // Fallback if firebase-config.js is missing

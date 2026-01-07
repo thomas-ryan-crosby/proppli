@@ -1,5 +1,26 @@
 # Using a Test Firestore Database
 
+## Current Setup
+
+This project uses **two separate Firebase projects**:
+
+1. **Production Database** (`maintenance-tracker-760ce`)
+   - Used by: **main branch** (production deployment)
+   - Config file: `firebase-config.js`
+   - Purpose: Live production data
+
+2. **Test/Development Database** (`maintenance-tracker-test`)
+   - Used by: **phase1-development branch** and local development
+   - Config file: `firebase-config.test.js`
+   - Purpose: Testing new features without affecting production
+
+## Branch-to-Database Mapping
+
+| Branch | Database | Config File | Purpose |
+|--------|----------|-------------|---------|
+| `main` | `maintenance-tracker-760ce` (Production) | `firebase-config.js` | Live production data |
+| `phase1-development` | `maintenance-tracker-test` (Test) | `firebase-config.test.js` | Development and testing |
+
 ## Best Practices for Development
 
 When developing new features, it's recommended to use a **separate Firebase project** for testing to avoid affecting your production data.
