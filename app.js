@@ -3536,9 +3536,28 @@ function enableEmailSelectionMode() {
         contacts: new Set()
     };
     
-    // Show all checkboxes
-    document.querySelectorAll('.email-select-building, .email-select-tenant, .email-select-contact').forEach(cb => {
+    // Check if brokers are currently shown
+    const showBrokersToggle = document.getElementById('showBrokersToggle');
+    const brokersVisible = showBrokersToggle ? showBrokersToggle.checked : false;
+    
+    // Show building and tenant checkboxes
+    document.querySelectorAll('.email-select-building, .email-select-tenant').forEach(cb => {
         cb.style.display = 'block';
+    });
+    
+    // Only show contact checkboxes for regular contacts (not brokers)
+    document.querySelectorAll('.email-select-contact').forEach(cb => {
+        // Check if this contact is in a broker cell
+        const contactCard = cb.closest('.contact-card-table');
+        const brokerCell = contactCard ? contactCard.closest('td[data-contact-type="broker"]') : null;
+        
+        if (brokerCell) {
+            // Only show checkbox if brokers are visible
+            cb.style.display = brokersVisible ? 'block' : 'none';
+        } else {
+            // Regular contact, always show
+            cb.style.display = 'block';
+        }
     });
     
     // Show selection action buttons
