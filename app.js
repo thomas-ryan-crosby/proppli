@@ -3519,6 +3519,15 @@ function toggleBrokerColumns(show) {
     brokerCells.forEach(cell => {
         cell.style.display = show ? '' : 'none';
     });
+    
+    // If in email selection mode, update broker contact checkboxes visibility
+    const emailSelectionActions = document.getElementById('emailSelectionActions');
+    if (emailSelectionActions && emailSelectionActions.style.display !== 'none') {
+        // We're in selection mode, update broker contact checkboxes
+        document.querySelectorAll('td[data-contact-type="broker"] .email-select-contact').forEach(cb => {
+            cb.style.display = show ? 'block' : 'none';
+        });
+    }
 }
 
 // Track manually unchecked items to prevent re-checking
