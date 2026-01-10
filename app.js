@@ -3377,15 +3377,19 @@ async function renderTenantsTableView(tenants) {
         `;
     });
     
-    // Render tenants without building
+    // Render tenants without building (always show section, even if empty)
+    html += `
+        <div class="building-group" style="border-left: 3px solid #e65100; margin-top: 30px;">
+            <div class="building-group-header" style="background: #fff3e0;">
+                <input type="checkbox" class="email-select-building" data-building-id="" data-building-name="Orphan Tenants" style="display: none; margin-right: 8px; cursor: pointer;">
+                <span style="font-weight: 600; color: #e65100;">⚠️ Orphan Tenants${tenantsWithoutBuilding.length > 0 ? ` (${tenantsWithoutBuilding.length})` : ''}</span>
+                <span style="font-size: 0.75rem; color: #666; margin-left: 10px;">Tenants without associated buildings</span>
+            </div>
+    `;
+    
     if (tenantsWithoutBuilding.length > 0) {
         html += `
-            <div class="building-group">
-                <div class="building-group-header">
-                    <input type="checkbox" class="email-select-building" data-building-id="" data-building-name="Orphan Tenants" style="display: none; margin-right: 8px; cursor: pointer;">
-                    <span style="font-weight: 600; color: #e65100;">⚠️ Orphan Tenants</span>
-                </div>
-                <table class="tenants-table">
+            <table class="tenants-table">
                     <thead>
                         <tr class="header-major">
                             <th rowspan="2">Occupancies</th>
@@ -3465,6 +3469,13 @@ async function renderTenantsTableView(tenants) {
                 </table>
             </div>
         `;
+    } else {
+        html += `
+            <div style="padding: 20px; text-align: center; color: #999;">
+                No orphan tenants found.
+            </div>
+        </div>
+        `;
     }
     
     tenantsTable.innerHTML = html;
@@ -3508,7 +3519,7 @@ async function renderTenantsTableView(tenants) {
     loadContactsForTableView(filteredTenants, maxContacts, maxBrokers);
     
     // Load and display orphan contacts (contacts without tenants)
-    loadOrphanContacts(maxContacts, maxBrokers);
+    await loadOrphanContacts(maxContacts, maxBrokers);
 }
 
 async function loadOrphanContacts(maxContacts, maxBrokers) {
@@ -3530,9 +3541,10 @@ async function loadOrphanContacts(maxContacts, maxBrokers) {
             }
         });
         
-        if (orphanContacts.length === 0) {
-            return; // No orphan contacts
-        }
+        // Always show the orphan contacts section, even if empty
+        // if (orphanContacts.length === 0) {
+        //     return; // No orphan contacts
+        // }
         
         // Separate regular contacts and brokers
         const regularOrphans = [];
@@ -3561,6 +3573,17 @@ async function loadOrphanContacts(maxContacts, maxBrokers) {
                     <span style="font-weight: 600; color: #c62828;">⚠️ Orphan Contacts (${orphanContacts.length})</span>
                     <span style="font-size: 0.75rem; color: #666; margin-left: 10px;">Contacts without associated tenants</span>
                 </div>
+        `;
+        
+        if (orphanContacts.length === 0) {
+            orphanHtml += `
+                <div style="padding: 20px; text-align: center; color: #999;">
+                    No orphan contacts found.
+                </div>
+            </div>
+            `;
+        } else {
+            orphanHtml += `
                 <table class="tenants-table">
                     <thead>
                         <tr class="header-major">
@@ -3569,27 +3592,27 @@ async function loadOrphanContacts(maxContacts, maxBrokers) {
                             ${maxBrokers > 0 ? `<th colspan="${maxBrokers}">Brokers</th>` : ''}
                         </tr>
                         <tr class="header-sub">
-        `;
-        
-        // Generate contact column headers
-        for (let i = 1; i <= maxContacts; i++) {
-            orphanHtml += `<th>Contact ${i}</th>`;
-        }
-        for (let i = 1; i <= maxBrokers; i++) {
-            orphanHtml += `<th>Broker ${i}</th>`;
-        }
-        
-        orphanHtml += `
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td style="font-weight: 600; color: #c62828;">Orphan Contacts</td>
-        `;
-        
-        // Fill contact columns
-        for (let i = 0; i < maxContacts; i++) {
-            if (i < regularOrphans.length) {
+            `;
+            
+            // Generate contact column headers
+            for (let i = 1; i <= maxContacts; i++) {
+                orphanHtml += `<th>Contact ${i}</th>`;
+            }
+            for (let i = 1; i <= maxBrokers; i++) {
+                orphanHtml += `<th>Broker ${i}</th>`;
+            }
+            
+            orphanHtml += `
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="font-weight: 600; color: #c62828;">Orphan Contacts</td>
+            `;
+            
+            // Fill contact columns
+            for (let i = 0; i < maxContacts; i++) {
+                if (i < regularOrphans.length) {
                 const contact = regularOrphans[i];
                 orphanHtml += `
                     <td class="tenant-contact-cell" data-contact-type="contact">
@@ -3695,12 +3718,13 @@ async function loadOrphanContacts(maxContacts, maxBrokers) {
             }
         }
         
-        orphanHtml += `
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        `;
+            orphanHtml += `
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
         
         tenantsTable.insertAdjacentHTML('beforeend', orphanHtml);
     } catch (error) {
@@ -4433,15 +4457,19 @@ function rebuildTableWithContactColumns(tenantsByBuilding, tenantsWithoutBuildin
         `;
     });
     
-    // Render tenants without building
+    // Render tenants without building (always show section, even if empty)
+    html += `
+        <div class="building-group" style="border-left: 3px solid #e65100; margin-top: 30px;">
+            <div class="building-group-header" style="background: #fff3e0;">
+                <input type="checkbox" class="email-select-building" data-building-id="" data-building-name="Orphan Tenants" style="display: none; margin-right: 8px; cursor: pointer;">
+                <span style="font-weight: 600; color: #e65100;">⚠️ Orphan Tenants${tenantsWithoutBuilding.length > 0 ? ` (${tenantsWithoutBuilding.length})` : ''}</span>
+                <span style="font-size: 0.75rem; color: #666; margin-left: 10px;">Tenants without associated buildings</span>
+            </div>
+    `;
+    
     if (tenantsWithoutBuilding.length > 0) {
         html += `
-            <div class="building-group">
-                <div class="building-group-header">
-                    <input type="checkbox" class="email-select-building" data-building-id="" data-building-name="Orphan Tenants" style="display: none; margin-right: 8px; cursor: pointer;">
-                    <span style="font-weight: 600; color: #e65100;">⚠️ Orphan Tenants</span>
-                </div>
-                <table class="tenants-table">
+            <table class="tenants-table">
                     <thead>
                         <tr class="header-major">
                             <th rowspan="2">Occupancies</th>
