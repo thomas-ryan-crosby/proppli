@@ -3519,14 +3519,23 @@ function toggleBrokerColumns(show) {
             
             // Hide/show corresponding subheaders
             const subHeaderRow = header.parentElement.nextElementSibling;
-            if (subHeaderRow) {
+            if (subHeaderRow && subHeaderRow.classList.contains('header-sub')) {
                 const subHeaders = Array.from(subHeaderRow.querySelectorAll('th'));
-                for (let i = 0; i < colspan; i++) {
-                    if (subHeaders[headerIndex + i]) {
-                        subHeaders[headerIndex + i].style.display = show ? '' : 'none';
+                // Find broker subheaders by checking text content
+                subHeaders.forEach((subHeader, idx) => {
+                    if (subHeader.textContent.trim().startsWith('Broker')) {
+                        subHeader.style.display = show ? '' : 'none';
                     }
-                }
+                });
             }
+        }
+    });
+    
+    // Also directly hide/show all broker subheaders by text content
+    const allSubHeaders = document.querySelectorAll('.tenants-table .header-sub th');
+    allSubHeaders.forEach(subHeader => {
+        if (subHeader.textContent.trim().startsWith('Broker')) {
+            subHeader.style.display = show ? '' : 'none';
         }
     });
     
