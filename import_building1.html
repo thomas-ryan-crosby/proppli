@@ -294,18 +294,24 @@
         
         // Import button
         document.getElementById('importBtn').addEventListener('click', async function() {
-            if (!confirm('Are you sure you want to import data? This will create/update records in the database.')) {
+            if (!confirm('Are you sure you want to import data into the DEVELOPMENT database? This will create/update records.')) {
                 return;
             }
             
             updateConfig();
             CONFIG.performImport = true;
             outputDiv.innerHTML = '';
-            showStatus('Importing data...', 'info');
+            showStatus('Importing data to development database...', 'info');
             
             try {
                 await importBuilding1Tenants();
-                showStatus('Import completed! Check console output above.', 'success');
+                showStatus('✓ Import completed! Refresh the tenant page to see the new data.', 'success');
+                // Auto-refresh suggestion
+                setTimeout(() => {
+                    if (confirm('Import completed! Would you like to open the tenant page to see the results?')) {
+                        window.open('index.html?page=tenants', '_blank');
+                    }
+                }, 1000);
             } catch (error) {
                 showStatus('Error during import: ' + error.message, 'error');
             }

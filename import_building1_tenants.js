@@ -22,7 +22,7 @@
 const CONFIG = {
     propertyName: 'Sanctuary Office Park', // Property name to find
     buildingNumber: '1', // Building number
-    performImport: false, // Set to true to actually import (false = dry run)
+    performImport: true, // Set to true to actually import (false = dry run)
     updateExisting: true // Update existing tenants/contacts if found
 };
 
