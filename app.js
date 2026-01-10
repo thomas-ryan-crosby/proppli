@@ -3521,7 +3521,21 @@ function toggleBrokerColumns(show) {
     });
 }
 
+// Track manually unchecked items to prevent re-checking
+window._manuallyUncheckedItems = {
+    buildings: new Set(),
+    tenants: new Set(),
+    contacts: new Set()
+};
+
 function enableEmailSelectionMode() {
+    // Reset manually unchecked tracking
+    window._manuallyUncheckedItems = {
+        buildings: new Set(),
+        tenants: new Set(),
+        contacts: new Set()
+    };
+    
     // Show all checkboxes
     document.querySelectorAll('.email-select-building, .email-select-tenant, .email-select-contact').forEach(cb => {
         cb.style.display = 'block';
@@ -3533,12 +3547,120 @@ function enableEmailSelectionMode() {
     if (emailSelectionActions) emailSelectionActions.style.display = 'flex';
     if (startEmailSelectionBtn) startEmailSelectionBtn.style.display = 'none';
     
-    // Add event listeners for checkboxes
-    document.querySelectorAll('.email-select-building, .email-select-tenant, .email-select-contact').forEach(checkbox => {
-        checkbox.addEventListener('change', updateEmailSelectionCount);
+    // Add event listeners for building checkboxes (cascade to tenants)
+    document.querySelectorAll('.email-select-building').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            handleBuildingCheckboxChange(this);
+            updateEmailSelectionCount();
+        });
+    });
+    
+    // Add event listeners for tenant checkboxes (cascade to contacts)
+    document.querySelectorAll('.email-select-tenant').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            handleTenantCheckboxChange(this);
+            updateEmailSelectionCount();
+        });
+    });
+    
+    // Add event listeners for contact checkboxes
+    document.querySelectorAll('.email-select-contact').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            handleContactCheckboxChange(this);
+            updateEmailSelectionCount();
+        });
     });
     
     updateEmailSelectionCount();
+}
+
+function handleBuildingCheckboxChange(buildingCheckbox) {
+    const buildingId = buildingCheckbox.getAttribute('data-building-id');
+    const isChecked = buildingCheckbox.checked;
+    
+    if (isChecked) {
+        // Remove from manually unchecked if it was there
+        window._manuallyUncheckedItems.buildings.delete(buildingId);
+        
+        // Find all tenants in this building group
+        const buildingGroup = buildingCheckbox.closest('.building-group');
+        if (buildingGroup) {
+            const tenantCheckboxes = buildingGroup.querySelectorAll('.email-select-tenant');
+            tenantCheckboxes.forEach(tenantCb => {
+                const tenantId = tenantCb.getAttribute('data-tenant-id');
+                // Only check if not manually unchecked
+                if (!window._manuallyUncheckedItems.tenants.has(tenantId)) {
+                    tenantCb.checked = true;
+                    // Cascade to contacts
+                    handleTenantCheckboxChange(tenantCb, false); // false = don't update count yet
+                }
+            });
+        }
+    } else {
+        // Mark as manually unchecked
+        window._manuallyUncheckedItems.buildings.add(buildingId);
+        
+        // Uncheck all tenants in this building
+        const buildingGroup = buildingCheckbox.closest('.building-group');
+        if (buildingGroup) {
+            const tenantCheckboxes = buildingGroup.querySelectorAll('.email-select-tenant');
+            tenantCheckboxes.forEach(tenantCb => {
+                tenantCb.checked = false;
+                // Uncheck all contacts for these tenants
+                const tenantId = tenantCb.getAttribute('data-tenant-id');
+                const contactCheckboxes = document.querySelectorAll(`.email-select-contact[data-tenant-id="${tenantId}"]`);
+                contactCheckboxes.forEach(contactCb => {
+                    contactCb.checked = false;
+                });
+            });
+        }
+    }
+}
+
+function handleTenantCheckboxChange(tenantCheckbox, updateCount = true) {
+    const tenantId = tenantCheckbox.getAttribute('data-tenant-id');
+    const isChecked = tenantCheckbox.checked;
+    
+    if (isChecked) {
+        // Remove from manually unchecked if it was there
+        window._manuallyUncheckedItems.tenants.delete(tenantId);
+        
+        // Find all contacts for this tenant
+        const contactCheckboxes = document.querySelectorAll(`.email-select-contact[data-tenant-id="${tenantId}"]`);
+        contactCheckboxes.forEach(contactCb => {
+            const contactId = contactCb.getAttribute('data-contact-id');
+            // Only check if not manually unchecked
+            if (!window._manuallyUncheckedItems.contacts.has(contactId)) {
+                contactCb.checked = true;
+            }
+        });
+    } else {
+        // Mark as manually unchecked
+        window._manuallyUncheckedItems.tenants.add(tenantId);
+        
+        // Uncheck all contacts for this tenant
+        const contactCheckboxes = document.querySelectorAll(`.email-select-contact[data-tenant-id="${tenantId}"]`);
+        contactCheckboxes.forEach(contactCb => {
+            contactCb.checked = false;
+        });
+    }
+    
+    if (updateCount) {
+        updateEmailSelectionCount();
+    }
+}
+
+function handleContactCheckboxChange(contactCheckbox) {
+    const contactId = contactCheckbox.getAttribute('data-contact-id');
+    const isChecked = contactCheckbox.checked;
+    
+    if (!isChecked) {
+        // Mark as manually unchecked
+        window._manuallyUncheckedItems.contacts.add(contactId);
+    } else {
+        // Remove from manually unchecked if it was there
+        window._manuallyUncheckedItems.contacts.delete(contactId);
+    }
 }
 
 function disableEmailSelectionMode() {
