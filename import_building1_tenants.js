@@ -222,11 +222,21 @@ async function importBuilding1Tenants() {
         let csvText = CSV_CONTENT;
         
         if (!csvText) {
-            console.error('CSV content not found. Please either:');
-            console.log('1. Set CSV_CONTENT variable with the CSV content, OR');
-            console.log('2. Use loadCSVFromFile() function to load from a file input');
-            console.log('\nExample: CSV_CONTENT = `...paste CSV content here...`;');
-            return;
+            // Try to load from default path
+            try {
+                const csvPath = 'c:\\Users\\thoma\\Downloads\\Sanctuary Office Park_CONTROLLER_Source - Office Park Controller (3).csv';
+                console.log('Attempting to load CSV from default path...');
+                // Note: Browser can't directly read local files, but we can try fetch
+                // For now, user needs to load it manually
+                console.error('CSV content not found. Please either:');
+                console.log('1. Use createCSVFileInput() to select the CSV file, OR');
+                console.log('2. Set CSV_CONTENT variable with the CSV content');
+                console.log('\nExample: CSV_CONTENT = `...paste CSV content here...`;');
+                return;
+            } catch (e) {
+                console.error('CSV content not found. Please load the CSV file first.');
+                return;
+            }
         }
         
         const rows = parseCSV(csvText);
