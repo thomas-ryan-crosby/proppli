@@ -5815,21 +5815,88 @@ function loadUnitsForOccupancy(propertyId) {
     
     if (!propertyId) return Promise.resolve();
     
-    return db.collection('units')
-        .where('propertyId', '==', propertyId)
-        .get()
-        .then((querySnapshot) => {
-            querySnapshot.forEach((doc) => {
-                const unit = doc.data();
-                const option = document.createElement('option');
-                option.value = doc.id;
-                option.textContent = unit.unitNumber || 'Unnamed Unit';
-                unitSelect.appendChild(option);
-            });
-        })
-        .catch((error) => {
-            console.error('Error loading units for occupancy:', error);
+    // Load both units and buildings
+    return Promise.all([
+        db.collection('units').where('propertyId', '==', propertyId).get(),
+        db.collection('buildings').where('propertyId', '==', propertyId).get()
+    ]).then(([unitsSnapshot, buildingsSnapshot]) => {
+        // Create buildings map
+        const buildingsMap = {};
+        buildingsSnapshot.forEach((doc) => {
+            buildingsMap[doc.id] = { id: doc.id, ...doc.data() };
         });
+        
+        // Group units by building
+        const unitsByBuilding = {};
+        const unitsWithoutBuilding = [];
+        
+        unitsSnapshot.forEach((doc) => {
+            const unit = { id: doc.id, ...doc.data() };
+            if (unit.buildingId && buildingsMap[unit.buildingId]) {
+                if (!unitsByBuilding[unit.buildingId]) {
+                    unitsByBuilding[unit.buildingId] = [];
+                }
+                unitsByBuilding[unit.buildingId].push(unit);
+            } else {
+                unitsWithoutBuilding.push(unit);
+            }
+        });
+        
+        // Sort buildings by name
+        const sortedBuildingIds = Object.keys(unitsByBuilding).sort((a, b) => {
+            const buildingA = buildingsMap[a];
+            const buildingB = buildingsMap[b];
+            const nameA = buildingA.buildingName || buildingA.buildingNumber || '';
+            const nameB = buildingB.buildingName || buildingB.buildingNumber || '';
+            return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+        });
+        
+        // Add units grouped by building
+        sortedBuildingIds.forEach((buildingId) => {
+            const building = buildingsMap[buildingId];
+            const buildingName = building.buildingName || building.buildingNumber || `Building ${buildingId.substring(0, 8)}`;
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = buildingName;
+            
+            // Sort units by unit number
+            unitsByBuilding[buildingId].sort((a, b) => {
+                const numA = a.unitNumber || '';
+                const numB = b.unitNumber || '';
+                return numA.localeCompare(numB, undefined, { numeric: true, sensitivity: 'base' });
+            });
+            
+            unitsByBuilding[buildingId].forEach((unit) => {
+                const option = document.createElement('option');
+                option.value = unit.id;
+                option.textContent = unit.unitNumber || 'Unnamed Unit';
+                optgroup.appendChild(option);
+            });
+            
+            unitSelect.appendChild(optgroup);
+        });
+        
+        // Add units without building (if any)
+        if (unitsWithoutBuilding.length > 0) {
+            unitsWithoutBuilding.sort((a, b) => {
+                const numA = a.unitNumber || '';
+                const numB = b.unitNumber || '';
+                return numA.localeCompare(numB, undefined, { numeric: true, sensitivity: 'base' });
+            });
+            
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = 'No Building';
+            unitsWithoutBuilding.forEach((unit) => {
+                const option = document.createElement('option');
+                option.value = unit.id;
+                option.textContent = unit.unitNumber || 'Unnamed Unit';
+                optgroup.appendChild(option);
+            });
+            unitSelect.appendChild(optgroup);
+        }
+    })
+    .catch((error) => {
+        console.error('Error loading units for occupancy:', error);
+    });
 }
 
 window.addOccupancy = function(tenantId) {
