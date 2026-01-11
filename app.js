@@ -1634,6 +1634,8 @@ window.deleteUnit = async function(unitId) {
             if (document.getElementById('tenantsPage') && document.getElementById('tenantsPage').style.display !== 'none') {
                 loadTenants();
             }
+            // Refresh unit dropdown in occupancy modal if open
+            refreshOccupancyUnitDropdownIfOpen();
         })
         .catch((error) => {
             console.error('Error deleting unit:', error);
