@@ -762,6 +762,14 @@ function renderBuildingsAndUnitsTable(buildings, units, propertyId) {
             const statusBadge = unit.status ? `<span class="status-badge status-${unit.status.toLowerCase().replace(' ', '-')}" style="font-size: 0.75rem; padding: 3px 8px;">${unit.status}</span>` : '<span style="color: #94a3b8;">—</span>';
             const monthlyRentFormatted = unit.monthlyRent ? `$${unit.monthlyRent.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '<span style="color: #94a3b8;">—</span>';
             
+            // Calculate price per foot
+            let pricePerFoot = null;
+            let pricePerFootFormatted = '<span style="color: #94a3b8;">—</span>';
+            if (unit.monthlyRent && unit.squareFootage && unit.squareFootage > 0) {
+                pricePerFoot = unit.monthlyRent / unit.squareFootage;
+                pricePerFootFormatted = `$${pricePerFoot.toFixed(2)}`;
+            }
+            
             html += `
                     <td style="padding: 12px 10px; font-weight: 600; color: #1e293b;">${escapeHtml(unit.unitNumber || 'N/A')}</td>
                     <td style="padding: 12px 10px; color: #475569;">${unit.unitType || '<span style="color: #94a3b8;">—</span>'}</td>
@@ -771,6 +779,7 @@ function renderBuildingsAndUnitsTable(buildings, units, propertyId) {
                     <td style="padding: 12px 10px; text-align: center; color: #475569;">${unit.numberOfBedrooms ? unit.numberOfBedrooms : '<span style="color: #94a3b8;">—</span>'}</td>
                     <td style="padding: 12px 10px; text-align: center; color: #475569;">${unit.numberOfBathrooms ? unit.numberOfBathrooms : '<span style="color: #94a3b8;">—</span>'}</td>
                     <td style="padding: 12px 10px; text-align: right; color: #059669; font-weight: 600; font-variant-numeric: tabular-nums;">${monthlyRentFormatted}</td>
+                    <td style="padding: 12px 10px; text-align: right; color: #7c3aed; font-weight: 500; font-variant-numeric: tabular-nums;">${pricePerFootFormatted}</td>
                     <td style="padding: 12px 10px; text-align: center;">
                         <div style="display: flex; gap: 4px; justify-content: center; flex-wrap: wrap;">
                             <button class="btn-secondary btn-small" onclick="editUnit('${unit.id}')" style="padding: 3px 6px; font-size: 0.7rem; min-height: 22px;" title="Edit Unit">✏️</button>
@@ -798,7 +807,7 @@ function renderBuildingsAndUnitsTable(buildings, units, propertyId) {
                     <td style="padding: 12px 10px; vertical-align: top; background: #f8fafc; border-right: 2px solid #e2e8f0; text-align: center;">
                         ${building.numberOfFloors ? building.numberOfFloors : '<span style="color: #94a3b8;">—</span>'}
                     </td>
-                    <td colspan="9" style="padding: 12px 10px; text-align: center; color: #94a3b8; font-style: italic; font-size: 0.85rem;">No units</td>
+                    <td colspan="10" style="padding: 12px 10px; text-align: center; color: #94a3b8; font-style: italic; font-size: 0.85rem;">No units</td>
                 </tr>
             `;
         }
