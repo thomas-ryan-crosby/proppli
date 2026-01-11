@@ -20,32 +20,32 @@ function updateFABsVisibility() {
     const fabAddTenant = document.getElementById('fabAddTenant');
     const fabAddContact = document.getElementById('fabAddContact');
     const tenantsPage = document.getElementById('tenantsPage');
-    const tenantDetailView = document.getElementById('tenantDetailView');
+    const tenantDetailModal = document.getElementById('tenantDetailModal');
     const contactsTab = document.getElementById('contactsTab');
     
     // Show Add Tenant FAB when on tenants page (visible when scrolling the table)
     if (fabAddTenant) {
         if (tenantsPage) {
             const isTenantsPageVisible = tenantsPage.style.display !== 'none';
-            const isDetailViewVisible = tenantDetailView && tenantDetailView.style.display !== 'none';
-            // Show when tenants page is visible and detail view is hidden (i.e., showing the table)
-            const shouldShow = isTenantsPageVisible && !isDetailViewVisible;
+            const isModalVisible = tenantDetailModal && tenantDetailModal.classList.contains('show');
+            // Show when tenants page is visible and modal is hidden (i.e., showing the table)
+            const shouldShow = isTenantsPageVisible && !isModalVisible;
             fabAddTenant.style.display = shouldShow ? 'flex' : 'none';
         } else {
             fabAddTenant.style.display = 'none';
         }
     }
     
-    // Show Add Contact FAB when on tenants page (table view) OR when viewing tenant details with contacts tab active
+    // Show Add Contact FAB when on tenants page (table view) OR when tenant detail modal is open with contacts tab active
     if (fabAddContact) {
         const isTenantsPageVisible = tenantsPage && tenantsPage.style.display !== 'none';
-        const isDetailViewVisible = tenantDetailView && tenantDetailView.style.display !== 'none';
-        const isContactsTabActive = contactsTab && contactsTab.classList.contains('active');
+        const isModalVisible = tenantDetailModal && tenantDetailModal.classList.contains('show');
+        const isContactsTabActive = contactsTab && contactsTab.classList.contains('active') && contactsTab.style.display !== 'none';
         
         // Show when:
         // 1. On tenants page (table view) - allows adding contacts from table
-        // 2. OR when viewing tenant details with contacts tab active
-        const shouldShow = (isTenantsPageVisible && !isDetailViewVisible) || (isDetailViewVisible && isContactsTabActive);
+        // 2. OR when tenant detail modal is open with contacts tab active
+        const shouldShow = (isTenantsPageVisible && !isModalVisible) || (isModalVisible && isContactsTabActive);
         fabAddContact.style.display = shouldShow ? 'flex' : 'none';
     }
 }
