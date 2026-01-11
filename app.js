@@ -10,6 +10,34 @@ let beforePhotoUrl = null;
 let afterPhotoUrl = null;
 let completionAfterPhotoFile = null;
 
+// Tenant Management - moved to top for early initialization
+let editingTenantId = null;
+let currentTenantView = 'table'; // 'cards' or 'table' - table is now default
+let selectedPropertyForTenants = null;
+
+// Update floating action buttons visibility
+function updateFABsVisibility() {
+    const fabAddTenant = document.getElementById('fabAddTenant');
+    const fabAddContact = document.getElementById('fabAddContact');
+    const tenantsPage = document.getElementById('tenantsPage');
+    const tenantDetailView = document.getElementById('tenantDetailView');
+    const contactsTab = document.getElementById('contactsTab');
+    
+    // Show Add Tenant FAB when on tenants page and detail view is hidden
+    if (fabAddTenant && tenantsPage) {
+        const isTenantsPageVisible = tenantsPage.style.display !== 'none' && tenantsPage.classList.contains('active');
+        const isDetailViewVisible = tenantDetailView && tenantDetailView.style.display !== 'none';
+        fabAddTenant.style.display = (isTenantsPageVisible && !isDetailViewVisible) ? 'flex' : 'none';
+    }
+    
+    // Show Add Contact FAB when tenant detail view is visible and contacts tab is active
+    if (fabAddContact && tenantDetailView && contactsTab) {
+        const isDetailViewVisible = tenantDetailView.style.display !== 'none';
+        const isContactsTabActive = contactsTab.classList.contains('active');
+        fabAddContact.style.display = (isDetailViewVisible && isContactsTabActive) ? 'flex' : 'none';
+    }
+}
+
 // Initialize app
 function startApp() {
     console.log('📄 Starting app initialization...');
