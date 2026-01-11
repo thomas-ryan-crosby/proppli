@@ -3342,10 +3342,7 @@ window.openPhotoModal = function(photoUrl) {
         }
     });
 };
-// Tenant Management - moved to top for early initialization
-let editingTenantId = null;
-let currentTenantView = 'table'; // 'cards' or 'table' - table is now default
-let selectedPropertyForTenants = null;
+// Tenant Management - variables moved to top
 
 function loadTenants() {
     db.collection('tenants').onSnapshot((snapshot) => {
