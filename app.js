@@ -24,19 +24,29 @@ function updateFABsVisibility() {
     const contactsTab = document.getElementById('contactsTab');
     
     // Show Add Tenant FAB when on tenants page (visible when scrolling the table)
-    if (fabAddTenant && tenantsPage) {
-        const isTenantsPageVisible = tenantsPage.style.display !== 'none';
-        const isDetailViewVisible = tenantDetailView && tenantDetailView.style.display !== 'none';
-        // Show when tenants page is visible and detail view is hidden (i.e., showing the table)
-        fabAddTenant.style.display = (isTenantsPageVisible && !isDetailViewVisible) ? 'flex' : 'none';
+    if (fabAddTenant) {
+        if (tenantsPage) {
+            const isTenantsPageVisible = tenantsPage.style.display !== 'none';
+            const isDetailViewVisible = tenantDetailView && tenantDetailView.style.display !== 'none';
+            // Show when tenants page is visible and detail view is hidden (i.e., showing the table)
+            const shouldShow = isTenantsPageVisible && !isDetailViewVisible;
+            fabAddTenant.style.display = shouldShow ? 'flex' : 'none';
+        } else {
+            fabAddTenant.style.display = 'none';
+        }
     }
     
     // Show Add Contact FAB when tenant detail view is visible and contacts tab is active (visible when scrolling contacts)
-    if (fabAddContact && tenantDetailView && contactsTab) {
-        const isDetailViewVisible = tenantDetailView.style.display !== 'none';
-        const isContactsTabActive = contactsTab.classList.contains('active');
-        // Show when viewing tenant details with contacts tab active
-        fabAddContact.style.display = (isDetailViewVisible && isContactsTabActive) ? 'flex' : 'none';
+    if (fabAddContact) {
+        if (tenantDetailView && contactsTab) {
+            const isDetailViewVisible = tenantDetailView.style.display !== 'none';
+            const isContactsTabActive = contactsTab.classList.contains('active');
+            // Show when viewing tenant details with contacts tab active
+            const shouldShow = isDetailViewVisible && isContactsTabActive;
+            fabAddContact.style.display = shouldShow ? 'flex' : 'none';
+        } else {
+            fabAddContact.style.display = 'none';
+        }
     }
 }
 
