@@ -191,8 +191,9 @@ body {
 
 .metrics-dashboard h2 {
     margin: 0;
-    color: #333;
+    color: #1F2937;
     font-size: 1.5rem;
+    font-weight: 600;
 }
 
 .metrics-content {
@@ -285,7 +286,8 @@ body {
 
 .tickets-view h2 {
     margin-bottom: 20px;
-    color: #333;
+    color: #1F2937;
+    font-weight: 600;
 }
 
 .tickets-list {
