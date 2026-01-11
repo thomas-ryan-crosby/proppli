@@ -350,6 +350,12 @@ function setupEventListeners() {
         tenantTypeSelect.addEventListener('change', updateTenantTypeFields);
     }
     
+    // Unit assignment save button
+    const saveTenantOccupancyBtn = document.getElementById('saveTenantOccupancyBtn');
+    if (saveTenantOccupancyBtn) {
+        saveTenantOccupancyBtn.addEventListener('click', handleTenantOccupancySave);
+    }
+    
     // Tenant detail view
     const backToTenantsBtn = document.getElementById('backToTenantsBtn');
     if (backToTenantsBtn) {
@@ -6089,6 +6095,113 @@ window.removeTenantFromUnit = function(occupancyId, tenantId) {
             alert('Error removing tenant from unit: ' + error.message);
         });
 };
+
+// Mark tenant as moved out
+window.markTenantAsMovedOut = function(tenantId) {
+    if (!confirm('Mark this tenant as moved out? This will update their status to "Moved Out".')) {
+        return;
+    }
+    
+    db.collection('tenants').doc(tenantId).update({
+        status: 'Moved Out',
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    })
+    .then(() => {
+        console.log('Tenant marked as moved out');
+        // Refresh table view
+        db.collection('tenants').get().then((snapshot) => {
+            const tenants = {};
+            snapshot.forEach((doc) => {
+                tenants[doc.id] = { id: doc.id, ...doc.data() };
+            });
+            renderTenantsList(tenants);
+        });
+    })
+    .catch((error) => {
+        console.error('Error marking tenant as moved out:', error);
+        alert('Error marking tenant as moved out: ' + error.message);
+    });
+};
+
+// Handle tenant occupancy save from edit modal
+function handleTenantOccupancySave() {
+    const tenantId = document.getElementById('tenantId').value;
+    if (!tenantId) {
+        alert('Please save the tenant first before assigning units.');
+        return;
+    }
+    
+    const propertyId = document.getElementById('tenantEditPropertyId').value;
+    if (!propertyId) {
+        alert('Please select a property.');
+        return;
+    }
+    
+    const unitId = document.getElementById('tenantEditUnitId').value || null;
+    const moveInDateStr = document.getElementById('tenantEditMoveInDate').value;
+    const moveOutDateStr = document.getElementById('tenantEditMoveOutDate').value;
+    const status = document.getElementById('tenantEditOccupancyStatus').value || 'Active';
+    const notes = document.getElementById('tenantEditOccupancyNotes').value.trim() || null;
+    
+    if (!moveInDateStr) {
+        alert('Please enter a move-in date.');
+        return;
+    }
+    
+    const moveInDate = firebase.firestore.Timestamp.fromDate(new Date(moveInDateStr));
+    const moveOutDate = moveOutDateStr ? firebase.firestore.Timestamp.fromDate(new Date(moveOutDateStr)) : null;
+    
+    // Check if occupancy already exists for this tenant/property/unit combination
+    let occupancyQuery = db.collection('occupancies')
+        .where('tenantId', '==', tenantId)
+        .where('propertyId', '==', propertyId);
+    
+    if (unitId) {
+        occupancyQuery = occupancyQuery.where('unitId', '==', unitId);
+    } else {
+        occupancyQuery = occupancyQuery.where('unitId', '==', null);
+    }
+    
+    occupancyQuery.get().then((snapshot) => {
+        const occupancyData = {
+            tenantId,
+            propertyId,
+            unitId,
+            moveInDate,
+            moveOutDate,
+            status,
+            notes,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        
+        if (!snapshot.empty) {
+            // Update existing occupancy
+            const occupancyId = snapshot.docs[0].id;
+            occupancyData.createdAt = snapshot.docs[0].data().createdAt || firebase.firestore.FieldValue.serverTimestamp();
+            return db.collection('occupancies').doc(occupancyId).update(occupancyData);
+        } else {
+            // Create new occupancy
+            occupancyData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+            return db.collection('occupancies').add(occupancyData);
+        }
+    }).then(() => {
+        console.log('Occupancy saved successfully');
+        alert('Unit assignment saved successfully!');
+        // Refresh table view
+        if (currentTenantView === 'table') {
+            db.collection('tenants').get().then((snapshot) => {
+                const tenants = {};
+                snapshot.forEach((doc) => {
+                    tenants[doc.id] = { id: doc.id, ...doc.data() };
+                });
+                renderTenantsList(tenants);
+            });
+        }
+    }).catch((error) => {
+        console.error('Error saving occupancy:', error);
+        alert('Error saving unit assignment: ' + error.message);
+    });
+}
 
 function closeOccupancyModal() {
     const modal = document.getElementById('occupancyModal');
