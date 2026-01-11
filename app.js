@@ -320,8 +320,7 @@ function setupEventListeners() {
     const tenantPropertyFilter = document.getElementById('tenantPropertyFilter');
     
     // Table view is now default - view toggle removed
-    // Set table view as default
-    currentTenantView = 'table';
+    // currentTenantView is initialized to 'table' at declaration (line 3282)
     const tableViewOptions = document.getElementById('tableViewOptions');
     if (tableViewOptions) tableViewOptions.style.display = 'flex';
     
