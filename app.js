@@ -789,56 +789,68 @@ function renderBuildingsAndUnitsTable(buildings, units, propertyId) {
         </table>
     `;
     
-    // Add orphaned units section if there are any
+    // Always show orphaned units section (even if empty)
+    html += `
+        <div style="margin-top: 30px; border-left: 3px solid #f59e0b; padding: 15px; background: #fffbeb; border-radius: 6px;">
+            <div style="margin-bottom: 15px;">
+                <h4 style="margin: 0; font-size: 0.95rem; font-weight: 600; color: #d97706;">
+                    ⚠️ Orphaned Units${unitsWithoutBuilding.length > 0 ? ` (${unitsWithoutBuilding.length})` : ''}
+                </h4>
+                <p style="margin: 5px 0 0 0; font-size: 0.75rem; color: #666;">Units without associated buildings</p>
+            </div>
+    `;
+    
     if (unitsWithoutBuilding.length > 0) {
         html += `
-            <div style="margin-top: 30px; border-left: 3px solid #f59e0b; padding: 15px; background: #fffbeb; border-radius: 6px;">
-                <div style="margin-bottom: 15px;">
-                    <h4 style="margin: 0; font-size: 0.95rem; font-weight: 600; color: #d97706;">
-                        ⚠️ Orphaned Units (${unitsWithoutBuilding.length})
-                    </h4>
-                    <p style="margin: 5px 0 0 0; font-size: 0.75rem; color: #666;">Units without associated buildings</p>
-                </div>
-                <table class="buildings-units-table" style="width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                    <thead>
-                        <tr style="background: #f59e0b; color: white;">
-                            <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #d97706;">Unit Number</th>
-                            <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #d97706;">Unit Type</th>
-                            <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #d97706;">Status</th>
-                            <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #d97706;">Square Footage</th>
-                            <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #d97706;">Floor</th>
-                            <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #d97706;">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
+            <table class="buildings-units-table" style="width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                <thead>
+                    <tr style="background: #f59e0b; color: white;">
+                        <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #d97706;">Unit Number</th>
+                        <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #d97706;">Unit Type</th>
+                        <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #d97706;">Status</th>
+                        <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #d97706;">Square Footage</th>
+                        <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #d97706;">Floor</th>
+                        <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #d97706;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
         `;
         
         unitsWithoutBuilding.forEach((unit) => {
             const statusBadge = unit.status ? `<span class="status-badge status-${unit.status.toLowerCase().replace(' ', '-')}">${unit.status}</span>` : '<span style="color: #999;">—</span>';
             
             html += `
-                        <tr style="border-bottom: 1px solid #e5e7eb;">
-                            <td style="padding: 12px;">${escapeHtml(unit.unitNumber || 'N/A')}</td>
-                            <td style="padding: 12px;">${unit.unitType || '<span style="color: #999;">—</span>'}</td>
-                            <td style="padding: 12px;">${statusBadge}</td>
-                            <td style="padding: 12px;">${unit.squareFootage ? unit.squareFootage.toLocaleString() + ' sq ft' : '<span style="color: #999;">—</span>'}</td>
-                            <td style="padding: 12px;">${unit.floorNumber ? unit.floorNumber : '<span style="color: #999;">—</span>'}</td>
-                            <td style="padding: 12px;">
-                                <div style="display: flex; gap: 6px;">
-                                    <button class="btn-secondary btn-small" onclick="editUnit('${unit.id}')" style="padding: 4px 8px; font-size: 0.75rem;">Edit</button>
-                                    <button class="btn-danger btn-small" onclick="deleteUnit('${unit.id}')" style="padding: 4px 8px; font-size: 0.75rem;">Delete</button>
-                                </div>
-                            </td>
-                        </tr>
+                    <tr style="border-bottom: 1px solid #e5e7eb;">
+                        <td style="padding: 12px;">${escapeHtml(unit.unitNumber || 'N/A')}</td>
+                        <td style="padding: 12px;">${unit.unitType || '<span style="color: #999;">—</span>'}</td>
+                        <td style="padding: 12px;">${statusBadge}</td>
+                        <td style="padding: 12px;">${unit.squareFootage ? unit.squareFootage.toLocaleString() + ' sq ft' : '<span style="color: #999;">—</span>'}</td>
+                        <td style="padding: 12px;">${unit.floorNumber ? unit.floorNumber : '<span style="color: #999;">—</span>'}</td>
+                        <td style="padding: 12px;">
+                            <div style="display: flex; gap: 6px;">
+                                <button class="btn-secondary btn-small" onclick="editUnit('${unit.id}')" style="padding: 4px 8px; font-size: 0.75rem;">Edit</button>
+                                <button class="btn-danger btn-small" onclick="deleteUnit('${unit.id}')" style="padding: 4px 8px; font-size: 0.75rem;">Delete</button>
+                            </div>
+                        </td>
+                    </tr>
             `;
         });
         
         html += `
-                    </tbody>
-                </table>
+                </tbody>
+            </table>
+        `;
+    } else {
+        html += `
+            <div style="padding: 20px; text-align: center; color: #999;">
+                No orphaned units found.
             </div>
         `;
     }
+    
+    html += `
+        </div>
+    `;
     
     if (sortedBuildings.length === 0 && unitsWithoutBuilding.length === 0) {
         html = '<p style="color: #999; text-align: center; padding: 40px;">No buildings or units yet. Add one to get started!</p>';
