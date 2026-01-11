@@ -5744,14 +5744,14 @@ function loadContacts(tenantId) {
         });
 }
 
-window.addContact = function(tenantId) {
+window.addContact = async function(tenantId) {
     editingContactId = null;
     document.getElementById('contactModalTitle').textContent = 'Add Contact';
     document.getElementById('contactId').value = '';
     document.getElementById('contactForm').reset();
     
-    // Load tenants into dropdown
-    loadTenantsForContactSelect(tenantId || null);
+    // Load tenants into dropdown (grouped by building)
+    await loadTenantsForContactSelect(tenantId || null);
     
     const submitBtn = document.querySelector('#contactForm button[type="submit"]');
     if (submitBtn) {
@@ -5930,16 +5930,16 @@ window.editContactFromTable = function(contactId, event) {
     editContact(contactId);
 };
 
-window.editContact = function(contactId) {
-    db.collection('tenantContacts').doc(contactId).get().then((doc) => {
+window.editContact = async function(contactId) {
+    db.collection('tenantContacts').doc(contactId).get().then(async (doc) => {
         const contact = doc.data();
         if (contact) {
             editingContactId = contactId;
             document.getElementById('contactModalTitle').textContent = 'Edit Contact';
             document.getElementById('contactId').value = contactId;
             
-            // Load tenants and set selected tenant
-            loadTenantsForContactSelect(contact.tenantId || null);
+            // Load tenants and set selected tenant (grouped by building)
+            await loadTenantsForContactSelect(contact.tenantId || null);
             
             document.getElementById('contactName').value = contact.contactName || '';
             document.getElementById('contactEmail').value = contact.contactEmail || '';
