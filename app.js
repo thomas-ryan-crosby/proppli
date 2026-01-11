@@ -719,7 +719,8 @@ function renderBuildingsAndUnitsTable(buildings, units, propertyId) {
                         <th style="padding: 14px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #1e3a8a; white-space: nowrap; width: 70px;">Floor</th>
                         <th style="padding: 14px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #1e3a8a; white-space: nowrap; width: 80px;">Bed</th>
                         <th style="padding: 14px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #1e3a8a; white-space: nowrap; width: 80px;">Bath</th>
-                        <th style="padding: 14px 10px; text-align: right; font-weight: 600; border-bottom: 2px solid #1e3a8a; white-space: nowrap; width: 110px;">Monthly Rent</th>
+                        <th style="padding: 14px 10px; text-align: right; font-weight: 600; border-bottom: 2px solid #1e3a8a; white-space: nowrap; width: 110px;">Expected Monthly Rent</th>
+                        <th style="padding: 14px 10px; text-align: right; font-weight: 600; border-bottom: 2px solid #1e3a8a; white-space: nowrap; width: 100px;">Price Per Foot</th>
                         <th style="padding: 14px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #1e3a8a; white-space: nowrap; width: 120px;">Actions</th>
                     </tr>
                 </thead>
@@ -797,7 +798,7 @@ function renderBuildingsAndUnitsTable(buildings, units, propertyId) {
                     <td style="padding: 12px 10px; vertical-align: top; background: #f8fafc; border-right: 2px solid #e2e8f0; text-align: center;">
                         ${building.numberOfFloors ? building.numberOfFloors : '<span style="color: #94a3b8;">—</span>'}
                     </td>
-                    <td colspan="8" style="padding: 12px 10px; text-align: center; color: #94a3b8; font-style: italic; font-size: 0.85rem;">No units</td>
+                    <td colspan="9" style="padding: 12px 10px; text-align: center; color: #94a3b8; font-style: italic; font-size: 0.85rem;">No units</td>
                 </tr>
             `;
         }
@@ -823,7 +824,7 @@ function renderBuildingsAndUnitsTable(buildings, units, propertyId) {
     if (unitsWithoutBuilding.length > 0) {
         html += `
             <div style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
-                <table class="buildings-units-table" style="width: 100%; min-width: 900px; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-size: 0.875rem;">
+                <table class="buildings-units-table" style="width: 100%; min-width: 1000px; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-size: 0.875rem;">
                     <thead>
                         <tr style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white;">
                             <th style="padding: 14px 10px; text-align: left; font-weight: 600; border-bottom: 2px solid #b45309; white-space: nowrap; width: 100px;">Unit #</th>
@@ -833,7 +834,8 @@ function renderBuildingsAndUnitsTable(buildings, units, propertyId) {
                             <th style="padding: 14px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #b45309; white-space: nowrap; width: 70px;">Floor</th>
                             <th style="padding: 14px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #b45309; white-space: nowrap; width: 80px;">Bed</th>
                             <th style="padding: 14px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #b45309; white-space: nowrap; width: 80px;">Bath</th>
-                            <th style="padding: 14px 10px; text-align: right; font-weight: 600; border-bottom: 2px solid #b45309; white-space: nowrap; width: 110px;">Monthly Rent</th>
+                            <th style="padding: 14px 10px; text-align: right; font-weight: 600; border-bottom: 2px solid #b45309; white-space: nowrap; width: 110px;">Expected Monthly Rent</th>
+                            <th style="padding: 14px 10px; text-align: right; font-weight: 600; border-bottom: 2px solid #b45309; white-space: nowrap; width: 100px;">Price Per Foot</th>
                             <th style="padding: 14px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #b45309; white-space: nowrap; width: 120px;">Actions</th>
                         </tr>
                     </thead>
@@ -843,6 +845,14 @@ function renderBuildingsAndUnitsTable(buildings, units, propertyId) {
         unitsWithoutBuilding.forEach((unit) => {
             const statusBadge = unit.status ? `<span class="status-badge status-${unit.status.toLowerCase().replace(' ', '-')}" style="font-size: 0.75rem; padding: 3px 8px;">${unit.status}</span>` : '<span style="color: #94a3b8;">—</span>';
             const monthlyRentFormatted = unit.monthlyRent ? `$${unit.monthlyRent.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '<span style="color: #94a3b8;">—</span>';
+            
+            // Calculate price per foot
+            let pricePerFoot = null;
+            let pricePerFootFormatted = '<span style="color: #94a3b8;">—</span>';
+            if (unit.monthlyRent && unit.squareFootage && unit.squareFootage > 0) {
+                pricePerFoot = unit.monthlyRent / unit.squareFootage;
+                pricePerFootFormatted = `$${pricePerFoot.toFixed(2)}`;
+            }
             
             html += `
                         <tr style="border-bottom: 1px solid #e2e8f0;">
@@ -854,6 +864,7 @@ function renderBuildingsAndUnitsTable(buildings, units, propertyId) {
                             <td style="padding: 12px 10px; text-align: center; color: #475569;">${unit.numberOfBedrooms ? unit.numberOfBedrooms : '<span style="color: #94a3b8;">—</span>'}</td>
                             <td style="padding: 12px 10px; text-align: center; color: #475569;">${unit.numberOfBathrooms ? unit.numberOfBathrooms : '<span style="color: #94a3b8;">—</span>'}</td>
                             <td style="padding: 12px 10px; text-align: right; color: #059669; font-weight: 600; font-variant-numeric: tabular-nums;">${monthlyRentFormatted}</td>
+                            <td style="padding: 12px 10px; text-align: right; color: #7c3aed; font-weight: 500; font-variant-numeric: tabular-nums;">${pricePerFootFormatted}</td>
                             <td style="padding: 12px 10px; text-align: center;">
                                 <div style="display: flex; gap: 4px; justify-content: center; flex-wrap: wrap;">
                                     <button class="btn-secondary btn-small" onclick="editUnit('${unit.id}')" style="padding: 3px 6px; font-size: 0.7rem; min-height: 22px;" title="Edit Unit">✏️</button>
@@ -1844,6 +1855,14 @@ function handlePropertySubmit(e) {
             closePropertyModal();
             // Reload properties list
             loadProperties();
+            // If viewing property detail, refresh the table
+            const propertyDetailView = document.getElementById('propertyDetailView');
+            if (propertyDetailView && propertyDetailView.style.display !== 'none') {
+                const propertyId = propertyDetailView.getAttribute('data-property-id');
+                if (propertyId) {
+                    loadBuildingsAndUnitsTable(propertyId);
+                }
+            }
         }).catch((error) => {
             clearTimeout(timeoutId);
             console.error('Error updating property:', error);
@@ -1894,6 +1913,14 @@ function handlePropertySubmit(e) {
                 closePropertyModal();
                 // Reload properties list
                 loadProperties();
+                // If viewing property detail, refresh the table
+                const propertyDetailView = document.getElementById('propertyDetailView');
+                if (propertyDetailView && propertyDetailView.style.display !== 'none') {
+                    const propertyId = propertyDetailView.getAttribute('data-property-id');
+                    if (propertyId) {
+                        loadBuildingsAndUnitsTable(propertyId);
+                    }
+                }
             })
             .catch((error) => {
                 clearTimeout(timeoutId);
