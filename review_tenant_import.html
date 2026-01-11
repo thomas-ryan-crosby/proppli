@@ -434,25 +434,7 @@
             reader.readAsText(file);
         });
 
-        // Auto-load if file is in same directory
-        window.addEventListener('DOMContentLoaded', function() {
-            fetch('sanctuary_office_park_tenants_import.json')
-                .then(response => {
-                    if (response.ok) {
-                        return response.json();
-                    }
-                    throw new Error('File not found');
-                })
-                .then(data => {
-                    allTenants = data.tenants || [];
-                    filteredTenants = [...allTenants];
-                    updateStats();
-                    renderTenants();
-                })
-                .catch(error => {
-                    console.log('Auto-load failed, waiting for manual file selection');
-                });
-        });
+        // Auto-load removed - manual file selection only
 
         // Search functionality
         document.getElementById('searchInput').addEventListener('input', function(e) {
