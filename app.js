@@ -784,7 +784,7 @@ function renderBuildingsAndUnitsTable(buildings, units, propertyId) {
                     <td style="padding: 12px 10px; text-align: center; color: #475569;">${unit.numberOfBedrooms ? unit.numberOfBedrooms : '<span style="color: #94a3b8;">—</span>'}</td>
                     <td style="padding: 12px 10px; text-align: center; color: #475569;">${unit.numberOfBathrooms ? unit.numberOfBathrooms : '<span style="color: #94a3b8;">—</span>'}</td>
                     <td style="padding: 12px 10px; text-align: right; color: #059669; font-weight: 600; font-variant-numeric: tabular-nums;">${monthlyRentFormatted}</td>
-                    <td style="padding: 12px 10px; text-align: right; color: #7c3aed; font-weight: 500; font-variant-numeric: tabular-nums;">${pricePerFootFormatted}</td>
+                    <td style="padding: 12px 10px; text-align: right; font-variant-numeric: tabular-nums;">${pricePerFootFormatted}</td>
                     <td style="padding: 12px 10px; text-align: center;">
                         <div style="display: flex; gap: 4px; justify-content: center; flex-wrap: wrap;">
                             <button class="btn-secondary btn-small" onclick="editUnit('${unit.id}')" style="padding: 3px 6px; font-size: 0.7rem; min-height: 22px;" title="Edit Unit">✏️</button>
@@ -883,7 +883,7 @@ function renderBuildingsAndUnitsTable(buildings, units, propertyId) {
                             <td style="padding: 12px 10px; text-align: center; color: #475569;">${unit.numberOfBedrooms ? unit.numberOfBedrooms : '<span style="color: #94a3b8;">—</span>'}</td>
                             <td style="padding: 12px 10px; text-align: center; color: #475569;">${unit.numberOfBathrooms ? unit.numberOfBathrooms : '<span style="color: #94a3b8;">—</span>'}</td>
                             <td style="padding: 12px 10px; text-align: right; color: #059669; font-weight: 600; font-variant-numeric: tabular-nums;">${monthlyRentFormatted}</td>
-                            <td style="padding: 12px 10px; text-align: right; color: #7c3aed; font-weight: 500; font-variant-numeric: tabular-nums;">${pricePerFootFormatted}</td>
+                            <td style="padding: 12px 10px; text-align: right; font-variant-numeric: tabular-nums;">${pricePerFootFormatted}</td>
                             <td style="padding: 12px 10px; text-align: center;">
                                 <div style="display: flex; gap: 4px; justify-content: center; flex-wrap: wrap;">
                                     <button class="btn-secondary btn-small" onclick="editUnit('${unit.id}')" style="padding: 3px 6px; font-size: 0.7rem; min-height: 22px;" title="Edit Unit">✏️</button>
