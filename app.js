@@ -623,9 +623,8 @@ window.viewPropertyDetail = function(propertyId) {
             }
         });
         
-        // Load buildings and units
-        loadBuildings(propertyId);
-        loadUnits(propertyId);
+        // Load buildings and units in table format
+        loadBuildingsAndUnitsTable(propertyId);
     }
 };
 
@@ -640,6 +639,213 @@ window.backToProperties = function() {
 // Building Management
 let currentPropertyIdForDetail = null;
 let editingBuildingId = null;
+
+async function loadBuildingsAndUnitsTable(propertyId) {
+    currentPropertyIdForDetail = propertyId;
+    const tableContainer = document.getElementById('buildingsUnitsTable');
+    if (!tableContainer) return;
+    
+    try {
+        // Load buildings and units in parallel
+        const [buildingsSnapshot, unitsSnapshot] = await Promise.all([
+            db.collection('buildings').where('propertyId', '==', propertyId).get(),
+            db.collection('units').where('propertyId', '==', propertyId).get()
+        ]);
+        
+        const buildings = {};
+        buildingsSnapshot.forEach((doc) => {
+            buildings[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        
+        const units = {};
+        unitsSnapshot.forEach((doc) => {
+            units[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        
+        renderBuildingsAndUnitsTable(buildings, units, propertyId);
+    } catch (error) {
+        console.error('Error loading buildings and units:', error);
+        tableContainer.innerHTML = '<p style="color: #e74c3c; text-align: center; padding: 20px;">Error loading data. Please try again.</p>';
+    }
+}
+
+function renderBuildingsAndUnitsTable(buildings, units, propertyId) {
+    const tableContainer = document.getElementById('buildingsUnitsTable');
+    if (!tableContainer) return;
+    
+    // Group units by building
+    const unitsByBuilding = {};
+    const unitsWithoutBuilding = [];
+    
+    Object.keys(units).forEach(id => {
+        const unit = units[id];
+        if (unit.buildingId && buildings[unit.buildingId]) {
+            if (!unitsByBuilding[unit.buildingId]) {
+                unitsByBuilding[unit.buildingId] = [];
+            }
+            unitsByBuilding[unit.buildingId].push({ id, ...unit });
+        } else {
+            unitsWithoutBuilding.push({ id, ...unit });
+        }
+    });
+    
+    // Sort buildings by name (numeric-aware)
+    const sortedBuildings = Object.keys(buildings).map(id => ({ id, ...buildings[id] })).sort((a, b) => {
+        const aName = a.buildingName || '';
+        const bName = b.buildingName || '';
+        return aName.localeCompare(bName, undefined, { numeric: true, sensitivity: 'base' });
+    });
+    
+    // Sort units within each building by unit number (numeric-aware)
+    Object.keys(unitsByBuilding).forEach(buildingId => {
+        unitsByBuilding[buildingId].sort((a, b) => {
+            const aNum = a.unitNumber || '';
+            const bNum = b.unitNumber || '';
+            return aNum.localeCompare(bNum, undefined, { numeric: true, sensitivity: 'base' });
+        });
+    });
+    
+    // Sort property-level units
+    unitsWithoutBuilding.sort((a, b) => {
+        const aNum = a.unitNumber || '';
+        const bNum = b.unitNumber || '';
+        return aNum.localeCompare(bNum, undefined, { numeric: true, sensitivity: 'base' });
+    });
+    
+    let html = `
+        <table class="buildings-units-table" style="width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <thead>
+                <tr style="background: #2563eb; color: white;">
+                    <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #1e40af;">Building</th>
+                    <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #1e40af;">Address</th>
+                    <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #1e40af;">Floors</th>
+                    <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #1e40af;">Unit Number</th>
+                    <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #1e40af;">Unit Type</th>
+                    <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #1e40af;">Status</th>
+                    <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #1e40af;">Square Footage</th>
+                    <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #1e40af;">Floor</th>
+                    <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #1e40af;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    // Render buildings with their units
+    sortedBuildings.forEach(({ id: buildingId, ...building }) => {
+        const buildingUnits = unitsByBuilding[buildingId] || [];
+        
+        buildingUnits.forEach((unit, index) => {
+            const isBuildingRow = index === 0;
+            const rowspan = buildingUnits.length;
+            
+            html += `
+                <tr style="border-bottom: 1px solid #e5e7eb;">
+            `;
+            
+            // Building columns (only on first unit row)
+            if (isBuildingRow) {
+                html += `
+                    <td rowspan="${rowspan}" style="padding: 12px; vertical-align: top; background: #f9fafb; font-weight: 600; border-right: 2px solid #e5e7eb;">
+                        ${escapeHtml(building.buildingName || 'N/A')}
+                        <div style="margin-top: 8px; display: flex; gap: 6px;">
+                            <button class="btn-secondary btn-small" onclick="editBuilding('${buildingId}')" style="padding: 4px 8px; font-size: 0.75rem;">Edit</button>
+                            <button class="btn-danger btn-small" onclick="deleteBuilding('${buildingId}')" style="padding: 4px 8px; font-size: 0.75rem;">Delete</button>
+                        </div>
+                    </td>
+                    <td rowspan="${rowspan}" style="padding: 12px; vertical-align: top; background: #f9fafb; border-right: 2px solid #e5e7eb;">
+                        ${building.buildingAddress ? escapeHtml(building.buildingAddress) : '<span style="color: #999;">—</span>'}
+                    </td>
+                    <td rowspan="${rowspan}" style="padding: 12px; vertical-align: top; background: #f9fafb; border-right: 2px solid #e5e7eb;">
+                        ${building.numberOfFloors ? building.numberOfFloors : '<span style="color: #999;">—</span>'}
+                    </td>
+                `;
+            }
+            
+            // Unit columns
+            const statusBadge = unit.status ? `<span class="status-badge status-${unit.status.toLowerCase().replace(' ', '-')}">${unit.status}</span>` : '<span style="color: #999;">—</span>';
+            
+            html += `
+                    <td style="padding: 12px;">${escapeHtml(unit.unitNumber || 'N/A')}</td>
+                    <td style="padding: 12px;">${unit.unitType || '<span style="color: #999;">—</span>'}</td>
+                    <td style="padding: 12px;">${statusBadge}</td>
+                    <td style="padding: 12px;">${unit.squareFootage ? unit.squareFootage.toLocaleString() + ' sq ft' : '<span style="color: #999;">—</span>'}</td>
+                    <td style="padding: 12px;">${unit.floorNumber ? unit.floorNumber : '<span style="color: #999;">—</span>'}</td>
+                    <td style="padding: 12px;">
+                        <div style="display: flex; gap: 6px;">
+                            <button class="btn-secondary btn-small" onclick="editUnit('${unit.id}')" style="padding: 4px 8px; font-size: 0.75rem;">Edit</button>
+                            <button class="btn-danger btn-small" onclick="deleteUnit('${unit.id}')" style="padding: 4px 8px; font-size: 0.75rem;">Delete</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        // If building has no units, show building row with empty unit columns
+        if (buildingUnits.length === 0) {
+            html += `
+                <tr style="border-bottom: 1px solid #e5e7eb;">
+                    <td style="padding: 12px; vertical-align: top; background: #f9fafb; font-weight: 600; border-right: 2px solid #e5e7eb;">
+                        ${escapeHtml(building.buildingName || 'N/A')}
+                        <div style="margin-top: 8px; display: flex; gap: 6px;">
+                            <button class="btn-secondary btn-small" onclick="editBuilding('${buildingId}')" style="padding: 4px 8px; font-size: 0.75rem;">Edit</button>
+                            <button class="btn-danger btn-small" onclick="deleteBuilding('${buildingId}')" style="padding: 4px 8px; font-size: 0.75rem;">Delete</button>
+                        </div>
+                    </td>
+                    <td style="padding: 12px; vertical-align: top; background: #f9fafb; border-right: 2px solid #e5e7eb;">
+                        ${building.buildingAddress ? escapeHtml(building.buildingAddress) : '<span style="color: #999;">—</span>'}
+                    </td>
+                    <td style="padding: 12px; vertical-align: top; background: #f9fafb; border-right: 2px solid #e5e7eb;">
+                        ${building.numberOfFloors ? building.numberOfFloors : '<span style="color: #999;">—</span>'}
+                    </td>
+                    <td colspan="6" style="padding: 12px; text-align: center; color: #999; font-style: italic;">No units</td>
+                </tr>
+            `;
+        }
+    });
+    
+    // Render property-level units (units without a building)
+    if (unitsWithoutBuilding.length > 0) {
+        unitsWithoutBuilding.forEach((unit, index) => {
+            const statusBadge = unit.status ? `<span class="status-badge status-${unit.status.toLowerCase().replace(' ', '-')}">${unit.status}</span>` : '<span style="color: #999;">—</span>';
+            
+            html += `
+                <tr style="border-bottom: 1px solid #e5e7eb; background: #fff7ed;">
+                    <td style="padding: 12px; vertical-align: top; font-weight: 600; border-right: 2px solid #e5e7eb; color: #ea580c;">
+                        Property-Level
+                    </td>
+                    <td style="padding: 12px; vertical-align: top; border-right: 2px solid #e5e7eb;">
+                        <span style="color: #999;">—</span>
+                    </td>
+                    <td style="padding: 12px; vertical-align: top; border-right: 2px solid #e5e7eb;">
+                        <span style="color: #999;">—</span>
+                    </td>
+                    <td style="padding: 12px;">${escapeHtml(unit.unitNumber || 'N/A')}</td>
+                    <td style="padding: 12px;">${unit.unitType || '<span style="color: #999;">—</span>'}</td>
+                    <td style="padding: 12px;">${statusBadge}</td>
+                    <td style="padding: 12px;">${unit.squareFootage ? unit.squareFootage.toLocaleString() + ' sq ft' : '<span style="color: #999;">—</span>'}</td>
+                    <td style="padding: 12px;">${unit.floorNumber ? unit.floorNumber : '<span style="color: #999;">—</span>'}</td>
+                    <td style="padding: 12px;">
+                        <div style="display: flex; gap: 6px;">
+                            <button class="btn-secondary btn-small" onclick="editUnit('${unit.id}')" style="padding: 4px 8px; font-size: 0.75rem;">Edit</button>
+                            <button class="btn-danger btn-small" onclick="deleteUnit('${unit.id}')" style="padding: 4px 8px; font-size: 0.75rem;">Delete</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+    
+    html += `
+            </tbody>
+        </table>
+    `;
+    
+    if (sortedBuildings.length === 0 && unitsWithoutBuilding.length === 0) {
+        html = '<p style="color: #999; text-align: center; padding: 40px;">No buildings or units yet. Add one to get started!</p>';
+    }
+    
+    tableContainer.innerHTML = html;
+}
 
 function loadBuildings(propertyId) {
     currentPropertyIdForDetail = propertyId;
@@ -762,7 +968,7 @@ window.deleteBuilding = function(buildingId) {
         .then(() => {
             console.log('Building deleted successfully');
             if (currentPropertyIdForDetail) {
-                loadBuildings(currentPropertyIdForDetail);
+                loadBuildingsAndUnitsTable(currentPropertyIdForDetail);
             }
         })
         .catch((error) => {
@@ -841,7 +1047,7 @@ function handleBuildingSubmit(e) {
             resetButtonState();
             closeBuildingModal();
             if (currentPropertyIdForDetail) {
-                loadBuildings(currentPropertyIdForDetail);
+                loadBuildingsAndUnitsTable(currentPropertyIdForDetail);
             }
         }).catch((error) => {
             clearTimeout(timeoutId);
@@ -1190,7 +1396,7 @@ window.deleteUnit = function(unitId) {
         .then(() => {
             console.log('Unit deleted successfully');
             if (currentPropertyIdForDetail) {
-                loadUnits(currentPropertyIdForDetail);
+                loadBuildingsAndUnitsTable(currentPropertyIdForDetail);
             }
         })
         .catch((error) => {
@@ -1291,7 +1497,7 @@ function handleUnitSubmit(e) {
             resetButtonState();
             closeUnitModal();
             if (currentPropertyIdForDetail) {
-                loadUnits(currentPropertyIdForDetail);
+                loadBuildingsAndUnitsTable(currentPropertyIdForDetail);
             }
         }).catch((error) => {
             clearTimeout(timeoutId);

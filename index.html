@@ -471,17 +471,14 @@
                             <button id="backToPropertiesBtn" class="btn-secondary">← Back to Properties</button>
                             <h3 id="propertyDetailName"></h3>
                         </div>
-                        <div class="property-detail-tabs">
-                            <button class="tab-btn active" data-tab="buildings">Buildings</button>
-                            <button class="tab-btn" data-tab="units">Units/Spaces</button>
-                        </div>
-                        <div id="buildingsTab" class="tab-content active">
-                            <div class="section-header">
-                                <h4>Buildings</h4>
+                        <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <h4>Buildings & Units</h4>
+                            <div style="display: flex; gap: 10px;">
                                 <button id="addBuildingBtn" class="btn-primary btn-small">+ Add Building</button>
+                                <button id="addUnitBtn" class="btn-primary btn-small">+ Add Unit</button>
                             </div>
-                            <div id="buildingsList" class="buildings-list"></div>
                         </div>
+                        <div id="buildingsUnitsTable" class="buildings-units-table-container" style="overflow-x: auto;"></div>
                         
                         <!-- Building Modal -->
                         <div id="buildingModal" class="modal">
@@ -518,13 +515,6 @@
                                     </form>
                                 </div>
                             </div>
-                        </div>
-                        <div id="unitsTab" class="tab-content">
-                            <div class="section-header">
-                                <h4>Units/Spaces</h4>
-                                <button id="addUnitBtn" class="btn-primary btn-small">+ Add Unit</button>
-                            </div>
-                            <div id="unitsList" class="units-list"></div>
                         </div>
                         
                         <!-- Unit Modal -->
@@ -994,7 +984,7 @@
                     
                     // Now load app.js after config is ready
                     const appScript = document.createElement('script');
-                    appScript.src = 'app.js?v=3.15';
+                    appScript.src = 'app.js?v=3.16';
                     appScript.onload = function() {
                         console.log('✅ app.js loaded successfully');
                     };
@@ -1020,7 +1010,7 @@
                             return;
                         }
                         const appScript = document.createElement('script');
-                        appScript.src = 'app.js?v=3.15';
+                        appScript.src = 'app.js?v=3.16';
                         document.head.appendChild(appScript);
                     };
                     fallback.onerror = function() {
