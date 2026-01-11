@@ -705,21 +705,25 @@ function renderBuildingsAndUnitsTable(buildings, units, propertyId) {
     });
     
     let html = `
-        <table class="buildings-units-table" style="width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-            <thead>
-                <tr style="background: #2563eb; color: white;">
-                    <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #1e40af;">Building</th>
-                    <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #1e40af;">Address</th>
-                    <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #1e40af;">Floors</th>
-                    <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #1e40af;">Unit Number</th>
-                    <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #1e40af;">Unit Type</th>
-                    <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #1e40af;">Status</th>
-                    <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #1e40af;">Square Footage</th>
-                    <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #1e40af;">Floor</th>
-                    <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #1e40af;">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
+        <div style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+            <table class="buildings-units-table" style="width: 100%; min-width: 1200px; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-size: 0.875rem;">
+                <thead>
+                    <tr style="background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%); color: white;">
+                        <th style="padding: 14px 10px; text-align: left; font-weight: 600; border-bottom: 2px solid #1e3a8a; white-space: nowrap; width: 140px;">Building</th>
+                        <th style="padding: 14px 10px; text-align: left; font-weight: 600; border-bottom: 2px solid #1e3a8a; white-space: nowrap; width: 180px;">Address</th>
+                        <th style="padding: 14px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #1e3a8a; white-space: nowrap; width: 70px;">Floors</th>
+                        <th style="padding: 14px 10px; text-align: left; font-weight: 600; border-bottom: 2px solid #1e3a8a; white-space: nowrap; width: 100px;">Unit #</th>
+                        <th style="padding: 14px 10px; text-align: left; font-weight: 600; border-bottom: 2px solid #1e3a8a; white-space: nowrap; width: 100px;">Type</th>
+                        <th style="padding: 14px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #1e3a8a; white-space: nowrap; width: 100px;">Status</th>
+                        <th style="padding: 14px 10px; text-align: right; font-weight: 600; border-bottom: 2px solid #1e3a8a; white-space: nowrap; width: 110px;">Sq Ft</th>
+                        <th style="padding: 14px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #1e3a8a; white-space: nowrap; width: 70px;">Floor</th>
+                        <th style="padding: 14px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #1e3a8a; white-space: nowrap; width: 80px;">Bed</th>
+                        <th style="padding: 14px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #1e3a8a; white-space: nowrap; width: 80px;">Bath</th>
+                        <th style="padding: 14px 10px; text-align: right; font-weight: 600; border-bottom: 2px solid #1e3a8a; white-space: nowrap; width: 110px;">Monthly Rent</th>
+                        <th style="padding: 14px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #1e3a8a; white-space: nowrap; width: 120px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
     `;
     
     // Render buildings with their units
@@ -737,35 +741,39 @@ function renderBuildingsAndUnitsTable(buildings, units, propertyId) {
             // Building columns (only on first unit row)
             if (isBuildingRow) {
                 html += `
-                    <td rowspan="${rowspan}" style="padding: 12px; vertical-align: top; background: #f9fafb; font-weight: 600; border-right: 2px solid #e5e7eb;">
-                        ${escapeHtml(building.buildingName || 'N/A')}
-                        <div style="margin-top: 8px; display: flex; gap: 6px;">
-                            <button class="btn-secondary btn-small" onclick="editBuilding('${buildingId}')" style="padding: 4px 8px; font-size: 0.75rem;">Edit</button>
-                            <button class="btn-danger btn-small" onclick="deleteBuilding('${buildingId}')" style="padding: 4px 8px; font-size: 0.75rem;">Delete</button>
+                    <td rowspan="${rowspan}" style="padding: 12px 10px; vertical-align: top; background: #f8fafc; font-weight: 600; border-right: 2px solid #e2e8f0; position: sticky; left: 0; z-index: 1;">
+                        <div style="font-size: 0.9rem; line-height: 1.4;">${escapeHtml(building.buildingName || 'N/A')}</div>
+                        <div style="margin-top: 8px; display: flex; gap: 4px; flex-wrap: wrap;">
+                            <button class="btn-secondary btn-small" onclick="editBuilding('${buildingId}')" style="padding: 3px 6px; font-size: 0.7rem; min-height: 22px;">Edit</button>
+                            <button class="btn-danger btn-small" onclick="deleteBuilding('${buildingId}')" style="padding: 3px 6px; font-size: 0.7rem; min-height: 22px;">Delete</button>
                         </div>
                     </td>
-                    <td rowspan="${rowspan}" style="padding: 12px; vertical-align: top; background: #f9fafb; border-right: 2px solid #e5e7eb;">
-                        ${building.buildingAddress ? escapeHtml(building.buildingAddress) : '<span style="color: #999;">—</span>'}
+                    <td rowspan="${rowspan}" style="padding: 12px 10px; vertical-align: top; background: #f8fafc; border-right: 2px solid #e2e8f0; font-size: 0.8rem; line-height: 1.4;">
+                        ${building.buildingAddress ? escapeHtml(building.buildingAddress) : '<span style="color: #94a3b8;">—</span>'}
                     </td>
-                    <td rowspan="${rowspan}" style="padding: 12px; vertical-align: top; background: #f9fafb; border-right: 2px solid #e5e7eb;">
-                        ${building.numberOfFloors ? building.numberOfFloors : '<span style="color: #999;">—</span>'}
+                    <td rowspan="${rowspan}" style="padding: 12px 10px; vertical-align: top; background: #f8fafc; border-right: 2px solid #e2e8f0; text-align: center;">
+                        ${building.numberOfFloors ? building.numberOfFloors : '<span style="color: #94a3b8;">—</span>'}
                     </td>
                 `;
             }
             
             // Unit columns
-            const statusBadge = unit.status ? `<span class="status-badge status-${unit.status.toLowerCase().replace(' ', '-')}">${unit.status}</span>` : '<span style="color: #999;">—</span>';
+            const statusBadge = unit.status ? `<span class="status-badge status-${unit.status.toLowerCase().replace(' ', '-')}" style="font-size: 0.75rem; padding: 3px 8px;">${unit.status}</span>` : '<span style="color: #94a3b8;">—</span>';
+            const monthlyRentFormatted = unit.monthlyRent ? `$${unit.monthlyRent.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '<span style="color: #94a3b8;">—</span>';
             
             html += `
-                    <td style="padding: 12px;">${escapeHtml(unit.unitNumber || 'N/A')}</td>
-                    <td style="padding: 12px;">${unit.unitType || '<span style="color: #999;">—</span>'}</td>
-                    <td style="padding: 12px;">${statusBadge}</td>
-                    <td style="padding: 12px;">${unit.squareFootage ? unit.squareFootage.toLocaleString() + ' sq ft' : '<span style="color: #999;">—</span>'}</td>
-                    <td style="padding: 12px;">${unit.floorNumber ? unit.floorNumber : '<span style="color: #999;">—</span>'}</td>
-                    <td style="padding: 12px;">
-                        <div style="display: flex; gap: 6px;">
-                            <button class="btn-secondary btn-small" onclick="editUnit('${unit.id}')" style="padding: 4px 8px; font-size: 0.75rem;">Edit</button>
-                            <button class="btn-danger btn-small" onclick="deleteUnit('${unit.id}')" style="padding: 4px 8px; font-size: 0.75rem;">Delete</button>
+                    <td style="padding: 12px 10px; font-weight: 600; color: #1e293b;">${escapeHtml(unit.unitNumber || 'N/A')}</td>
+                    <td style="padding: 12px 10px; color: #475569;">${unit.unitType || '<span style="color: #94a3b8;">—</span>'}</td>
+                    <td style="padding: 12px 10px; text-align: center;">${statusBadge}</td>
+                    <td style="padding: 12px 10px; text-align: right; color: #475569; font-variant-numeric: tabular-nums;">${unit.squareFootage ? unit.squareFootage.toLocaleString() : '<span style="color: #94a3b8;">—</span>'}</td>
+                    <td style="padding: 12px 10px; text-align: center; color: #475569;">${unit.floorNumber ? unit.floorNumber : '<span style="color: #94a3b8;">—</span>'}</td>
+                    <td style="padding: 12px 10px; text-align: center; color: #475569;">${unit.numberOfBedrooms ? unit.numberOfBedrooms : '<span style="color: #94a3b8;">—</span>'}</td>
+                    <td style="padding: 12px 10px; text-align: center; color: #475569;">${unit.numberOfBathrooms ? unit.numberOfBathrooms : '<span style="color: #94a3b8;">—</span>'}</td>
+                    <td style="padding: 12px 10px; text-align: right; color: #059669; font-weight: 600; font-variant-numeric: tabular-nums;">${monthlyRentFormatted}</td>
+                    <td style="padding: 12px 10px; text-align: center;">
+                        <div style="display: flex; gap: 4px; justify-content: center; flex-wrap: wrap;">
+                            <button class="btn-secondary btn-small" onclick="editUnit('${unit.id}')" style="padding: 3px 6px; font-size: 0.7rem; min-height: 22px;" title="Edit Unit">✏️</button>
+                            <button class="btn-danger btn-small" onclick="deleteUnit('${unit.id}')" style="padding: 3px 6px; font-size: 0.7rem; min-height: 22px;" title="Delete Unit">🗑️</button>
                         </div>
                     </td>
                 </tr>
@@ -775,29 +783,30 @@ function renderBuildingsAndUnitsTable(buildings, units, propertyId) {
         // If building has no units, show building row with empty unit columns
         if (buildingUnits.length === 0) {
             html += `
-                <tr style="border-bottom: 1px solid #e5e7eb;">
-                    <td style="padding: 12px; vertical-align: top; background: #f9fafb; font-weight: 600; border-right: 2px solid #e5e7eb;">
-                        ${escapeHtml(building.buildingName || 'N/A')}
-                        <div style="margin-top: 8px; display: flex; gap: 6px;">
-                            <button class="btn-secondary btn-small" onclick="editBuilding('${buildingId}')" style="padding: 4px 8px; font-size: 0.75rem;">Edit</button>
-                            <button class="btn-danger btn-small" onclick="deleteBuilding('${buildingId}')" style="padding: 4px 8px; font-size: 0.75rem;">Delete</button>
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                    <td style="padding: 12px 10px; vertical-align: top; background: #f8fafc; font-weight: 600; border-right: 2px solid #e2e8f0;">
+                        <div style="font-size: 0.9rem; line-height: 1.4;">${escapeHtml(building.buildingName || 'N/A')}</div>
+                        <div style="margin-top: 8px; display: flex; gap: 4px; flex-wrap: wrap;">
+                            <button class="btn-secondary btn-small" onclick="editBuilding('${buildingId}')" style="padding: 3px 6px; font-size: 0.7rem; min-height: 22px;">Edit</button>
+                            <button class="btn-danger btn-small" onclick="deleteBuilding('${buildingId}')" style="padding: 3px 6px; font-size: 0.7rem; min-height: 22px;">Delete</button>
                         </div>
                     </td>
-                    <td style="padding: 12px; vertical-align: top; background: #f9fafb; border-right: 2px solid #e5e7eb;">
-                        ${building.buildingAddress ? escapeHtml(building.buildingAddress) : '<span style="color: #999;">—</span>'}
+                    <td style="padding: 12px 10px; vertical-align: top; background: #f8fafc; border-right: 2px solid #e2e8f0; font-size: 0.8rem;">
+                        ${building.buildingAddress ? escapeHtml(building.buildingAddress) : '<span style="color: #94a3b8;">—</span>'}
                     </td>
-                    <td style="padding: 12px; vertical-align: top; background: #f9fafb; border-right: 2px solid #e5e7eb;">
-                        ${building.numberOfFloors ? building.numberOfFloors : '<span style="color: #999;">—</span>'}
+                    <td style="padding: 12px 10px; vertical-align: top; background: #f8fafc; border-right: 2px solid #e2e8f0; text-align: center;">
+                        ${building.numberOfFloors ? building.numberOfFloors : '<span style="color: #94a3b8;">—</span>'}
                     </td>
-                    <td colspan="6" style="padding: 12px; text-align: center; color: #999; font-style: italic;">No units</td>
+                    <td colspan="8" style="padding: 12px 10px; text-align: center; color: #94a3b8; font-style: italic; font-size: 0.85rem;">No units</td>
                 </tr>
             `;
         }
     });
     
     html += `
-            </tbody>
-        </table>
+                </tbody>
+            </table>
+        </div>
     `;
     
     // Always show orphaned units section (even if empty)
@@ -813,43 +822,52 @@ function renderBuildingsAndUnitsTable(buildings, units, propertyId) {
     
     if (unitsWithoutBuilding.length > 0) {
         html += `
-            <table class="buildings-units-table" style="width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                <thead>
-                    <tr style="background: #f59e0b; color: white;">
-                        <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #d97706;">Unit Number</th>
-                        <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #d97706;">Unit Type</th>
-                        <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #d97706;">Status</th>
-                        <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #d97706;">Square Footage</th>
-                        <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #d97706;">Floor</th>
-                        <th style="padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #d97706;">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
+            <div style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+                <table class="buildings-units-table" style="width: 100%; min-width: 900px; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-size: 0.875rem;">
+                    <thead>
+                        <tr style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white;">
+                            <th style="padding: 14px 10px; text-align: left; font-weight: 600; border-bottom: 2px solid #b45309; white-space: nowrap; width: 100px;">Unit #</th>
+                            <th style="padding: 14px 10px; text-align: left; font-weight: 600; border-bottom: 2px solid #b45309; white-space: nowrap; width: 100px;">Type</th>
+                            <th style="padding: 14px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #b45309; white-space: nowrap; width: 100px;">Status</th>
+                            <th style="padding: 14px 10px; text-align: right; font-weight: 600; border-bottom: 2px solid #b45309; white-space: nowrap; width: 110px;">Sq Ft</th>
+                            <th style="padding: 14px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #b45309; white-space: nowrap; width: 70px;">Floor</th>
+                            <th style="padding: 14px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #b45309; white-space: nowrap; width: 80px;">Bed</th>
+                            <th style="padding: 14px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #b45309; white-space: nowrap; width: 80px;">Bath</th>
+                            <th style="padding: 14px 10px; text-align: right; font-weight: 600; border-bottom: 2px solid #b45309; white-space: nowrap; width: 110px;">Monthly Rent</th>
+                            <th style="padding: 14px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #b45309; white-space: nowrap; width: 120px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
         `;
         
         unitsWithoutBuilding.forEach((unit) => {
-            const statusBadge = unit.status ? `<span class="status-badge status-${unit.status.toLowerCase().replace(' ', '-')}">${unit.status}</span>` : '<span style="color: #999;">—</span>';
+            const statusBadge = unit.status ? `<span class="status-badge status-${unit.status.toLowerCase().replace(' ', '-')}" style="font-size: 0.75rem; padding: 3px 8px;">${unit.status}</span>` : '<span style="color: #94a3b8;">—</span>';
+            const monthlyRentFormatted = unit.monthlyRent ? `$${unit.monthlyRent.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '<span style="color: #94a3b8;">—</span>';
             
             html += `
-                    <tr style="border-bottom: 1px solid #e5e7eb;">
-                        <td style="padding: 12px;">${escapeHtml(unit.unitNumber || 'N/A')}</td>
-                        <td style="padding: 12px;">${unit.unitType || '<span style="color: #999;">—</span>'}</td>
-                        <td style="padding: 12px;">${statusBadge}</td>
-                        <td style="padding: 12px;">${unit.squareFootage ? unit.squareFootage.toLocaleString() + ' sq ft' : '<span style="color: #999;">—</span>'}</td>
-                        <td style="padding: 12px;">${unit.floorNumber ? unit.floorNumber : '<span style="color: #999;">—</span>'}</td>
-                        <td style="padding: 12px;">
-                            <div style="display: flex; gap: 6px;">
-                                <button class="btn-secondary btn-small" onclick="editUnit('${unit.id}')" style="padding: 4px 8px; font-size: 0.75rem;">Edit</button>
-                                <button class="btn-danger btn-small" onclick="deleteUnit('${unit.id}')" style="padding: 4px 8px; font-size: 0.75rem;">Delete</button>
-                            </div>
-                        </td>
-                    </tr>
+                        <tr style="border-bottom: 1px solid #e2e8f0;">
+                            <td style="padding: 12px 10px; font-weight: 600; color: #1e293b;">${escapeHtml(unit.unitNumber || 'N/A')}</td>
+                            <td style="padding: 12px 10px; color: #475569;">${unit.unitType || '<span style="color: #94a3b8;">—</span>'}</td>
+                            <td style="padding: 12px 10px; text-align: center;">${statusBadge}</td>
+                            <td style="padding: 12px 10px; text-align: right; color: #475569; font-variant-numeric: tabular-nums;">${unit.squareFootage ? unit.squareFootage.toLocaleString() : '<span style="color: #94a3b8;">—</span>'}</td>
+                            <td style="padding: 12px 10px; text-align: center; color: #475569;">${unit.floorNumber ? unit.floorNumber : '<span style="color: #94a3b8;">—</span>'}</td>
+                            <td style="padding: 12px 10px; text-align: center; color: #475569;">${unit.numberOfBedrooms ? unit.numberOfBedrooms : '<span style="color: #94a3b8;">—</span>'}</td>
+                            <td style="padding: 12px 10px; text-align: center; color: #475569;">${unit.numberOfBathrooms ? unit.numberOfBathrooms : '<span style="color: #94a3b8;">—</span>'}</td>
+                            <td style="padding: 12px 10px; text-align: right; color: #059669; font-weight: 600; font-variant-numeric: tabular-nums;">${monthlyRentFormatted}</td>
+                            <td style="padding: 12px 10px; text-align: center;">
+                                <div style="display: flex; gap: 4px; justify-content: center; flex-wrap: wrap;">
+                                    <button class="btn-secondary btn-small" onclick="editUnit('${unit.id}')" style="padding: 3px 6px; font-size: 0.7rem; min-height: 22px;" title="Edit Unit">✏️</button>
+                                    <button class="btn-danger btn-small" onclick="deleteUnit('${unit.id}')" style="padding: 3px 6px; font-size: 0.7rem; min-height: 22px;" title="Delete Unit">🗑️</button>
+                                </div>
+                            </td>
+                        </tr>
             `;
         });
         
         html += `
-                </tbody>
-            </table>
+                    </tbody>
+                </table>
+            </div>
         `;
     } else {
         html += `
