@@ -4757,20 +4757,26 @@ async function filterTenantsByProperty(tenants) {
         return tenants;
     }
     
-    // Get occupancies for the selected property
-    const occupanciesSnapshot = await db.collection('occupancies')
-        .where('propertyId', '==', selectedPropertyForTenants)
-        .get();
-    
+    // Get all occupancies to check which tenants have occupancies
+    const allOccupanciesSnapshot = await db.collection('occupancies').get();
+    const tenantIdsWithOccupancies = new Set();
     const tenantIdsInProperty = new Set();
-    occupanciesSnapshot.forEach(doc => {
-        tenantIdsInProperty.add(doc.data().tenantId);
+    
+    allOccupanciesSnapshot.forEach(doc => {
+        const occ = doc.data();
+        tenantIdsWithOccupancies.add(occ.tenantId);
+        if (occ.propertyId === selectedPropertyForTenants) {
+            tenantIdsInProperty.add(occ.tenantId);
+        }
     });
     
-    // Filter tenants
+    // Filter tenants: include tenants in the selected property OR tenants with no occupancies (orphan tenants)
     const filtered = {};
     Object.keys(tenants).forEach(id => {
-        if (tenantIdsInProperty.has(id)) {
+        const hasNoOccupancies = !tenantIdsWithOccupancies.has(id);
+        const isInSelectedProperty = tenantIdsInProperty.has(id);
+        
+        if (isInSelectedProperty || hasNoOccupancies) {
             filtered[id] = tenants[id];
         }
     });
