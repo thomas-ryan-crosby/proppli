@@ -1050,7 +1050,7 @@
                     
                     // Now load app.js after config is ready
                     const appScript = document.createElement('script');
-                    appScript.src = 'app.js?v=5.5';
+                    appScript.src = 'app.js?v=5.6';
                     appScript.onload = function() {
                         console.log('✅ app.js loaded successfully');
                     };
@@ -1076,7 +1076,7 @@
                             return;
                         }
                         const appScript = document.createElement('script');
-                        appScript.src = 'app.js?v=5.5';
+                        appScript.src = 'app.js?v=5.6';
                         document.head.appendChild(appScript);
                     };
                     fallback.onerror = function() {

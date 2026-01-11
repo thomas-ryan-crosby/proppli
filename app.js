@@ -4032,146 +4032,77 @@ async function loadOrphanContacts(maxContacts, maxBrokers) {
             </div>
             `;
         } else {
+            // Simple table structure for orphan contacts
             orphanHtml += `
-                <table class="tenants-table">
+                <table class="tenants-table" style="width: 100%;">
                     <thead>
-                        <tr class="header-major">
-                            <th rowspan="2">Contact Name</th>
-                            ${maxContacts > 0 ? `<th colspan="${maxContacts}">Contacts</th>` : ''}
-                            ${maxBrokers > 0 ? `<th colspan="${maxBrokers}">Brokers</th>` : ''}
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Title</th>
+                            <th>Notes</th>
+                            <th>Classifications</th>
+                            <th>Actions</th>
                         </tr>
-                        <tr class="header-sub">
+                    </thead>
+                    <tbody>
             `;
             
-            // Generate contact column headers
-            for (let i = 1; i <= maxContacts; i++) {
-                orphanHtml += `<th>Contact ${i}</th>`;
-            }
-            for (let i = 1; i <= maxBrokers; i++) {
-                orphanHtml += `<th>Broker ${i}</th>`;
-            }
+            // Combine regular and broker orphans for display
+            const allOrphanContacts = [...regularOrphans, ...brokerOrphans];
             
-            orphanHtml += `
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td style="font-weight: 600; color: #c62828;">Orphan Contacts</td>
-            `;
-            
-            // Fill contact columns
-            for (let i = 0; i < maxContacts; i++) {
-                if (i < regularOrphans.length) {
-                    const contact = regularOrphans[i];
+            if (allOrphanContacts.length === 0) {
                 orphanHtml += `
-                    <td class="tenant-contact-cell" data-contact-type="contact">
-                        <div class="contact-card-table">
-                            <div class="contact-card-header">
-                                <div class="contact-card-name">${escapeHtml(contact.contactName || 'Unknown')}</div>
-                                <div class="contact-type-indicators">
+                    <tr>
+                        <td colspan="7" style="text-align: center; padding: 20px; color: #999;">
+                            No orphan contacts found.
+                        </td>
+                    </tr>
                 `;
-                
-                // Add type indicators
-                if (contact.classifications) {
-                    contact.classifications.forEach(cls => {
+            } else {
+                allOrphanContacts.forEach(contact => {
+                    const classifications = contact.classifications || [];
+                    const classificationBadges = classifications.map(cls => {
                         const clsLower = cls.toLowerCase().replace(/\s+/g, '-');
-                        orphanHtml += `<span class="contact-type-indicator ${clsLower}" title="${escapeHtml(cls)}"></span>`;
-                    });
-                }
-                
-                orphanHtml += `
+                        return `<span class="contact-type-indicator ${clsLower}" title="${escapeHtml(cls)}"></span>`;
+                    }).join(' ');
+                    
+                    orphanHtml += `
+                        <tr>
+                            <td style="font-weight: 500;">${escapeHtml(contact.contactName || 'Unknown')}</td>
+                            <td>
+                                ${contact.contactEmail ? `<a href="mailto:${escapeHtml(contact.contactEmail)}" style="color: #2563eb; text-decoration: none;">${escapeHtml(contact.contactEmail)}</a>` : '<span style="color: #999;">—</span>'}
+                            </td>
+                            <td>
+                                ${contact.contactPhone ? `<a href="tel:${escapeHtml(contact.contactPhone)}" style="color: #2563eb; text-decoration: none;">${escapeHtml(contact.contactPhone)}</a>` : '<span style="color: #999;">—</span>'}
+                            </td>
+                            <td>${escapeHtml(contact.contactTitle || '') || '<span style="color: #999;">—</span>'}</td>
+                            <td>${escapeHtml(contact.notes || '') || '<span style="color: #999;">—</span>'}</td>
+                            <td>
+                                <div class="contact-type-indicators" style="display: flex; gap: 4px; flex-wrap: wrap;">
+                                    ${classificationBadges || '<span style="color: #999;">—</span>'}
                                 </div>
-                            </div>
-                            <div class="contact-card-info">
-                `;
-                
-                if (contact.contactEmail) {
-                    orphanHtml += `
-                        <div class="contact-info-item">
-                            <span class="contact-icon-email">✉️</span>
-                            <a href="mailto:${escapeHtml(contact.contactEmail)}" style="color: #2563eb; text-decoration: none; font-size: 0.65rem;">${escapeHtml(contact.contactEmail)}</a>
-                        </div>
-                    `;
-                }
-                
-                if (contact.contactPhone) {
-                    orphanHtml += `
-                        <div class="contact-info-item">
-                            <span class="contact-icon-phone">📞</span>
-                            <a href="tel:${escapeHtml(contact.contactPhone)}" style="color: #2563eb; text-decoration: none; font-size: 0.65rem;">${escapeHtml(contact.contactPhone)}</a>
-                        </div>
-                    `;
-                }
-                
-                if (!contact.contactEmail && !contact.contactPhone) {
-                    orphanHtml += `<div style="color: #999; font-size: 0.65rem;">No contact information</div>`;
-                }
-                
-                orphanHtml += `
-                            </div>
-                            <div style="text-align: right; margin-top: 4px;">
-                                <button class="btn-edit-contact" onclick="deleteOrphanContact('${contact.id}')" title="Delete Orphan Contact">🗑️</button>
-                            </div>
-                        </div>
-                    </td>
-                `;
-            } else {
-                orphanHtml += `<td class="tenant-contact-cell" data-contact-type="contact"></td>`;
-            }
-        }
-        
-        // Fill broker columns
-        for (let i = 0; i < maxBrokers; i++) {
-            if (i < brokerOrphans.length) {
-                const contact = brokerOrphans[i];
-                orphanHtml += `
-                    <td class="tenant-contact-cell" data-contact-type="broker">
-                        <div class="contact-card-table">
-                            <div class="contact-card-header">
-                                <div class="contact-card-name">${escapeHtml(contact.contactName || 'Unknown')}</div>
-                                <div class="contact-type-indicators">
-                                    <span class="contact-type-indicator tenant-rep" title="Tenant Representative"></span>
+                            </td>
+                            <td>
+                                <div style="display: flex; gap: 4px;">
+                                    <button class="btn-action btn-edit" onclick="editContact('${contact.id}')" title="Edit">
+                                        <span class="btn-icon">✏️</span>
+                                    </button>
+                                    <button class="btn-action btn-delete" onclick="deleteOrphanContact('${contact.id}')" title="Delete">
+                                        <span class="btn-icon">🗑️</span>
+                                    </button>
                                 </div>
-                            </div>
-                            <div class="contact-card-info">
-                `;
-                
-                if (contact.contactEmail) {
-                    orphanHtml += `
-                        <div class="contact-info-item">
-                            <span class="contact-icon-email">✉️</span>
-                            <a href="mailto:${escapeHtml(contact.contactEmail)}" style="color: #2563eb; text-decoration: none; font-size: 0.65rem;">${escapeHtml(contact.contactEmail)}</a>
-                        </div>
+                            </td>
+                        </tr>
                     `;
-                }
-                
-                if (contact.contactPhone) {
-                    orphanHtml += `
-                        <div class="contact-info-item">
-                            <span class="contact-icon-phone">📞</span>
-                            <a href="tel:${escapeHtml(contact.contactPhone)}" style="color: #2563eb; text-decoration: none; font-size: 0.65rem;">${escapeHtml(contact.contactPhone)}</a>
-                        </div>
-                    `;
-                }
-                
-                orphanHtml += `
-                            </div>
-                            <div style="text-align: right; margin-top: 4px;">
-                                <button class="btn-edit-contact" onclick="deleteOrphanContact('${contact.id}')" title="Delete Orphan Contact">🗑️</button>
-                            </div>
-                        </div>
-                    </td>
-                `;
-            } else {
-                orphanHtml += `<td class="tenant-contact-cell" data-contact-type="broker"></td>`;
+                });
             }
-        }
-        
+            
             orphanHtml += `
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+                    </tbody>
+                </table>
+            </div>
             `;
         }
         
