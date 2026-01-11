@@ -762,12 +762,17 @@ function renderBuildingsAndUnitsTable(buildings, units, propertyId) {
             const statusBadge = unit.status ? `<span class="status-badge status-${unit.status.toLowerCase().replace(' ', '-')}" style="font-size: 0.75rem; padding: 3px 8px;">${unit.status}</span>` : '<span style="color: #94a3b8;">—</span>';
             const monthlyRentFormatted = unit.monthlyRent ? `$${unit.monthlyRent.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '<span style="color: #94a3b8;">—</span>';
             
-            // Calculate price per foot
-            let pricePerFoot = null;
+            // Calculate price per foot (monthly and annual)
             let pricePerFootFormatted = '<span style="color: #94a3b8;">—</span>';
             if (unit.monthlyRent && unit.squareFootage && unit.squareFootage > 0) {
-                pricePerFoot = unit.monthlyRent / unit.squareFootage;
-                pricePerFootFormatted = `$${pricePerFoot.toFixed(2)}`;
+                const monthlyPPF = unit.monthlyRent / unit.squareFootage;
+                const annualPPF = monthlyPPF * 12;
+                pricePerFootFormatted = `
+                    <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
+                        <span style="color: #7c3aed; font-weight: 500; font-variant-numeric: tabular-nums;">$${monthlyPPF.toFixed(2)}/mo</span>
+                        <span style="color: #a78bfa; font-weight: 400; font-size: 0.75rem; font-variant-numeric: tabular-nums;">$${annualPPF.toFixed(2)}/yr</span>
+                    </div>
+                `;
             }
             
             html += `
@@ -855,12 +860,17 @@ function renderBuildingsAndUnitsTable(buildings, units, propertyId) {
             const statusBadge = unit.status ? `<span class="status-badge status-${unit.status.toLowerCase().replace(' ', '-')}" style="font-size: 0.75rem; padding: 3px 8px;">${unit.status}</span>` : '<span style="color: #94a3b8;">—</span>';
             const monthlyRentFormatted = unit.monthlyRent ? `$${unit.monthlyRent.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '<span style="color: #94a3b8;">—</span>';
             
-            // Calculate price per foot
-            let pricePerFoot = null;
+            // Calculate price per foot (monthly and annual)
             let pricePerFootFormatted = '<span style="color: #94a3b8;">—</span>';
             if (unit.monthlyRent && unit.squareFootage && unit.squareFootage > 0) {
-                pricePerFoot = unit.monthlyRent / unit.squareFootage;
-                pricePerFootFormatted = `$${pricePerFoot.toFixed(2)}`;
+                const monthlyPPF = unit.monthlyRent / unit.squareFootage;
+                const annualPPF = monthlyPPF * 12;
+                pricePerFootFormatted = `
+                    <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
+                        <span style="color: #7c3aed; font-weight: 500; font-variant-numeric: tabular-nums;">$${monthlyPPF.toFixed(2)}/mo</span>
+                        <span style="color: #a78bfa; font-weight: 400; font-size: 0.75rem; font-variant-numeric: tabular-nums;">$${annualPPF.toFixed(2)}/yr</span>
+                    </div>
+                `;
             }
             
             html += `
