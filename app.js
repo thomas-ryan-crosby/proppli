@@ -193,11 +193,50 @@ function setupEventListeners() {
     const backToPropertiesBtn = document.getElementById('backToPropertiesBtn');
     if (backToPropertiesBtn) {
         backToPropertiesBtn.addEventListener('click', function() {
-            const propertiesList = document.querySelector('.properties-page-content .section');
-            const propertyDetailView = document.getElementById('propertyDetailView');
+            window.backToProperties();
+        });
+    }
+    
+    // Floating action buttons for properties
+    const fabAddBuilding = document.getElementById('fabAddBuilding');
+    const fabAddUnit = document.getElementById('fabAddUnit');
+    
+    if (fabAddBuilding) {
+        fabAddBuilding.addEventListener('click', () => {
+            // Get propertyId from the current detail view or data attribute
+            let propertyId = currentPropertyIdForDetail;
             
-            if (propertiesList) propertiesList.style.display = 'block';
-            if (propertyDetailView) propertyDetailView.style.display = 'none';
+            // Fallback: try to get from property detail view data attribute
+            if (!propertyId) {
+                const propertyDetailView = document.getElementById('propertyDetailView');
+                if (propertyDetailView) {
+                    propertyId = propertyDetailView.getAttribute('data-property-id');
+                }
+            }
+            
+            if (propertyId) {
+                window.addBuilding(propertyId);
+            } else {
+                alert('Error: Property context is missing. Please go back to properties and try again.');
+                console.error('Cannot add building: currentPropertyIdForDetail is', currentPropertyIdForDetail);
+            }
+        });
+    }
+    
+    if (fabAddUnit) {
+        fabAddUnit.addEventListener('click', () => {
+            let propertyId = currentPropertyIdForDetail;
+            if (!propertyId) {
+                const propertyDetailView = document.getElementById('propertyDetailView');
+                if (propertyDetailView) {
+                    propertyId = propertyDetailView.getAttribute('data-property-id');
+                }
+            }
+            if (propertyId) {
+                window.addUnit(propertyId);
+            } else {
+                alert('Error: Property context is missing. Please go back to properties and try again.');
+            }
         });
     }
     
