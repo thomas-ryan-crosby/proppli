@@ -3651,6 +3651,9 @@ async function renderTenantsTableView(tenants) {
                                 <button class="btn-action btn-edit" onclick="editTenant('${tenant.id}')" title="Edit">
                                     <span class="btn-icon">✏️</span>
                                 </button>
+                                <button class="btn-action btn-danger" onclick="markTenantAsMovedOut('${tenant.id}')" title="Mark as Moved Out" style="background: #f97316; border-color: #f97316; color: white;">
+                                    <span class="btn-icon">🚪</span>
+                                </button>
                                 <button class="btn-action btn-delete" onclick="deleteTenant('${tenant.id}')" title="Delete">
                                     <span class="btn-icon">🗑️</span>
                                 </button>
@@ -3792,6 +3795,9 @@ async function renderTenantsTableView(tenants) {
                                 </button>
                                 <button class="btn-action btn-edit" onclick="editTenant('${tenant.id}')" title="Edit">
                                     <span class="btn-icon">✏️</span>
+                                </button>
+                                <button class="btn-action btn-danger" onclick="markTenantAsMovedOut('${tenant.id}')" title="Mark as Moved Out" style="background: #f97316; border-color: #f97316; color: white;">
+                                    <span class="btn-icon">🚪</span>
                                 </button>
                                 <button class="btn-action btn-delete" onclick="deleteTenant('${tenant.id}')" title="Delete">
                                     <span class="btn-icon">🗑️</span>
@@ -4779,6 +4785,9 @@ function rebuildTableWithContactColumns(tenantsByBuilding, tenantsWithoutBuildin
                                 <button class="btn-action btn-edit" onclick="editTenant('${tenant.id}')" title="Edit">
                                     <span class="btn-icon">✏️</span>
                                 </button>
+                                <button class="btn-action btn-danger" onclick="markTenantAsMovedOut('${tenant.id}')" title="Mark as Moved Out" style="background: #f97316; border-color: #f97316; color: white;">
+                                    <span class="btn-icon">🚪</span>
+                                </button>
                                 <button class="btn-action btn-delete" onclick="deleteTenant('${tenant.id}')" title="Delete">
                                     <span class="btn-icon">🗑️</span>
                                 </button>
@@ -4880,6 +4889,9 @@ function rebuildTableWithContactColumns(tenantsByBuilding, tenantsWithoutBuildin
                                 </button>
                                 <button class="btn-action btn-edit" onclick="editTenant('${tenant.id}')" title="Edit">
                                     <span class="btn-icon">✏️</span>
+                                </button>
+                                <button class="btn-action btn-danger" onclick="markTenantAsMovedOut('${tenant.id}')" title="Mark as Moved Out" style="background: #f97316; border-color: #f97316; color: white;">
+                                    <span class="btn-icon">🚪</span>
                                 </button>
                                 <button class="btn-action btn-delete" onclick="deleteTenant('${tenant.id}')" title="Delete">
                                     <span class="btn-icon">🗑️</span>

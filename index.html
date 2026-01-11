@@ -664,8 +664,58 @@
                                 <select id="tenantStatus" required>
                                     <option value="Active">Active</option>
                                     <option value="Past">Past</option>
+                                    <option value="Moved Out">Moved Out</option>
                                     <option value="Prospect">Prospect</option>
                                 </select>
+                            </div>
+                            
+                            <!-- Unit Assignment Section (shown only when editing) -->
+                            <div id="tenantUnitAssignmentSection" style="display: none;">
+                                <h3 style="margin: 20px 0 15px 0; color: #2563EB; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px;">Unit Assignment</h3>
+                                
+                                <div class="form-group">
+                                    <label for="tenantEditPropertyId">Property</label>
+                                    <select id="tenantEditPropertyId">
+                                        <option value="">Select property...</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="tenantEditUnitId">Unit/Space (Optional)</label>
+                                    <select id="tenantEditUnitId">
+                                        <option value="">No Unit (Property Level)</option>
+                                    </select>
+                                    <small style="color: #666; font-size: 12px;">Select a unit to assign this tenant to</small>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="tenantEditMoveInDate">Move-In Date</label>
+                                    <input type="date" id="tenantEditMoveInDate">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="tenantEditMoveOutDate">Move-Out Date</label>
+                                    <input type="date" id="tenantEditMoveOutDate">
+                                    <small style="color: #666; font-size: 12px;">Leave blank if currently occupied</small>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="tenantEditOccupancyStatus">Occupancy Status</label>
+                                    <select id="tenantEditOccupancyStatus">
+                                        <option value="Active">Active</option>
+                                        <option value="Past">Past</option>
+                                        <option value="Pending">Pending</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="tenantEditOccupancyNotes">Occupancy Notes</label>
+                                    <textarea id="tenantEditOccupancyNotes" rows="2" placeholder="Additional notes about this occupancy..."></textarea>
+                                </div>
+                                
+                                <div class="form-actions" style="margin-top: 10px;">
+                                    <button type="button" id="saveTenantOccupancyBtn" class="btn-primary btn-small">Save Unit Assignment</button>
+                                </div>
                             </div>
                             
                             <div class="form-group">
@@ -981,7 +1031,7 @@
                     
                     // Now load app.js after config is ready
                     const appScript = document.createElement('script');
-                    appScript.src = 'app.js?v=4.3';
+                    appScript.src = 'app.js?v=4.4';
                     appScript.onload = function() {
                         console.log('✅ app.js loaded successfully');
                     };
@@ -1007,7 +1057,7 @@
                             return;
                         }
                         const appScript = document.createElement('script');
-                        appScript.src = 'app.js?v=4.3';
+                        appScript.src = 'app.js?v=4.4';
                         document.head.appendChild(appScript);
                     };
                     fallback.onerror = function() {
