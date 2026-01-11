@@ -1148,6 +1148,8 @@ window.deleteBuilding = function(buildingId) {
             if (currentPropertyIdForDetail) {
                 loadBuildingsAndUnitsTable(currentPropertyIdForDetail);
             }
+            // Refresh unit dropdown in occupancy modal if open
+            refreshOccupancyUnitDropdownIfOpen();
         })
         .catch((error) => {
             console.error('Error deleting building:', error);
@@ -1227,6 +1229,8 @@ function handleBuildingSubmit(e) {
             if (currentPropertyIdForDetail) {
                 loadBuildingsAndUnitsTable(currentPropertyIdForDetail);
             }
+            // Refresh unit dropdown in occupancy modal if open
+            refreshOccupancyUnitDropdownIfOpen();
         }).catch((error) => {
             clearTimeout(timeoutId);
             console.error('Error updating building:', error);
@@ -1245,6 +1249,8 @@ function handleBuildingSubmit(e) {
                 if (currentPropertyIdForDetail) {
                     loadBuildings(currentPropertyIdForDetail);
                 }
+                // Refresh unit dropdown in occupancy modal if open
+                refreshOccupancyUnitDropdownIfOpen();
             })
             .catch((error) => {
                 clearTimeout(timeoutId);
@@ -1729,6 +1735,8 @@ function handleUnitSubmit(e) {
             if (currentPropertyIdForDetail) {
                 loadBuildingsAndUnitsTable(currentPropertyIdForDetail);
             }
+            // Refresh unit dropdown in occupancy modal if open
+            refreshOccupancyUnitDropdownIfOpen();
         }).catch((error) => {
             clearTimeout(timeoutId);
             console.error('Error updating unit:', error);
@@ -1747,6 +1755,8 @@ function handleUnitSubmit(e) {
                 if (currentPropertyIdForDetail) {
                     loadBuildingsAndUnitsTable(currentPropertyIdForDetail);
                 }
+                // Refresh unit dropdown in occupancy modal if open
+                refreshOccupancyUnitDropdownIfOpen();
             })
             .catch((error) => {
                 clearTimeout(timeoutId);
@@ -6431,6 +6441,17 @@ function loadPropertiesForOccupancy() {
         });
 }
 
+// Function to refresh unit dropdown if occupancy modal is open
+function refreshOccupancyUnitDropdownIfOpen() {
+    const occupancyModal = document.getElementById('occupancyModal');
+    const propertySelect = document.getElementById('occupancyPropertyId');
+    
+    // Only refresh if modal is open and a property is selected
+    if (occupancyModal && occupancyModal.classList.contains('show') && propertySelect && propertySelect.value) {
+        loadUnitsForOccupancy(propertySelect.value);
+    }
+}
+
 function loadUnitsForOccupancy(propertyId) {
     const unitSelect = document.getElementById('occupancyUnitId');
     if (!unitSelect) return Promise.resolve();
@@ -6439,7 +6460,7 @@ function loadUnitsForOccupancy(propertyId) {
     
     if (!propertyId) return Promise.resolve();
     
-    // Load both units and buildings
+    // Always fetch fresh data from Firestore
     return Promise.all([
         db.collection('units').where('propertyId', '==', propertyId).get(),
         db.collection('buildings').where('propertyId', '==', propertyId).get()
