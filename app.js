@@ -1559,7 +1559,7 @@ function handleUnitSubmit(e) {
                 resetButtonState();
                 closeUnitModal();
                 if (currentPropertyIdForDetail) {
-                    loadUnits(currentPropertyIdForDetail);
+                    loadBuildingsAndUnitsTable(currentPropertyIdForDetail);
                 }
             })
             .catch((error) => {
