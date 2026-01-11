@@ -704,125 +704,98 @@ function renderBuildingsAndUnitsTable(buildings, units, propertyId) {
         return aNum.localeCompare(bNum, undefined, { numeric: true, sensitivity: 'base' });
     });
     
-    let html = `
-        <div style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
-            <table class="buildings-units-table" style="width: 100%; min-width: 1300px; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-size: 0.875rem;">
-                <thead>
-                    <tr style="background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%); color: white;">
-                        <th style="padding: 14px 10px; text-align: left; font-weight: 600; border-bottom: 2px solid #1e3a8a; white-space: nowrap; width: 140px;">Building</th>
-                        <th style="padding: 14px 10px; text-align: left; font-weight: 600; border-bottom: 2px solid #1e3a8a; white-space: nowrap; width: 180px;">Address</th>
-                        <th style="padding: 14px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #1e3a8a; white-space: nowrap; width: 70px;">Floors</th>
-                        <th style="padding: 14px 10px; text-align: left; font-weight: 600; border-bottom: 2px solid #1e3a8a; white-space: nowrap; width: 100px;">Unit #</th>
-                        <th style="padding: 14px 10px; text-align: left; font-weight: 600; border-bottom: 2px solid #1e3a8a; white-space: nowrap; width: 100px;">Type</th>
-                        <th style="padding: 14px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #1e3a8a; white-space: nowrap; width: 100px;">Status</th>
-                        <th style="padding: 14px 10px; text-align: right; font-weight: 600; border-bottom: 2px solid #1e3a8a; white-space: nowrap; width: 110px;">Sq Ft</th>
-                        <th style="padding: 14px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #1e3a8a; white-space: nowrap; width: 70px;">Floor</th>
-                        <th style="padding: 14px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #1e3a8a; white-space: nowrap; width: 80px;">Bed</th>
-                        <th style="padding: 14px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #1e3a8a; white-space: nowrap; width: 80px;">Bath</th>
-                        <th style="padding: 14px 10px; text-align: right; font-weight: 600; border-bottom: 2px solid #1e3a8a; white-space: nowrap; width: 110px;">Expected Monthly Rent</th>
-                        <th style="padding: 14px 10px; text-align: right; font-weight: 600; border-bottom: 2px solid #1e3a8a; white-space: nowrap; width: 100px;">Price Per Foot</th>
-                        <th style="padding: 14px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #1e3a8a; white-space: nowrap; width: 120px;">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-    `;
+    let html = '';
     
-    // Render buildings with their units
+    // Render buildings with their units - each building gets its own section
     sortedBuildings.forEach(({ id: buildingId, ...building }) => {
         const buildingUnits = unitsByBuilding[buildingId] || [];
         
-        buildingUnits.forEach((unit, index) => {
-            const isBuildingRow = index === 0;
-            const rowspan = buildingUnits.length;
-            
-            html += `
-                <tr style="border-bottom: 1px solid #e5e7eb;">
-            `;
-            
-            // Building columns (only on first unit row)
-            if (isBuildingRow) {
-                html += `
-                    <td rowspan="${rowspan}" style="padding: 12px 10px; vertical-align: top; background: #f8fafc; font-weight: 600; border-right: 2px solid #e2e8f0; position: sticky; left: 0; z-index: 1;">
-                        <div style="font-size: 0.9rem; line-height: 1.4;">${escapeHtml(building.buildingName || 'N/A')}</div>
-                        <div style="margin-top: 8px; display: flex; gap: 4px; flex-wrap: wrap;">
-                            <button class="btn-secondary btn-small" onclick="editBuilding('${buildingId}')" style="padding: 3px 6px; font-size: 0.7rem; min-height: 22px;">Edit</button>
-                            <button class="btn-danger btn-small" onclick="deleteBuilding('${buildingId}')" style="padding: 3px 6px; font-size: 0.7rem; min-height: 22px;">Delete</button>
-                        </div>
-                    </td>
-                    <td rowspan="${rowspan}" style="padding: 12px 10px; vertical-align: top; background: #f8fafc; border-right: 2px solid #e2e8f0; font-size: 0.8rem; line-height: 1.4;">
-                        ${building.buildingAddress ? escapeHtml(building.buildingAddress) : '<span style="color: #94a3b8;">—</span>'}
-                    </td>
-                    <td rowspan="${rowspan}" style="padding: 12px 10px; vertical-align: top; background: #f8fafc; border-right: 2px solid #e2e8f0; text-align: center;">
-                        ${building.numberOfFloors ? building.numberOfFloors : '<span style="color: #94a3b8;">—</span>'}
-                    </td>
-                `;
-            }
-            
-            // Unit columns
-            const statusBadge = unit.status ? `<span class="status-badge status-${unit.status.toLowerCase().replace(' ', '-')}" style="font-size: 0.75rem; padding: 3px 8px;">${unit.status}</span>` : '<span style="color: #94a3b8;">—</span>';
-            const monthlyRentFormatted = unit.monthlyRent ? `$${unit.monthlyRent.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '<span style="color: #94a3b8;">—</span>';
-            
-            // Calculate price per foot (monthly and annual)
-            let pricePerFootFormatted = '<span style="color: #94a3b8;">—</span>';
-            if (unit.monthlyRent && unit.squareFootage && unit.squareFootage > 0) {
-                const monthlyPPF = unit.monthlyRent / unit.squareFootage;
-                const annualPPF = monthlyPPF * 12;
-                pricePerFootFormatted = `
-                    <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
-                        <span style="color: #7c3aed; font-weight: 500; font-variant-numeric: tabular-nums;">$${monthlyPPF.toFixed(2)}/mo</span>
-                        <span style="color: #a78bfa; font-weight: 400; font-size: 0.75rem; font-variant-numeric: tabular-nums;">$${annualPPF.toFixed(2)}/yr</span>
+        html += `
+            <div class="building-group" style="margin-bottom: 30px; border-left: 3px solid #2563eb; padding: 0; background: #f8fafc; border-radius: 6px; overflow: hidden;">
+                <div class="building-group-header" style="background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%); color: white; padding: 12px 15px; font-weight: 600; display: flex; align-items: center; justify-content: space-between;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1rem;">${escapeHtml(building.buildingName || 'N/A')}</span>
+                        ${building.buildingAddress ? `<span style="font-size: 0.8rem; font-weight: 400; opacity: 0.9;">${escapeHtml(building.buildingAddress)}</span>` : ''}
+                        ${building.numberOfFloors ? `<span style="font-size: 0.75rem; font-weight: 400; opacity: 0.8; background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 4px;">${building.numberOfFloors} Floor${building.numberOfFloors !== 1 ? 's' : ''}</span>` : ''}
                     </div>
-                `;
-            }
-            
-            html += `
-                    <td style="padding: 12px 10px; font-weight: 600; color: #1e293b;">${escapeHtml(unit.unitNumber || 'N/A')}</td>
-                    <td style="padding: 12px 10px; color: #475569;">${unit.unitType || '<span style="color: #94a3b8;">—</span>'}</td>
-                    <td style="padding: 12px 10px; text-align: center;">${statusBadge}</td>
-                    <td style="padding: 12px 10px; text-align: right; color: #475569; font-variant-numeric: tabular-nums;">${unit.squareFootage ? unit.squareFootage.toLocaleString() : '<span style="color: #94a3b8;">—</span>'}</td>
-                    <td style="padding: 12px 10px; text-align: center; color: #475569;">${unit.floorNumber ? unit.floorNumber : '<span style="color: #94a3b8;">—</span>'}</td>
-                    <td style="padding: 12px 10px; text-align: center; color: #475569;">${unit.numberOfBedrooms ? unit.numberOfBedrooms : '<span style="color: #94a3b8;">—</span>'}</td>
-                    <td style="padding: 12px 10px; text-align: center; color: #475569;">${unit.numberOfBathrooms ? unit.numberOfBathrooms : '<span style="color: #94a3b8;">—</span>'}</td>
-                    <td style="padding: 12px 10px; text-align: right; color: #059669; font-weight: 600; font-variant-numeric: tabular-nums;">${monthlyRentFormatted}</td>
-                    <td style="padding: 12px 10px; text-align: right; font-variant-numeric: tabular-nums;">${pricePerFootFormatted}</td>
-                    <td style="padding: 12px 10px; text-align: center;">
-                        <div style="display: flex; gap: 4px; justify-content: center; flex-wrap: wrap;">
-                            <button class="btn-secondary btn-small" onclick="editUnit('${unit.id}')" style="padding: 3px 6px; font-size: 0.7rem; min-height: 22px;" title="Edit Unit">✏️</button>
-                            <button class="btn-danger btn-small" onclick="deleteUnit('${unit.id}')" style="padding: 3px 6px; font-size: 0.7rem; min-height: 22px;" title="Delete Unit">🗑️</button>
-                        </div>
-                    </td>
-                </tr>
-            `;
-        });
+                    <div style="display: flex; gap: 4px;">
+                        <button class="btn-secondary btn-small" onclick="editBuilding('${buildingId}')" style="padding: 4px 8px; font-size: 0.75rem; min-height: 24px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white;">Edit</button>
+                        <button class="btn-danger btn-small" onclick="deleteBuilding('${buildingId}')" style="padding: 4px 8px; font-size: 0.75rem; min-height: 24px; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white;">Delete</button>
+                    </div>
+                </div>
+                <div style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+                    <table class="buildings-units-table" style="width: 100%; min-width: 1000px; border-collapse: collapse; background: white; font-size: 0.875rem;">
+                        <thead>
+                            <tr style="background: #e0e7ff; color: #1e40af;">
+                                <th style="padding: 12px 10px; text-align: left; font-weight: 600; border-bottom: 2px solid #3b82f6; white-space: nowrap; width: 100px;">Unit #</th>
+                                <th style="padding: 12px 10px; text-align: left; font-weight: 600; border-bottom: 2px solid #3b82f6; white-space: nowrap; width: 100px;">Type</th>
+                                <th style="padding: 12px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #3b82f6; white-space: nowrap; width: 100px;">Status</th>
+                                <th style="padding: 12px 10px; text-align: right; font-weight: 600; border-bottom: 2px solid #3b82f6; white-space: nowrap; width: 110px;">Sq Ft</th>
+                                <th style="padding: 12px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #3b82f6; white-space: nowrap; width: 70px;">Floor</th>
+                                <th style="padding: 12px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #3b82f6; white-space: nowrap; width: 80px;">Bed</th>
+                                <th style="padding: 12px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #3b82f6; white-space: nowrap; width: 80px;">Bath</th>
+                                <th style="padding: 12px 10px; text-align: right; font-weight: 600; border-bottom: 2px solid #3b82f6; white-space: nowrap; width: 110px;">Expected Monthly Rent</th>
+                                <th style="padding: 12px 10px; text-align: right; font-weight: 600; border-bottom: 2px solid #3b82f6; white-space: nowrap; width: 100px;">Price Per Foot</th>
+                                <th style="padding: 12px 10px; text-align: center; font-weight: 600; border-bottom: 2px solid #3b82f6; white-space: nowrap; width: 120px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        `;
         
-        // If building has no units, show building row with empty unit columns
         if (buildingUnits.length === 0) {
             html += `
-                <tr style="border-bottom: 1px solid #e2e8f0;">
-                    <td style="padding: 12px 10px; vertical-align: top; background: #f8fafc; font-weight: 600; border-right: 2px solid #e2e8f0;">
-                        <div style="font-size: 0.9rem; line-height: 1.4;">${escapeHtml(building.buildingName || 'N/A')}</div>
-                        <div style="margin-top: 8px; display: flex; gap: 4px; flex-wrap: wrap;">
-                            <button class="btn-secondary btn-small" onclick="editBuilding('${buildingId}')" style="padding: 3px 6px; font-size: 0.7rem; min-height: 22px;">Edit</button>
-                            <button class="btn-danger btn-small" onclick="deleteBuilding('${buildingId}')" style="padding: 3px 6px; font-size: 0.7rem; min-height: 22px;">Delete</button>
-                        </div>
-                    </td>
-                    <td style="padding: 12px 10px; vertical-align: top; background: #f8fafc; border-right: 2px solid #e2e8f0; font-size: 0.8rem;">
-                        ${building.buildingAddress ? escapeHtml(building.buildingAddress) : '<span style="color: #94a3b8;">—</span>'}
-                    </td>
-                    <td style="padding: 12px 10px; vertical-align: top; background: #f8fafc; border-right: 2px solid #e2e8f0; text-align: center;">
-                        ${building.numberOfFloors ? building.numberOfFloors : '<span style="color: #94a3b8;">—</span>'}
-                    </td>
-                    <td colspan="10" style="padding: 12px 10px; text-align: center; color: #94a3b8; font-style: italic; font-size: 0.85rem;">No units</td>
-                </tr>
+                            <tr>
+                                <td colspan="10" style="padding: 20px; text-align: center; color: #94a3b8; font-style: italic; font-size: 0.85rem;">No units</td>
+                            </tr>
             `;
+        } else {
+            buildingUnits.forEach((unit) => {
+                // Unit columns
+                const statusBadge = unit.status ? `<span class="status-badge status-${unit.status.toLowerCase().replace(' ', '-')}" style="font-size: 0.75rem; padding: 3px 8px;">${unit.status}</span>` : '<span style="color: #94a3b8;">—</span>';
+                const monthlyRentFormatted = unit.monthlyRent ? `$${unit.monthlyRent.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '<span style="color: #94a3b8;">—</span>';
+                
+                // Calculate price per foot (monthly and annual)
+                let pricePerFootFormatted = '<span style="color: #94a3b8;">—</span>';
+                if (unit.monthlyRent && unit.squareFootage && unit.squareFootage > 0) {
+                    const monthlyPPF = unit.monthlyRent / unit.squareFootage;
+                    const annualPPF = monthlyPPF * 12;
+                    pricePerFootFormatted = `
+                        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
+                            <span style="color: #7c3aed; font-weight: 500; font-variant-numeric: tabular-nums;">$${monthlyPPF.toFixed(2)}/mo</span>
+                            <span style="color: #a78bfa; font-weight: 400; font-size: 0.75rem; font-variant-numeric: tabular-nums;">$${annualPPF.toFixed(2)}/yr</span>
+                        </div>
+                    `;
+                }
+                
+                html += `
+                            <tr style="border-bottom: 1px solid #e5e7eb;">
+                                <td style="padding: 12px 10px; font-weight: 600; color: #1e293b;">${escapeHtml(unit.unitNumber || 'N/A')}</td>
+                                <td style="padding: 12px 10px; color: #475569;">${unit.unitType || '<span style="color: #94a3b8;">—</span>'}</td>
+                                <td style="padding: 12px 10px; text-align: center;">${statusBadge}</td>
+                                <td style="padding: 12px 10px; text-align: right; color: #475569; font-variant-numeric: tabular-nums;">${unit.squareFootage ? unit.squareFootage.toLocaleString() : '<span style="color: #94a3b8;">—</span>'}</td>
+                                <td style="padding: 12px 10px; text-align: center; color: #475569;">${unit.floorNumber ? unit.floorNumber : '<span style="color: #94a3b8;">—</span>'}</td>
+                                <td style="padding: 12px 10px; text-align: center; color: #475569;">${unit.numberOfBedrooms ? unit.numberOfBedrooms : '<span style="color: #94a3b8;">—</span>'}</td>
+                                <td style="padding: 12px 10px; text-align: center; color: #475569;">${unit.numberOfBathrooms ? unit.numberOfBathrooms : '<span style="color: #94a3b8;">—</span>'}</td>
+                                <td style="padding: 12px 10px; text-align: right; color: #059669; font-weight: 600; font-variant-numeric: tabular-nums;">${monthlyRentFormatted}</td>
+                                <td style="padding: 12px 10px; text-align: right; font-variant-numeric: tabular-nums;">${pricePerFootFormatted}</td>
+                                <td style="padding: 12px 10px; text-align: center;">
+                                    <div style="display: flex; gap: 4px; justify-content: center; flex-wrap: wrap;">
+                                        <button class="btn-secondary btn-small" onclick="editUnit('${unit.id}')" style="padding: 3px 6px; font-size: 0.7rem; min-height: 22px;" title="Edit Unit">✏️</button>
+                                        <button class="btn-danger btn-small" onclick="deleteUnit('${unit.id}')" style="padding: 3px 6px; font-size: 0.7rem; min-height: 22px;" title="Delete Unit">🗑️</button>
+                                    </div>
+                                </td>
+                            </tr>
+                `;
+            });
         }
+        
+        html += `
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
     });
-    
-    html += `
-                </tbody>
-            </table>
-        </div>
-    `;
     
     // Always show orphaned units section (even if empty)
     html += `
