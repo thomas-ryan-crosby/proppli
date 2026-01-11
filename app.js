@@ -4032,21 +4032,22 @@ async function loadOrphanContacts(maxContacts, maxBrokers) {
             </div>
             `;
         } else {
-            // Simple table structure for orphan contacts
+            // Simple, clean table structure for orphan contacts
             orphanHtml += `
-                <table class="tenants-table" style="width: 100%;">
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Email</th>
-                            <th>Phone</th>
-                            <th>Title</th>
-                            <th>Notes</th>
-                            <th>Classifications</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
+                <div style="overflow-x: auto;">
+                    <table class="orphan-contacts-table">
+                        <thead>
+                            <tr>
+                                <th style="min-width: 150px;">Name</th>
+                                <th style="min-width: 200px;">Email</th>
+                                <th style="min-width: 140px;">Phone</th>
+                                <th style="min-width: 120px;">Title</th>
+                                <th style="min-width: 200px;">Notes</th>
+                                <th style="min-width: 140px;">Classifications</th>
+                                <th style="min-width: 100px; text-align: center;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
             `;
             
             // Combine regular and broker orphans for display
@@ -4055,13 +4056,13 @@ async function loadOrphanContacts(maxContacts, maxBrokers) {
             if (allOrphanContacts.length === 0) {
                 orphanHtml += `
                     <tr>
-                        <td colspan="7" style="text-align: center; padding: 20px; color: #999;">
+                        <td colspan="7" style="text-align: center; padding: 40px 20px; color: #999; font-size: 0.9rem;">
                             No orphan contacts found.
                         </td>
                     </tr>
                 `;
             } else {
-                allOrphanContacts.forEach(contact => {
+                allOrphanContacts.forEach((contact, index) => {
                     const classifications = contact.classifications || [];
                     const classificationBadges = classifications.map(cls => {
                         const clsLower = cls.toLowerCase().replace(/\s+/g, '-');
@@ -4069,27 +4070,27 @@ async function loadOrphanContacts(maxContacts, maxBrokers) {
                     }).join(' ');
                     
                     orphanHtml += `
-                        <tr>
-                            <td style="font-weight: 500;">${escapeHtml(contact.contactName || 'Unknown')}</td>
+                        <tr class="orphan-contact-row">
+                            <td style="font-weight: 600; color: #1F2937;">${escapeHtml(contact.contactName || 'Unknown')}</td>
                             <td>
-                                ${contact.contactEmail ? `<a href="mailto:${escapeHtml(contact.contactEmail)}" style="color: #2563eb; text-decoration: none;">${escapeHtml(contact.contactEmail)}</a>` : '<span style="color: #999;">—</span>'}
+                                ${contact.contactEmail ? `<a href="mailto:${escapeHtml(contact.contactEmail)}" style="color: #2563eb; text-decoration: none; font-size: 0.875rem;">${escapeHtml(contact.contactEmail)}</a>` : '<span style="color: #9ca3af; font-size: 0.875rem;">—</span>'}
                             </td>
                             <td>
-                                ${contact.contactPhone ? `<a href="tel:${escapeHtml(contact.contactPhone)}" style="color: #2563eb; text-decoration: none;">${escapeHtml(contact.contactPhone)}</a>` : '<span style="color: #999;">—</span>'}
+                                ${contact.contactPhone ? `<a href="tel:${escapeHtml(contact.contactPhone)}" style="color: #2563eb; text-decoration: none; font-size: 0.875rem;">${escapeHtml(contact.contactPhone)}</a>` : '<span style="color: #9ca3af; font-size: 0.875rem;">—</span>'}
                             </td>
-                            <td>${escapeHtml(contact.contactTitle || '') || '<span style="color: #999;">—</span>'}</td>
-                            <td>${escapeHtml(contact.notes || '') || '<span style="color: #999;">—</span>'}</td>
+                            <td style="color: #4b5563; font-size: 0.875rem;">${escapeHtml(contact.contactTitle || '') || '<span style="color: #9ca3af;">—</span>'}</td>
+                            <td style="color: #6b7280; font-size: 0.875rem; max-width: 200px; word-wrap: break-word;">${escapeHtml(contact.notes || '') || '<span style="color: #9ca3af;">—</span>'}</td>
                             <td>
-                                <div class="contact-type-indicators" style="display: flex; gap: 4px; flex-wrap: wrap;">
-                                    ${classificationBadges || '<span style="color: #999;">—</span>'}
+                                <div class="contact-type-indicators" style="display: flex; gap: 6px; align-items: center; justify-content: flex-start;">
+                                    ${classificationBadges || '<span style="color: #9ca3af; font-size: 0.875rem;">—</span>'}
                                 </div>
                             </td>
-                            <td>
-                                <div style="display: flex; gap: 4px;">
-                                    <button class="btn-action btn-edit" onclick="editContact('${contact.id}')" title="Edit">
+                            <td style="text-align: center;">
+                                <div style="display: flex; gap: 6px; justify-content: center; align-items: center;">
+                                    <button class="btn-action btn-edit" onclick="editContact('${contact.id}')" title="Edit Contact">
                                         <span class="btn-icon">✏️</span>
                                     </button>
-                                    <button class="btn-action btn-delete" onclick="deleteOrphanContact('${contact.id}')" title="Delete">
+                                    <button class="btn-action btn-delete" onclick="deleteOrphanContact('${contact.id}')" title="Delete Contact">
                                         <span class="btn-icon">🗑️</span>
                                     </button>
                                 </div>
@@ -4100,8 +4101,9 @@ async function loadOrphanContacts(maxContacts, maxBrokers) {
             }
             
             orphanHtml += `
-                    </tbody>
-                </table>
+                        </tbody>
+                    </table>
+                </div>
             </div>
             `;
         }
