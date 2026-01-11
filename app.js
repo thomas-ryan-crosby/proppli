@@ -48,6 +48,26 @@ function updateFABsVisibility() {
         const shouldShow = (isTenantsPageVisible && !isModalVisible) || (isModalVisible && isContactsTabActive);
         fabAddContact.style.display = shouldShow ? 'flex' : 'none';
     }
+    
+    // Show Add Building and Add Unit FABs when property detail view is visible
+    const fabAddBuilding = document.getElementById('fabAddBuilding');
+    const fabAddUnit = document.getElementById('fabAddUnit');
+    const propertiesPage = document.getElementById('propertiesPage');
+    const propertyDetailView = document.getElementById('propertyDetailView');
+    
+    if (fabAddBuilding) {
+        const isPropertiesPageVisible = propertiesPage && propertiesPage.style.display !== 'none';
+        const isPropertyDetailVisible = propertyDetailView && propertyDetailView.style.display !== 'none';
+        const shouldShow = isPropertiesPageVisible && isPropertyDetailVisible;
+        fabAddBuilding.style.display = shouldShow ? 'flex' : 'none';
+    }
+    
+    if (fabAddUnit) {
+        const isPropertiesPageVisible = propertiesPage && propertiesPage.style.display !== 'none';
+        const isPropertyDetailVisible = propertyDetailView && propertyDetailView.style.display !== 'none';
+        const shouldShow = isPropertiesPageVisible && isPropertyDetailVisible;
+        fabAddUnit.style.display = shouldShow ? 'flex' : 'none';
+    }
 }
 
 // Initialize app
@@ -678,6 +698,8 @@ window.viewPropertyDetail = function(propertyId) {
         // Load buildings and units in table format
         loadBuildingsAndUnitsTable(propertyId);
     }
+    
+    updateFABsVisibility();
 };
 
 window.backToProperties = function() {
@@ -686,6 +708,8 @@ window.backToProperties = function() {
     
     if (propertiesList) propertiesList.style.display = 'block';
     if (propertyDetailView) propertyDetailView.style.display = 'none';
+    
+    updateFABsVisibility();
 };
 
 // Building Management

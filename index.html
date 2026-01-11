@@ -478,7 +478,7 @@
                         </div>
                         <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                             <h4>Buildings & Units</h4>
-                            <div style="display: flex; gap: 10px;">
+                            <div style="display: flex; gap: 10px; display: none;">
                                 <button id="addBuildingBtn" class="btn-primary btn-small">+ Add Building</button>
                                 <button id="addUnitBtn" class="btn-primary btn-small">+ Add Unit</button>
                             </div>
@@ -998,6 +998,14 @@
             <span class="fab-icon">+</span>
             <span class="fab-label">Add Contact</span>
         </button>
+        <button id="fabAddBuilding" class="fab" title="Add Building" style="display: none;">
+            <span class="fab-icon">+</span>
+            <span class="fab-label">Add Building</span>
+        </button>
+        <button id="fabAddUnit" class="fab" title="Add Unit" style="display: none;">
+            <span class="fab-icon">+</span>
+            <span class="fab-label">Add Unit</span>
+        </button>
     </div>
 
     <!-- Firebase Config - Automatically selects test or production based on environment -->
@@ -1054,7 +1062,7 @@
                     
                     // Now load app.js after config is ready
                     const appScript = document.createElement('script');
-                    appScript.src = 'app.js?v=6.6';
+                    appScript.src = 'app.js?v=6.7';
                     appScript.onload = function() {
                         console.log('✅ app.js loaded successfully');
                     };
@@ -1080,7 +1088,7 @@
                             return;
                         }
                         const appScript = document.createElement('script');
-                        appScript.src = 'app.js?v=6.6';
+                        appScript.src = 'app.js?v=6.7';
                         document.head.appendChild(appScript);
                     };
                     fallback.onerror = function() {
