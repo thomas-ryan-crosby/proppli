@@ -1523,45 +1523,60 @@
         </button>
     </div>
 
-    <!-- Firebase Config - Automatically selects test or production based on environment -->
+    <!-- Firebase Config - Automatically selects config based on environment -->
     <script>
         // Auto-detect environment and load appropriate Firebase config
         (function() {
-            const isLocal = window.location.hostname === 'localhost' || 
-                           window.location.hostname === '127.0.0.1';
+            const hostname = window.location.hostname;
+            const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
+            const isProduction = hostname === 'www.proppli.com' || hostname === 'proppli.com';
+            const isStaging = hostname === 'staging.proppli.com';
+            
             const urlParams = new URLSearchParams(window.location.search);
-            const forceTest = urlParams.get('test') === 'true';
             const forceProd = urlParams.get('prod') === 'true';
+            const forceStaging = urlParams.get('staging') === 'true';
+            const forceDev = urlParams.get('dev') === 'true';
             
             // Determine which config to use
-            let useTestConfig = false;
+            let configFile;
+            let environment;
             
             if (forceProd) {
-                useTestConfig = false;
+                configFile = 'firebase-config.production.js';
+                environment = 'PRODUCTION (forced)';
                 console.log('🔵 Using PRODUCTION database (forced via ?prod=true)');
-            } else if (forceTest) {
-                useTestConfig = true;
-                console.log('🟡 Using TEST database (forced via ?test=true)');
+            } else if (forceStaging) {
+                configFile = 'firebase-config.staging.js';
+                environment = 'STAGING (forced)';
+                console.log('🟡 Using STAGING database (forced via ?staging=true)');
+            } else if (forceDev) {
+                configFile = 'firebase-config.development.js';
+                environment = 'DEVELOPMENT (forced)';
+                console.log('🟢 Using DEVELOPMENT database (forced via ?dev=true)');
+            } else if (isProduction) {
+                configFile = 'firebase-config.production.js';
+                environment = 'PRODUCTION';
+                console.log('🔵 Using PRODUCTION database (www.proppli.com detected)');
+            } else if (isStaging) {
+                configFile = 'firebase-config.staging.js';
+                environment = 'STAGING';
+                console.log('🟡 Using STAGING database (staging.proppli.com detected)');
             } else if (isLocal) {
-                // Local development defaults to test database
-                useTestConfig = true;
-                console.log('🟡 Using TEST database (localhost detected)');
+                configFile = 'firebase-config.development.js';
+                environment = 'DEVELOPMENT';
+                console.log('🟢 Using DEVELOPMENT database (localhost detected)');
             } else {
-                // Production/GitHub Pages - check if we're on main branch or dev branch
-                // For GitHub Pages, main branch uses production, dev branch uses test
-                // This is determined by which branch is deployed
-                // Default to production for safety
-                useTestConfig = false;
-                console.log('🔵 Using PRODUCTION database (production environment)');
+                // Fallback: default to development for unknown domains
+                configFile = 'firebase-config.development.js';
+                environment = 'DEVELOPMENT (fallback)';
+                console.log('🟢 Using DEVELOPMENT database (unknown domain, defaulting to dev)');
             }
-            
-            const configFile = useTestConfig ? 'firebase-config.test.js' : 'firebase-config.js';
             const script = document.createElement('script');
             script.src = configFile;
             
             // Wait for config to load before loading app.js
             script.onload = function() {
-                console.log('✅ Config script loaded:', configFile);
+                console.log(`✅ Config script loaded: ${configFile} (${environment})`);
                 
                 // Give it a moment for Firebase to initialize
                 setTimeout(function() {
@@ -1569,7 +1584,8 @@
                     if (typeof db === 'undefined') {
                         console.error('❌ Firebase db is not defined after loading config');
                         console.error('Firebase object:', typeof firebase !== 'undefined' ? 'exists' : 'missing');
-                        alert('Error: Firebase configuration did not initialize properly. Please check firebase-config.test.js or firebase-config.js');
+                        console.error('Config file attempted:', configFile);
+                        alert(`Error: Firebase configuration did not initialize properly.\n\nEnvironment: ${environment}\nConfig file: ${configFile}\n\nPlease check that the config file exists and contains valid Firebase credentials.`);
                         return;
                     }
                     
@@ -1591,28 +1607,28 @@
             
             script.onerror = function() {
                 console.error('❌ Firebase config file not found:', configFile);
-                // Fallback to production config
-                if (useTestConfig) {
-                    console.warn('⚠️ Falling back to production config');
-                    const fallback = document.createElement('script');
-                    fallback.src = 'firebase-config.js';
-                    fallback.onload = function() {
-                        if (typeof db === 'undefined') {
-                            console.error('❌ Firebase db is not defined after loading fallback config');
-                            alert('Error: Firebase configuration did not initialize properly.');
-                            return;
-                        }
-                        const appScript = document.createElement('script');
-                        appScript.src = 'app.js?v=7.0';
-                        document.head.appendChild(appScript);
-                    };
-                    fallback.onerror = function() {
-                        alert('Error: Firebase configuration file is missing. Please check the setup.');
-                    };
-                    document.head.appendChild(fallback);
-                } else {
-                    alert('Error: Firebase configuration file is missing. Please check the setup.');
-                }
+                console.error('Environment:', environment);
+                console.error('Hostname:', hostname);
+                
+                // Try fallback to development config
+                console.warn('⚠️ Attempting fallback to development config');
+                const fallback = document.createElement('script');
+                fallback.src = 'firebase-config.development.js';
+                fallback.onload = function() {
+                    if (typeof db === 'undefined') {
+                        console.error('❌ Firebase db is not defined after loading fallback config');
+                        alert(`Error: Firebase configuration file is missing or invalid.\n\nAttempted: ${configFile}\nFallback: firebase-config.development.js\n\nPlease ensure the config files exist and contain valid Firebase credentials.`);
+                        return;
+                    }
+                    console.log('✅ Fallback config loaded successfully');
+                    const appScript = document.createElement('script');
+                    appScript.src = 'app.js?v=7.0';
+                    document.head.appendChild(appScript);
+                };
+                fallback.onerror = function() {
+                    alert(`Error: Firebase configuration files are missing.\n\nPlease ensure the following files exist:\n- firebase-config.production.js\n- firebase-config.staging.js\n- firebase-config.development.js\n\nAnd that they contain valid Firebase credentials.`);
+                };
+                document.head.appendChild(fallback);
             };
             document.head.appendChild(script);
         })();

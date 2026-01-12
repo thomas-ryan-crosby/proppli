@@ -1,4 +1,18 @@
-# Firebase
+# Firebase Configuration Files
+# Note: Firebase web API keys are safe to expose publicly
+# You can choose to include these files in Git or exclude them
+# 
+# Option A: Include in Git (Recommended for simplicity)
+# Comment out or remove the lines below to include config files
+#
+# Option B: Exclude from Git (More secure, requires environment variables)
+# Keep the lines below to exclude config files from Git
+
+# firebase-config.production.js
+# firebase-config.staging.js
+# firebase-config.development.js
+
+# Legacy config files (if still using)
 firebase-config.js
 firebase-config.test.js
 
