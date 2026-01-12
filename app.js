@@ -134,12 +134,18 @@ function initAuth() {
             if (user) {
                 console.log('👤 User authenticated:', user.email);
                 currentUser = user;
+                // Reset permission error flag on new login
+                permissionErrorShown = false;
                 await loadUserProfile(user.uid);
-                showApplication();
+                // Only show application if user profile loaded successfully and is active
+                if (currentUserProfile && currentUserProfile.isActive) {
+                    showApplication();
+                }
             } else {
                 console.log('👤 No user authenticated');
                 currentUser = null;
                 currentUserProfile = null;
+                permissionErrorShown = false;
                 // Don't automatically show auth pages - let user click launch button
             }
         });
@@ -161,31 +167,37 @@ async function loadUserProfile(userId) {
             currentUserProfile = { id: userDoc.id, ...userDoc.data() };
             console.log('✅ User profile loaded:', currentUserProfile);
             
+            // Update user menu with name
+            updateUserMenu();
+            
             // Check if user is active
             if (!currentUserProfile.isActive) {
                 console.warn('⚠️ User account is not active');
+                showPermissionDeniedModal('Your account is pending admin approval. Please contact a system administrator to activate your account.');
                 await auth.signOut();
-                alert('Your account is pending approval. Please contact an administrator.');
                 return;
             }
         } else {
             console.warn('⚠️ User profile not found in Firestore');
-            // Create basic profile if it doesn't exist (for existing users)
-            await createUserProfile(userId, {
-                email: currentUser.email,
-                displayName: currentUser.displayName || '',
-                role: 'viewer',
-                isActive: false
-            });
+            // For new signups, show permission denied modal
+            // They need an admin to create their profile
+            showPermissionDeniedModal('Your account has been created but requires admin approval. Please contact a system administrator to activate your account and grant permissions.');
+            await auth.signOut();
         }
     } catch (error) {
         console.error('Error loading user profile:', error);
+        if (error.code === 'permission-denied') {
+            showPermissionDeniedModal('You do not have permission to access this system. Please contact a system administrator for assistance.');
+            await auth.signOut();
+        }
     }
 }
 
-// Create user profile in Firestore
+// Create user profile in Firestore (only used during signup, requires admin permissions)
 async function createUserProfile(userId, userData) {
     try {
+        // Note: This will fail for new users due to security rules
+        // Admins must create user profiles manually or through the admin interface
         await db.collection('users').doc(userId).set({
             ...userData,
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -194,8 +206,81 @@ async function createUserProfile(userId, userData) {
         console.log('✅ User profile created');
     } catch (error) {
         console.error('Error creating user profile:', error);
+        // This is expected for new signups - they need admin approval
+        throw error;
     }
 }
+
+// Update user menu with current user info
+function updateUserMenu() {
+    const userMenuName = document.getElementById('userMenuName');
+    if (userMenuName && currentUserProfile) {
+        userMenuName.textContent = currentUserProfile.displayName || currentUserProfile.email || 'User';
+    } else if (userMenuName && currentUser) {
+        userMenuName.textContent = currentUser.displayName || currentUser.email || 'User';
+    }
+}
+
+// Handle permission errors globally
+let permissionErrorShown = false;
+
+function handlePermissionError(context = '') {
+    // Only show modal once per session
+    if (permissionErrorShown) {
+        return;
+    }
+    
+    let message = 'You do not have permission to access this system.';
+    if (context) {
+        message = `You do not have permission to access ${context}.`;
+    }
+    message += ' Please contact a system administrator to activate your account and grant permissions.';
+    
+    showPermissionDeniedModal(message);
+    permissionErrorShown = true;
+}
+
+// Show permission denied modal
+function showPermissionDeniedModal(message) {
+    // Remove existing modal if present
+    const existingModal = document.getElementById('permissionDeniedModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    const modal = document.createElement('div');
+    modal.id = 'permissionDeniedModal';
+    modal.className = 'modal show';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>Account Access Required</h2>
+                <button class="close-btn" onclick="closePermissionDeniedModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 20px; color: #64748b;">${message}</p>
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                    <p style="margin: 0 0 10px 0; font-weight: 600; color: #1e293b;">Contact System Administrator:</p>
+                    <p style="margin: 0; color: #475569;">
+                        <strong>Email:</strong> <a href="mailto:thomas.ryan.crosby@gmail.com" style="color: #667eea; text-decoration: none;">thomas.ryan.crosby@gmail.com</a>
+                    </p>
+                </div>
+                <button class="btn btn-primary" onclick="closePermissionDeniedModal(); window.logout();" style="width: 100%;">Sign Out</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    document.body.style.overflow = 'hidden';
+}
+
+// Close permission denied modal
+window.closePermissionDeniedModal = function() {
+    const modal = document.getElementById('permissionDeniedModal');
+    if (modal) {
+        modal.remove();
+        document.body.style.overflow = '';
+    }
+};
 
 // Show authentication pages
 function showAuthPages() {

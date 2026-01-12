@@ -407,6 +407,76 @@ body {
     flex-wrap: wrap;
 }
 
+.nav-user-menu {
+    display: flex;
+    align-items: center;
+}
+
+.user-menu-dropdown {
+    position: relative;
+}
+
+.user-menu-btn {
+    background: #667eea;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.2s;
+}
+
+.user-menu-btn:hover {
+    background: #5568d3;
+}
+
+.dropdown-arrow {
+    font-size: 0.7rem;
+    transition: transform 0.2s;
+}
+
+.user-menu-dropdown.active .dropdown-arrow {
+    transform: rotate(180deg);
+}
+
+.user-menu-dropdown-content {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: calc(100% + 5px);
+    background: white;
+    min-width: 150px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border-radius: 8px;
+    overflow: hidden;
+    z-index: 1000;
+}
+
+.user-menu-dropdown.active .user-menu-dropdown-content {
+    display: block;
+}
+
+.user-menu-dropdown-content a {
+    display: block;
+    padding: 12px 16px;
+    color: #1e293b;
+    text-decoration: none;
+    transition: background 0.2s;
+}
+
+.user-menu-dropdown-content a:hover {
+    background: #f1f5f9;
+}
+
+.user-menu-dropdown-content a:first-child {
+    border-top: none;
+}
+
 .nav-link {
     padding: 10px 20px;
     border: 2px solid #e0e0e0;
