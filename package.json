@@ -4,7 +4,8 @@
   "description": "Migration script to move data from maintenance-tracker-test to proppli",
   "main": "migrate_firebase_data.js",
   "scripts": {
-    "migrate": "node migrate_firebase_data.js"
+    "migrate": "node migrate_firebase_data.js",
+    "setup-super-admin": "node setup_super_admin.js"
   },
   "dependencies": {
     "firebase-admin": "^12.0.0"
