@@ -10423,31 +10423,15 @@ function calculateRentForMonth(lease, year, month) {
     
     const firstEscDate = lease.rentEscalation.firstEscalationDate.toDate();
     
-    // Normalize escalation date to first of month for comparison
+    // Get the escalation year and month (1-based for clarity)
     const firstEscYear = firstEscDate.getFullYear();
-    const firstEscMonth = firstEscDate.getMonth(); // 0-based (0 = January, 11 = December)
+    const firstEscMonth = firstEscDate.getMonth() + 1; // Convert to 1-based (1 = January, 12 = December)
     
-    // Compare year and month directly (more reliable than date comparison)
+    // Target year and month (1-based)
     const targetYear = year;
-    const targetMonth = month - 1; // Convert to 0-based (0 = January, 11 = December)
-    
-    // Debug logging for Carver Darden lease (remove after fixing)
-    const tenantName = lease.tenantId ? (tenants && tenants[lease.tenantId] ? tenants[lease.tenantId].tenantName : '') : '';
-    if (tenantName && tenantName.toLowerCase().includes('carver')) {
-        console.log(`Escalation Debug - ${tenantName} - ${month}/${year}:`, {
-            firstEscDate: firstEscDate.toISOString(),
-            firstEscDateLocal: `${firstEscDate.getFullYear()}-${String(firstEscDate.getMonth() + 1).padStart(2, '0')}-${String(firstEscDate.getDate()).padStart(2, '0')}`,
-            firstEscYear,
-            firstEscMonth: firstEscMonth + 1, // Show as 1-12
-            targetYear,
-            targetMonth: targetMonth + 1, // Show as 1-12
-            beforeCheck: targetYear < firstEscYear || (targetYear === firstEscYear && targetMonth < firstEscMonth),
-            periods: 'will calculate below'
-        });
-    }
+    const targetMonth = month; // Already 1-based (1 = January, 12 = December)
     
     // If we haven't reached the first escalation month, return initial rent
-    // We use strict less-than: target must be at or after the escalation month
     if (targetYear < firstEscYear) {
         return { rent: initialRent, hasEscalation: false };
     }
@@ -10464,11 +10448,12 @@ function calculateRentForMonth(lease, year, month) {
     const frequency = esc.escalationFrequency;
     
     if (frequency === 'Monthly') {
+        // Calculate months difference (both are 1-based now)
         const monthsDiff = (targetYear - firstEscYear) * 12 + (targetMonth - firstEscMonth);
-        periods = Math.max(0, monthsDiff);
+        periods = Math.max(0, monthsDiff + 1); // +1 because the first month itself is period 1
     } else if (frequency === 'Quarterly') {
         const monthsDiff = (targetYear - firstEscYear) * 12 + (targetMonth - firstEscMonth);
-        periods = Math.max(0, Math.floor(monthsDiff / 3));
+        periods = Math.max(0, Math.floor(monthsDiff / 3) + 1); // +1 because the first quarter itself is period 1
     } else if (frequency === 'Annually') {
         // For annual escalations, count how many full years have passed since the first escalation
         // The first escalation month itself counts as period 1
@@ -10485,11 +10470,8 @@ function calculateRentForMonth(lease, year, month) {
             }
         } else {
             // Future year - calculate based on month position
-            if (targetMonth > firstEscMonth) {
-                // We're past the escalation month in a future year
-                periods = yearsDiff + 1;
-            } else if (targetMonth === firstEscMonth) {
-                // We're exactly at the escalation month in a future year
+            if (targetMonth >= firstEscMonth) {
+                // We're at or past the escalation month in a future year
                 periods = yearsDiff + 1;
             } else {
                 // We're before the escalation month in a future year
