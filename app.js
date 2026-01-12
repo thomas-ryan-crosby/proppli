@@ -2884,6 +2884,11 @@ function loadTickets() {
         });
         renderTickets(tickets);
         updateMetrics(tickets);
+    }, (error) => {
+        console.error('Error loading tickets:', error);
+        if (error.code === 'permission-denied') {
+            handlePermissionError('ticket data');
+        }
     });
 }
 
@@ -8137,7 +8142,11 @@ async function loadLeases() {
         populateLeaseFilters(properties);
     } catch (error) {
         console.error('Error loading leases:', error);
-        alert('Error loading leases: ' + error.message);
+        if (error.code === 'permission-denied') {
+            handlePermissionError('lease data');
+        } else {
+            alert('Error loading leases: ' + error.message);
+        }
     }
 }
 
