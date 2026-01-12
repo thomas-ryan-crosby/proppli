@@ -10423,8 +10423,11 @@ function calculateRentForMonth(lease, year, month) {
     
     const firstEscDate = lease.rentEscalation.firstEscalationDate.toDate();
     
-    // If we haven't reached the first escalation date, return initial rent
-    if (targetDate < firstEscDate) {
+    // Normalize escalation date to first of month for comparison
+    const firstEscMonth = new Date(firstEscDate.getFullYear(), firstEscDate.getMonth(), 1);
+    
+    // If we haven't reached the first escalation month, return initial rent
+    if (targetDate < firstEscMonth) {
         return { rent: initialRent, hasEscalation: false };
     }
     
@@ -10436,14 +10439,6 @@ function calculateRentForMonth(lease, year, month) {
     let periods = 0;
     const frequency = esc.escalationFrequency;
     
-    // Check if we're exactly at or past the first escalation date
-    const isAtOrPastEscDate = targetDate >= firstEscDate;
-    
-    if (!isAtOrPastEscDate) {
-        // Before escalation date, return initial rent
-        return { rent: initialRent, hasEscalation: false };
-    }
-    
     if (frequency === 'Monthly') {
         const monthsDiff = (year - firstEscDate.getFullYear()) * 12 + (month - 1 - firstEscDate.getMonth());
         periods = Math.max(0, Math.floor(monthsDiff));
@@ -10452,15 +10447,26 @@ function calculateRentForMonth(lease, year, month) {
         periods = Math.max(0, Math.floor(monthsDiff / 3));
     } else if (frequency === 'Annually') {
         const yearsDiff = year - firstEscDate.getFullYear();
-        if (month - 1 > firstEscDate.getMonth()) {
-            // Target month is after escalation month
-            periods = yearsDiff;
-        } else if (month - 1 === firstEscDate.getMonth()) {
-            // Same month - check if we're at or past the escalation date
-            periods = yearsDiff;
+        const monthDiff = (month - 1) - firstEscDate.getMonth();
+        
+        if (yearsDiff === 0) {
+            // Same year - only count if we're at or past the escalation month
+            if (monthDiff >= 0) {
+                periods = 1; // First escalation period
+            } else {
+                periods = 0;
+            }
+        } else if (yearsDiff > 0) {
+            // Future year
+            if (monthDiff > 0) {
+                periods = yearsDiff + 1;
+            } else if (monthDiff === 0) {
+                periods = yearsDiff + 1;
+            } else {
+                periods = yearsDiff;
+            }
         } else {
-            // Target month is before escalation month in the year
-            periods = Math.max(0, yearsDiff - 1);
+            periods = 0;
         }
     }
     
@@ -10700,15 +10706,26 @@ function renderVerticalTable(leases, tenants, units, buildings, year, monthLabel
             const rent = result.rent;
             monthTotal += rent;
             
+            // Determine if escalation indicator should be shown
+            // Show indicator if rent changed from previous month
             let hasEscalation = false;
-            if (month > 1 && rent > 0) {
-                const prevResult = calculateRentForMonth(lease, year, month - 1);
-                const prevRent = prevResult.rent;
+            
+            if (rent > 0) {
+                let prevRent = 0;
+                if (month > 1) {
+                    // Compare with previous month
+                    const prevResult = calculateRentForMonth(lease, year, month - 1);
+                    prevRent = prevResult.rent;
+                } else {
+                    // January - compare with December of previous year
+                    const prevResult = calculateRentForMonth(lease, year - 1, 12);
+                    prevRent = prevResult.rent;
+                }
+                
+                // Show escalation indicator if rent changed
                 if (prevRent > 0 && Math.abs(rent - prevRent) > 0.01) {
                     hasEscalation = true;
                 }
-            } else if (month === 1 && result.hasEscalation && rent > 0) {
-                hasEscalation = true;
             }
             
             const rentDisplay = rent > 0 ? `$${rent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—';
