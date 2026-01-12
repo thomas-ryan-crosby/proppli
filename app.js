@@ -97,6 +97,9 @@ function updateFABsVisibility() {
 function startApp() {
     console.log('📄 Starting app initialization...');
     
+    // Initialize auth first
+    initAuth();
+    
     // Wait a bit for config script to load if it hasn't already
     const checkFirebase = () => {
         if (typeof firebase === 'undefined') {
@@ -118,6 +121,138 @@ function startApp() {
     
     // Start checking
     checkFirebase();
+}
+
+// Initialize Firebase Auth
+function initAuth() {
+    if (typeof firebase !== 'undefined' && firebase.auth) {
+        auth = firebase.auth();
+        console.log('✅ Firebase Auth initialized');
+        
+        // Listen for auth state changes
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                console.log('👤 User authenticated:', user.email);
+                currentUser = user;
+                await loadUserProfile(user.uid);
+                showApplication();
+            } else {
+                console.log('👤 No user authenticated');
+                currentUser = null;
+                currentUserProfile = null;
+                // Don't automatically show auth pages - let user click launch button
+            }
+        });
+    } else {
+        console.error('❌ Firebase Auth not available');
+    }
+}
+
+// Load user profile from Firestore
+async function loadUserProfile(userId) {
+    try {
+        if (!db) {
+            console.error('Database not initialized');
+            return;
+        }
+        
+        const userDoc = await db.collection('users').doc(userId).get();
+        if (userDoc.exists) {
+            currentUserProfile = { id: userDoc.id, ...userDoc.data() };
+            console.log('✅ User profile loaded:', currentUserProfile);
+            
+            // Check if user is active
+            if (!currentUserProfile.isActive) {
+                console.warn('⚠️ User account is not active');
+                await auth.signOut();
+                alert('Your account is pending approval. Please contact an administrator.');
+                return;
+            }
+        } else {
+            console.warn('⚠️ User profile not found in Firestore');
+            // Create basic profile if it doesn't exist (for existing users)
+            await createUserProfile(userId, {
+                email: currentUser.email,
+                displayName: currentUser.displayName || '',
+                role: 'viewer',
+                isActive: false
+            });
+        }
+    } catch (error) {
+        console.error('Error loading user profile:', error);
+    }
+}
+
+// Create user profile in Firestore
+async function createUserProfile(userId, userData) {
+    try {
+        await db.collection('users').doc(userId).set({
+            ...userData,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        console.log('✅ User profile created');
+    } catch (error) {
+        console.error('Error creating user profile:', error);
+    }
+}
+
+// Show authentication pages
+function showAuthPages() {
+    const landingPage = document.getElementById('landingPage');
+    const authPages = document.getElementById('authPages');
+    const appContainer = document.getElementById('appContainer');
+    
+    if (landingPage) landingPage.style.display = 'none';
+    if (appContainer) appContainer.style.display = 'none';
+    if (authPages) {
+        authPages.style.display = 'block';
+        showLoginPage();
+    }
+}
+
+// Show application
+function showApplication() {
+    const landingPage = document.getElementById('landingPage');
+    const authPages = document.getElementById('authPages');
+    const appContainer = document.getElementById('appContainer');
+    
+    if (landingPage) landingPage.style.display = 'none';
+    if (authPages) authPages.style.display = 'none';
+    if (appContainer) appContainer.style.display = 'block';
+}
+
+// Show login page
+function showLoginPage() {
+    const loginPage = document.getElementById('loginPage');
+    const signupPage = document.getElementById('signupPage');
+    const passwordResetPage = document.getElementById('passwordResetPage');
+    
+    if (loginPage) loginPage.style.display = 'block';
+    if (signupPage) signupPage.style.display = 'none';
+    if (passwordResetPage) passwordResetPage.style.display = 'none';
+}
+
+// Show signup page
+function showSignupPage() {
+    const loginPage = document.getElementById('loginPage');
+    const signupPage = document.getElementById('signupPage');
+    const passwordResetPage = document.getElementById('passwordResetPage');
+    
+    if (loginPage) loginPage.style.display = 'none';
+    if (signupPage) signupPage.style.display = 'block';
+    if (passwordResetPage) passwordResetPage.style.display = 'none';
+}
+
+// Show password reset page
+function showPasswordResetPage() {
+    const loginPage = document.getElementById('loginPage');
+    const signupPage = document.getElementById('signupPage');
+    const passwordResetPage = document.getElementById('passwordResetPage');
+    
+    if (loginPage) loginPage.style.display = 'none';
+    if (signupPage) signupPage.style.display = 'none';
+    if (passwordResetPage) passwordResetPage.style.display = 'block';
 }
 
 // Initialize landing page and app
