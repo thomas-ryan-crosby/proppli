@@ -214,10 +214,14 @@ async function createUserProfile(userId, userData) {
 // Update user menu with current user info
 function updateUserMenu() {
     const userMenuName = document.getElementById('userMenuName');
-    if (userMenuName && currentUserProfile) {
-        userMenuName.textContent = currentUserProfile.displayName || currentUserProfile.email || 'User';
-    } else if (userMenuName && currentUser) {
-        userMenuName.textContent = currentUser.displayName || currentUser.email || 'User';
+    if (userMenuName) {
+        if (currentUserProfile) {
+            userMenuName.textContent = currentUserProfile.displayName || currentUserProfile.email || 'User';
+        } else if (currentUser) {
+            userMenuName.textContent = currentUser.displayName || currentUser.email || 'User';
+        } else {
+            userMenuName.textContent = 'User';
+        }
     }
 }
 
