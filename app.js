@@ -10334,6 +10334,21 @@ async function populateRentRollFilters() {
                 loadRentRoll();
             });
         }
+        
+        // Add event listeners for view option changes
+        const orientationRadios = document.querySelectorAll('input[name="rentRollOrientation"]');
+        orientationRadios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                loadRentRoll();
+            });
+        });
+        
+        const breakoutByBuildingCheckbox = document.getElementById('rentRollBreakoutByBuilding');
+        if (breakoutByBuildingCheckbox) {
+            breakoutByBuildingCheckbox.addEventListener('change', () => {
+                loadRentRoll();
+            });
+        }
     } catch (error) {
         console.error('Error loading filters for rent roll:', error);
     }
