@@ -117,7 +117,25 @@ function startApp() {
 
 // Check if DOM is already loaded, if so run immediately, otherwise wait
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', startApp);
+    // Initialize landing page
+    document.addEventListener('DOMContentLoaded', function() {
+        // Setup launch application button
+        const launchAppBtn = document.getElementById('launchAppBtn');
+        const landingPage = document.getElementById('landingPage');
+        const appContainer = document.getElementById('appContainer');
+        
+        if (launchAppBtn && landingPage && appContainer) {
+            launchAppBtn.addEventListener('click', function() {
+                landingPage.style.display = 'none';
+                appContainer.style.display = 'block';
+                // Initialize the app after showing it
+                startApp();
+            });
+        } else {
+            // If landing page elements don't exist, just initialize the app
+            startApp();
+        }
+    });
 } else {
     // DOM is already loaded, run immediately
     startApp();
