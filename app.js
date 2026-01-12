@@ -10436,6 +10436,14 @@ function calculateRentForMonth(lease, year, month) {
     let periods = 0;
     const frequency = esc.escalationFrequency;
     
+    // Check if we're exactly at or past the first escalation date
+    const isAtOrPastEscDate = targetDate >= firstEscDate;
+    
+    if (!isAtOrPastEscDate) {
+        // Before escalation date, return initial rent
+        return { rent: initialRent, hasEscalation: false };
+    }
+    
     if (frequency === 'Monthly') {
         const monthsDiff = (year - firstEscDate.getFullYear()) * 12 + (month - 1 - firstEscDate.getMonth());
         periods = Math.max(0, Math.floor(monthsDiff));
@@ -10444,14 +10452,19 @@ function calculateRentForMonth(lease, year, month) {
         periods = Math.max(0, Math.floor(monthsDiff / 3));
     } else if (frequency === 'Annually') {
         const yearsDiff = year - firstEscDate.getFullYear();
-        if (month - 1 > firstEscDate.getMonth() || (month - 1 === firstEscDate.getMonth())) {
-            periods = Math.max(0, yearsDiff);
+        if (month - 1 > firstEscDate.getMonth()) {
+            // Target month is after escalation month
+            periods = yearsDiff;
+        } else if (month - 1 === firstEscDate.getMonth()) {
+            // Same month - check if we're at or past the escalation date
+            periods = yearsDiff;
         } else {
+            // Target month is before escalation month in the year
             periods = Math.max(0, yearsDiff - 1);
         }
     }
     
-    // Check if this is the first month of an escalation period
+    // Apply escalations
     if (periods > 0) {
         hasEscalation = true; // This month has an escalation applied
         
@@ -10464,8 +10477,9 @@ function calculateRentForMonth(lease, year, month) {
         }
     }
     
-    // Check if this is the exact month when escalation first occurs
+    // Check if this is the exact month when escalation first occurs (periods = 0 but we're at the escalation date)
     if (periods === 0 && targetDate.getMonth() === firstEscDate.getMonth() && targetDate.getFullYear() === firstEscDate.getFullYear()) {
+        // This is the first month of escalation - rent hasn't changed yet, but mark it as escalation month
         hasEscalation = true;
     }
     
@@ -10854,11 +10868,25 @@ function renderHorizontalTable(leases, tenants, units, buildings, year, monthLab
         html += `<td style="padding: 10px; text-align: right; color: #64748b; font-variant-numeric: tabular-nums;">${squareFootage ? squareFootage.toLocaleString() : '—'}</td>`;
         
         monthlyRents.forEach((rent, idx) => {
+            const month = idx + 1;
+            const result = calculateRentForMonth(lease, year, month);
+            
+            // Determine if escalation indicator should be shown
             let hasEscalation = false;
-            if (idx > 0 && rent > 0) {
-                const prevRent = monthlyRents[idx - 1];
-                if (prevRent > 0 && Math.abs(rent - prevRent) > 0.01) {
-                    hasEscalation = true;
+            if (rent > 0) {
+                if (idx > 0) {
+                    // Compare with previous month
+                    const prevRent = monthlyRents[idx - 1];
+                    if (prevRent > 0 && Math.abs(rent - prevRent) > 0.01) {
+                        hasEscalation = true;
+                    }
+                } else {
+                    // January - compare with December of previous year
+                    const prevResult = calculateRentForMonth(lease, year - 1, 12);
+                    const prevRent = prevResult.rent;
+                    if (prevRent > 0 && Math.abs(rent - prevRent) > 0.01) {
+                        hasEscalation = true;
+                    }
                 }
             }
             
