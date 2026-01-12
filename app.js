@@ -9188,7 +9188,10 @@ async function renderLeasesTableView(leases, properties, tenants, units, buildin
                 
                 html += `<tr style="opacity: 0.7;">
                     <td style="padding: 10px; vertical-align: top;">
-                        <div style="font-weight: 600;">${escapeHtml(tenantName)}</div>
+                        <div style="font-weight: 600;">
+                            ${escapeHtml(tenantName)}
+                            <span style="font-size: 0.7em; font-weight: 400; color: #999; margin-left: 6px;">ID: ${lease.id.substring(0, 8)}</span>
+                        </div>
                         <div style="font-size: 0.85em; color: #666;">${unitDisplay}</div>
                     </td>
                     <td style="padding: 10px; vertical-align: top;">
