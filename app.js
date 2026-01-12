@@ -15,10 +15,16 @@ let editingTenantId = null;
 let currentTenantView = 'table'; // 'cards' or 'table' - table is now default
 let selectedPropertyForTenants = null;
 
+// Lease Management
+let editingLeaseId = null;
+let currentLeaseView = 'current'; // 'current' or 'previous'
+let leaseDocumentFile = null;
+
 // Update floating action buttons visibility
 function updateFABsVisibility() {
     const fabAddTenant = document.getElementById('fabAddTenant');
     const fabAddContact = document.getElementById('fabAddContact');
+    const fabAddLease = document.getElementById('fabAddLease');
     const tenantsPage = document.getElementById('tenantsPage');
     const tenantDetailModal = document.getElementById('tenantDetailModal');
     const contactsTab = document.getElementById('contactsTab');
@@ -68,6 +74,17 @@ function updateFABsVisibility() {
         const shouldShow = isPropertiesPageVisible && isPropertyDetailVisible;
         fabAddUnit.style.display = shouldShow ? 'flex' : 'none';
     }
+    
+    // Show Add Lease FAB when on leases page
+    if (fabAddLease) {
+        const leasesPage = document.getElementById('leasesPage');
+        const leaseModal = document.getElementById('leaseModal');
+        const isLeasesPageVisible = leasesPage && leasesPage.style.display !== 'none';
+        const isModalVisible = leaseModal && leaseModal.classList.contains('show');
+        // Show when leases page is visible and modal is hidden
+        const shouldShow = isLeasesPageVisible && !isModalVisible;
+        fabAddLease.style.display = shouldShow ? 'flex' : 'none';
+    }
 }
 
 // Initialize app
@@ -107,6 +124,7 @@ if (document.readyState === 'loading') {
 
 function initializeApp() {
     setupEventListeners();
+    setupLeaseEventListeners();
     setupNavigation();
     loadProperties();
     loadTickets();
@@ -168,6 +186,8 @@ function showPage(page) {
         loadTenants();
     } else if (page === 'maintenance') {
         loadTickets();
+    } else if (page === 'leases') {
+        loadLeases();
     }
     
     // Update FAB visibility
@@ -439,6 +459,21 @@ function setupEventListeners() {
             }
             // Allow null/undefined tenantId to create orphan contact
             window.addContact(tenantId || null);
+        });
+    }
+    
+    // Floating action button for Add Lease
+    const fabAddLease = document.getElementById('fabAddLease');
+    if (fabAddLease) {
+        fabAddLease.addEventListener('click', () => {
+            if (window.openLeaseModal) {
+                window.openLeaseModal();
+            } else if (typeof openLeaseModal === 'function') {
+                openLeaseModal();
+            } else {
+                console.error('openLeaseModal is not defined');
+                alert('Error: Unable to open lease form. Please refresh the page.');
+            }
         });
     }
     
@@ -1592,7 +1627,7 @@ window.deleteUnit = async function(unitId) {
         for (const tenantId of tenantIds) {
             try {
                 const tenantDoc = await db.collection('tenants').doc(tenantId).get();
-                if (tenantDoc.exists()) {
+                if (tenantDoc.exists) {
                     tenantNames.push(tenantDoc.data().tenantName || 'Unknown Tenant');
                 }
             } catch (error) {
@@ -3551,6 +3586,50 @@ function loadPropertiesForTenantFilter() {
     });
 }
 
+// Load properties for tenant property select dropdown
+async function loadPropertiesForTenantPropertySelect() {
+    const propertySelect = document.getElementById('tenantPropertyId');
+    if (!propertySelect) return Promise.resolve();
+    
+    // Clear existing options except the first one
+    propertySelect.innerHTML = '<option value="">No Property (Orphan Tenant)</option>';
+    
+    return db.collection('properties').get().then((snapshot) => {
+        snapshot.forEach((doc) => {
+            const property = doc.data();
+            const option = document.createElement('option');
+            option.value = doc.id;
+            option.textContent = property.name || 'Unnamed Property';
+            propertySelect.appendChild(option);
+        });
+    }).catch((error) => {
+        console.error('Error loading properties for tenant property select:', error);
+        return Promise.resolve();
+    });
+}
+
+// Load properties for contact property select dropdown
+async function loadPropertiesForContactPropertySelect() {
+    const propertySelect = document.getElementById('contactPropertyId');
+    if (!propertySelect) return Promise.resolve();
+    
+    // Clear existing options except the first one
+    propertySelect.innerHTML = '<option value="">No Property (Orphan Contact)</option>';
+    
+    return db.collection('properties').get().then((snapshot) => {
+        snapshot.forEach((doc) => {
+            const property = doc.data();
+            const option = document.createElement('option');
+            option.value = doc.id;
+            option.textContent = property.name || 'Unnamed Property';
+            propertySelect.appendChild(option);
+        });
+    }).catch((error) => {
+        console.error('Error loading properties for contact property select:', error);
+        return Promise.resolve();
+    });
+}
+
 function renderTenantsList(tenants) {
     // Filter by property if selected
     if (currentTenantView === 'table') {
@@ -3622,12 +3701,8 @@ async function renderTenantsTableView(tenants) {
     // Filter tenants by property if needed
     const filteredTenants = await filterTenantsByProperty(tenants);
     
-    if (Object.keys(filteredTenants).length === 0) {
-        tenantsTable.innerHTML = '<p class="no-tenants-message">No tenants found. Add one to get started.</p>';
-        return;
-    }
-    
     // Load occupancies, buildings, units, and properties to group by building
+    // We need to load these even if there are no tenants, to show orphaned units
     const [occupanciesSnapshot, buildingsSnapshot, unitsSnapshot, propertiesSnapshot] = await Promise.all([
         db.collection('occupancies').get(),
         db.collection('buildings').get(),
@@ -3667,15 +3742,39 @@ async function renderTenantsTableView(tenants) {
         unitsMap[doc.id] = { id: doc.id, ...doc.data() };
     });
     
+    // Filter units by property if a property filter is selected
+    const propertyFilter = selectedPropertyForTenants;
+    if (propertyFilter) {
+        Object.keys(unitsMap).forEach(unitId => {
+            const unit = unitsMap[unitId];
+            if (unit.propertyId !== propertyFilter) {
+                delete unitsMap[unitId];
+            }
+        });
+    }
+    
+    // Check if we have any units for the selected property (even if no tenants)
+    const hasUnitsForProperty = Object.keys(unitsMap).length > 0;
+    
+    // If no tenants AND no units for the selected property, show "no tenants" message
+    if (Object.keys(filteredTenants).length === 0 && !hasUnitsForProperty) {
+        tenantsTable.innerHTML = '<p class="no-tenants-message">No tenants found. Add one to get started.</p>';
+        return;
+    }
+    
     // Group units by building
     const unitsByBuilding = {};
+    const unitsWithoutBuilding = [];
     Object.keys(unitsMap).forEach(unitId => {
         const unit = unitsMap[unitId];
-        if (unit.buildingId) {
+        if (unit.buildingId && buildingsMap[unit.buildingId]) {
             if (!unitsByBuilding[unit.buildingId]) {
                 unitsByBuilding[unit.buildingId] = [];
             }
             unitsByBuilding[unit.buildingId].push(unit);
+        } else {
+            // Unit is orphaned (no building or building doesn't exist)
+            unitsWithoutBuilding.push(unit);
         }
     });
     
@@ -3731,8 +3830,13 @@ async function renderTenantsTableView(tenants) {
                     if (buildingId && buildingsMap[buildingId]) {
                         const building = buildingsMap[buildingId];
                         buildingKey = building.buildingName || `Building ${buildingId}`;
+                    } else {
+                        // Unit has no building (orphaned unit) - skip it here, it will be shown in Orphaned Units section
+                        return; // Skip this occupancy - it's for an orphaned unit
                     }
                 }
+                // Note: If unitId is null or unit doesn't exist, it goes to "No Building Assigned"
+                // This is for occupancies without valid units, not orphaned units
                 
                 if (!occupanciesByBuilding[buildingKey]) {
                     occupanciesByBuilding[buildingKey] = {
@@ -3765,7 +3869,10 @@ async function renderTenantsTableView(tenants) {
     });
     
     // First, load contacts to determine max number of contact and broker columns needed
-    const { maxContacts, maxBrokers } = await determineMaxContacts(filteredTenants);
+    // If no tenants, use default values so orphaned units can still be displayed
+    const { maxContacts, maxBrokers } = Object.keys(filteredTenants).length > 0 
+        ? await determineMaxContacts(filteredTenants)
+        : { maxContacts: 5, maxBrokers: 2 };
     
     // Build HTML with dynamic contact and broker columns
     let html = '';
@@ -3846,6 +3953,8 @@ async function renderTenantsTableView(tenants) {
     });
     
     // Render grouped by building (sorted by building number)
+    // Only render if we have tenants OR if we have units to show
+    if (sortedBuildingNames.length > 0 || unitsWithoutBuilding.length > 0 || Object.keys(unitsByBuilding).length > 0) {
     sortedBuildingNames.forEach(buildingName => {
         const group = tenantsByBuilding[buildingName];
         html += `
@@ -4026,6 +4135,227 @@ async function renderTenantsTableView(tenants) {
             </div>
         `;
     });
+    }
+    
+    // Collect tenant IDs from orphaned units for contact loading
+    const orphanedUnitTenantIds = new Set();
+    if (unitsWithoutBuilding && unitsWithoutBuilding.length > 0) {
+        // Sort orphaned units by unit number
+        unitsWithoutBuilding.sort((a, b) => {
+            const aNum = a.unitNumber || '';
+            const bNum = b.unitNumber || '';
+            return aNum.localeCompare(bNum, undefined, { numeric: true, sensitivity: 'base' });
+        });
+        
+        // Collect tenant IDs while iterating
+        unitsWithoutBuilding.forEach(unit => {
+            const unitOccupancies = occupanciesByUnitId[unit.id] || [];
+            unitOccupancies.forEach(occ => {
+                if (occ.tenantId) {
+                    orphanedUnitTenantIds.add(occ.tenantId);
+                }
+            });
+        });
+        
+        // Group tenants by their occupancies in orphaned units
+        const tenantsInOrphanedUnits = {};
+        const vacantOrphanedUnits = [];
+        
+        unitsWithoutBuilding.forEach(unit => {
+            const unitOccupancies = occupanciesByUnitId[unit.id] || [];
+            if (unitOccupancies.length > 0) {
+                unitOccupancies.forEach(occ => {
+                    const tenantId = occ.tenantId;
+                    if (tenantId && filteredTenants[tenantId]) {
+                        if (!tenantsInOrphanedUnits[tenantId]) {
+                            tenantsInOrphanedUnits[tenantId] = {
+                                tenant: filteredTenants[tenantId],
+                                occupancies: []
+                            };
+                        }
+                        tenantsInOrphanedUnits[tenantId].occupancies.push(occ);
+                    }
+                });
+            } else {
+                vacantOrphanedUnits.push(unit);
+            }
+        });
+        
+        // Sort vacant units by unit number
+        vacantOrphanedUnits.sort((a, b) => {
+            const aNum = a.unitNumber || '';
+            const bNum = b.unitNumber || '';
+            return aNum.localeCompare(bNum, undefined, { numeric: true, sensitivity: 'base' });
+        });
+        
+        html += `
+            <div class="building-group">
+                <div class="building-group-header">
+                    <input type="checkbox" class="email-select-building" data-building-id="" data-building-name="Orphaned Units" style="display: none; margin-right: 8px; cursor: pointer;">
+                    <span>Orphaned Units${unitsWithoutBuilding.length > 0 ? ` (${unitsWithoutBuilding.length})` : ''}</span>
+                </div>
+                <table class="tenants-table">
+                    <thead>
+                        <tr class="header-major">
+                            <th rowspan="2">Occupancies</th>
+                            <th rowspan="2">Tenant Name</th>
+                            ${maxContacts > 0 ? `<th colspan="${maxContacts}">Contacts</th>` : ''}
+                            ${maxBrokers > 0 ? `<th colspan="${maxBrokers}">Brokers</th>` : ''}
+                        </tr>
+                        <tr class="header-sub">
+                            ${contactSubHeaders.join('')}
+                            ${brokerSubHeaders.join('')}
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        // Sort tenants by their lowest unit number
+        const sortedTenants = Object.values(tenantsInOrphanedUnits).sort((a, b) => {
+            const occupanciesA = a.occupancies || [];
+            const occupanciesB = b.occupancies || [];
+            
+            const unitNumbersA = occupanciesA
+                .filter(occ => occ.unitId && unitsMap[occ.unitId])
+                .map(occ => unitsMap[occ.unitId].unitNumber || '')
+                .filter(num => num);
+            
+            const unitNumbersB = occupanciesB
+                .filter(occ => occ.unitId && unitsMap[occ.unitId])
+                .map(occ => unitsMap[occ.unitId].unitNumber || '')
+                .filter(num => num);
+            
+            if (unitNumbersA.length === 0 && unitNumbersB.length === 0) {
+                return (a.tenant.tenantName || '').localeCompare(b.tenant.tenantName || '', undefined, { numeric: true, sensitivity: 'base' });
+            }
+            if (unitNumbersA.length === 0) return 1;
+            if (unitNumbersB.length === 0) return -1;
+            
+            unitNumbersA.sort((x, y) => x.localeCompare(y, undefined, { numeric: true, sensitivity: 'base' }));
+            unitNumbersB.sort((x, y) => x.localeCompare(y, undefined, { numeric: true, sensitivity: 'base' }));
+            
+            return unitNumbersA[0].localeCompare(unitNumbersB[0], undefined, { numeric: true, sensitivity: 'base' });
+        });
+        
+        // Render tenants with occupancies in orphaned units
+        sortedTenants.forEach(({ tenant, occupancies }) => {
+            // Get ALL occupancies for this tenant (not just orphaned units)
+            const allTenantOccupancies = occupanciesMap[tenant.id] || [];
+            
+            // Occupancies - show all occupancies for this tenant, sorted by unit number
+            let occupanciesHtml = '<span style="color: #999;">No occupancies</span>';
+            if (allTenantOccupancies.length > 0) {
+                const sortedOccupancies = [...allTenantOccupancies].sort((occA, occB) => {
+                    const unitA = occA.unitId && unitsMap[occA.unitId] ? unitsMap[occA.unitId] : null;
+                    const unitB = occB.unitId && unitsMap[occB.unitId] ? unitsMap[occB.unitId] : null;
+                    
+                    if (!unitA && !unitB) return 0;
+                    if (!unitA) return 1;
+                    if (!unitB) return -1;
+                    
+                    const numA = unitA.unitNumber || '';
+                    const numB = unitB.unitNumber || '';
+                    return numA.localeCompare(numB, undefined, { numeric: true, sensitivity: 'base' });
+                });
+                
+                const occupancyBadges = sortedOccupancies.map(occ => {
+                    if (occ.unitId && unitsMap[occ.unitId]) {
+                        const unit = unitsMap[occ.unitId];
+                        return `<span class="occupancy-info">Unit ${escapeHtml(unit.unitNumber || 'N/A')}</span>`;
+                    } else if (occ.unitId) {
+                        return `<span class="occupancy-info" style="color: #dc2626; font-style: italic;">Unit (Deleted)</span>`;
+                    } else {
+                        return `<span class="occupancy-info">Property Level</span>`;
+                    }
+                }).join('');
+                
+                // Wrap occupancies in a container that allows wrapping
+                occupanciesHtml = `<div style="display: flex; flex-wrap: wrap; gap: 4px; max-width: 100%;">${occupancyBadges}</div>`;
+            }
+            
+            // Create empty contact cells
+            const contactCells = [];
+            for (let i = 0; i < maxContacts; i++) {
+                contactCells.push(`<td class="tenant-contact-cell" data-contact-index="${i}" data-contact-type="contact" style="vertical-align: top;"></td>`);
+            }
+            
+            // Create empty broker cells
+            const brokerCells = [];
+            for (let i = 0; i < maxBrokers; i++) {
+                brokerCells.push(`<td class="tenant-contact-cell" data-contact-index="${i}" data-contact-type="broker" style="vertical-align: top;"></td>`);
+            }
+            
+            html += `
+                <tr data-tenant-id="${tenant.id}">
+                    <td class="tenant-occupancies-cell" style="vertical-align: top; padding-right: 20px;">${occupanciesHtml}</td>
+                    <td class="tenant-name-cell" style="vertical-align: top; padding-left: 20px;">
+                        <div class="tenant-name-wrapper">
+                            <div class="tenant-name-header">
+                                <input type="checkbox" class="email-select-tenant" data-tenant-id="${tenant.id}" style="display: none; cursor: pointer;">
+                                <span class="tenant-name-text">${escapeHtml(tenant.tenantName || 'Unnamed Tenant')}</span>
+                            </div>
+                            <div class="tenant-actions-compact">
+                                <button class="btn-action btn-view" onclick="viewTenantDetail('${tenant.id}')" title="View Details">
+                                    <span class="btn-icon">👁️</span>
+                                </button>
+                                <button class="btn-action btn-edit" onclick="editTenant('${tenant.id}')" title="Edit">
+                                    <span class="btn-icon">✏️</span>
+                                </button>
+                                <button class="btn-action btn-danger" onclick="markTenantAsMovedOut('${tenant.id}')" title="Mark as Moved Out" style="background: #f97316; border-color: #f97316; color: white;">
+                                    <span class="btn-icon">🚪</span>
+                                </button>
+                                <button class="btn-action btn-delete" onclick="deleteTenant('${tenant.id}')" title="Delete">
+                                    <span class="btn-icon">🗑️</span>
+                                </button>
+                            </div>
+                        </div>
+                    </td>
+                    ${contactCells.join('')}
+                    ${brokerCells.join('')}
+                </tr>
+            `;
+        });
+        
+        // Add rows for vacant orphaned units
+        vacantOrphanedUnits.forEach(unit => {
+            // Create empty contact cells
+            const contactCells = [];
+            for (let i = 0; i < maxContacts; i++) {
+                contactCells.push(`<td class="tenant-contact-cell" data-contact-index="${i}" data-contact-type="contact" style="vertical-align: top;"></td>`);
+            }
+            
+            // Create empty broker cells
+            const brokerCells = [];
+            for (let i = 0; i < maxBrokers; i++) {
+                brokerCells.push(`<td class="tenant-contact-cell" data-contact-index="${i}" data-contact-type="broker" style="vertical-align: top;"></td>`);
+            }
+            
+            html += `
+                <tr data-unit-id="${unit.id}" data-vacant="true">
+                    <td class="tenant-occupancies-cell" style="vertical-align: top; padding-right: 20px;">
+                        <div style="display: flex; flex-wrap: wrap; gap: 4px; max-width: 100%;">
+                            <span class="occupancy-info">Unit ${escapeHtml(unit.unitNumber || 'N/A')}</span>
+                        </div>
+                    </td>
+                    <td class="tenant-name-cell" style="vertical-align: top; padding-left: 20px;">
+                        <div class="tenant-name-wrapper">
+                            <div class="tenant-name-header">
+                                <span class="tenant-name-text" style="color: #6b7280; font-style: italic;">Vacant</span>
+                            </div>
+                        </div>
+                    </td>
+                    ${contactCells.join('')}
+                    ${brokerCells.join('')}
+                </tr>
+            `;
+        });
+        
+        html += `
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
     
     // Render tenants without building (always show section, even if empty)
     html += `
@@ -4183,10 +4513,17 @@ async function renderTenantsTableView(tenants) {
         });
     }
     
-    // Load contacts for all tenants (including moved out) and populate individual columns
+    // Collect tenant IDs from orphaned units for contact loading (already collected above)
+    // Add tenants from orphaned units to the contacts loading
     const allTenantsForContacts = { ...activeTenants };
     movedOutTenants.forEach(({ tenant }) => {
         allTenantsForContacts[tenant.id] = tenant;
+    });
+    // Add tenants from orphaned units
+    orphanedUnitTenantIds.forEach(tenantId => {
+        if (filteredTenants[tenantId] && !allTenantsForContacts[tenantId]) {
+            allTenantsForContacts[tenantId] = filteredTenants[tenantId];
+        }
     });
     loadContactsForTableView(allTenantsForContacts, maxContacts, maxBrokers);
     
@@ -4244,8 +4581,14 @@ async function loadOrphanContacts(maxContacts, maxBrokers) {
         const tenantsTable = document.getElementById('tenantsTable');
         if (!tenantsTable) return;
         
+        // Remove any existing orphan contacts section to prevent duplicates
+        const existingOrphanSection = tenantsTable.querySelector('.orphan-contacts-section');
+        if (existingOrphanSection) {
+            existingOrphanSection.remove();
+        }
+        
         let orphanHtml = `
-            <div class="building-group" style="border-left: 3px solid #f44336; margin-top: 30px;">
+            <div class="building-group orphan-contacts-section" style="border-left: 3px solid #f44336; margin-top: 30px;">
                 <div class="building-group-header" style="background: #ffebee;">
                     <span style="font-weight: 600; color: #c62828;">⚠️ Orphan Contacts (${orphanContacts.length})</span>
                     <span style="font-size: 0.75rem; color: #666; margin-left: 10px;">Contacts without associated tenants</span>
@@ -4354,6 +4697,12 @@ async function loadMovedOutTenantsSection(movedOutTenants, occupanciesMap, units
     const tenantsTable = document.getElementById('tenantsTable');
     if (!tenantsTable) return;
     
+    // Remove any existing moved out tenants section to prevent duplicates
+    const existingMovedOutSection = tenantsTable.querySelector('.moved-out-tenants-section');
+    if (existingMovedOutSection) {
+        existingMovedOutSection.remove();
+    }
+    
     // Generate contact column headers
     const contactSubHeaders = [];
     for (let i = 1; i <= maxContacts; i++) {
@@ -4366,7 +4715,7 @@ async function loadMovedOutTenantsSection(movedOutTenants, occupanciesMap, units
     }
     
     let movedOutHtml = `
-        <div class="building-group" style="border-left: 3px solid #9ca3af; margin-top: 30px;">
+        <div class="building-group moved-out-tenants-section" style="border-left: 3px solid #9ca3af; margin-top: 30px;">
             <div class="building-group-header" style="background: #f3f4f6;">
                 <input type="checkbox" class="email-select-building" data-building-id="" data-building-name="Moved Out Tenants" style="display: none; margin-right: 8px; cursor: pointer;">
                 <span style="font-weight: 600; color: #6b7280;">🚪 Moved Out Tenants${movedOutTenants.length > 0 ? ` (${movedOutTenants.length})` : ''}</span>
@@ -5553,13 +5902,16 @@ async function filterTenantsByProperty(tenants) {
         }
     });
     
-    // Filter tenants: include tenants in the selected property OR tenants with no occupancies (orphan tenants)
+    // Filter tenants: include tenants in the selected property OR tenants with no occupancies (orphan tenants) that are associated with this property
     const filtered = {};
     Object.keys(tenants).forEach(id => {
+        const tenant = tenants[id];
         const hasNoOccupancies = !tenantIdsWithOccupancies.has(id);
         const isInSelectedProperty = tenantIdsInProperty.has(id);
+        // Also check if tenant has propertyId matching the selected property
+        const isOrphanWithProperty = hasNoOccupancies && tenant.propertyId === selectedPropertyForTenants;
         
-        if (isInSelectedProperty || hasNoOccupancies) {
+        if (isInSelectedProperty || isOrphanWithProperty) {
             filtered[id] = tenants[id];
         }
     });
@@ -5580,6 +5932,9 @@ function showAddTenantForm() {
         submitBtn.textContent = 'Save Tenant';
         submitBtn.classList.remove('saving');
     }
+    
+    // Load properties for property dropdown
+    loadPropertiesForTenantPropertySelect();
     
     // Reset field visibility
     updateTenantTypeFields();
@@ -5634,48 +5989,99 @@ window.editTenant = function(tenantId) {
     editingTenantId = null;
     
     db.collection('tenants').doc(tenantId).get().then((doc) => {
+        if (!doc.exists) {
+            console.error('Tenant document does not exist');
+            alert('Tenant not found');
+            return;
+        }
+        
         const tenant = doc.data();
-        if (tenant) {
+        if (!tenant) {
+            console.error('Tenant data is null');
+            alert('Tenant data not found');
+            return;
+        }
+        
             editingTenantId = tenantId;
             document.getElementById('tenantModalTitle').textContent = 'Edit Tenant';
             document.getElementById('tenantId').value = tenantId;
             
-            // Set basic fields
-            const tenantNameField = document.getElementById('tenantName');
-            const tenantTypeField = document.getElementById('tenantType');
-            const tenantStatusField = document.getElementById('tenantStatus');
-            const tenantMailingAddressField = document.getElementById('tenantMailingAddress');
-            const tenantNotesField = document.getElementById('tenantNotes');
-            
-            if (tenantNameField) tenantNameField.value = tenant.tenantName || '';
+        // IMPORTANT: Get the tenantForm first, then scope all field lookups to it
+        // This prevents getting fields from other forms (like ticket form)
+        const tenantForm = document.getElementById('tenantForm');
+        if (!tenantForm) {
+            console.error('Tenant form not found');
+            alert('Error: Tenant form not found. Please refresh the page.');
+            return;
+        }
+        
+        // Get all field references scoped to tenantForm
+        const tenantNameField = tenantForm.querySelector('#tenantName');
+        const tenantTypeField = tenantForm.querySelector('#tenantType');
+        const tenantStatusField = tenantForm.querySelector('#tenantStatus');
+        const tenantMailingAddressField = tenantForm.querySelector('#tenantMailingAddress');
+        const tenantNotesField = tenantForm.querySelector('#tenantNotes');
+        const tenantPropertyIdField = tenantForm.querySelector('#tenantPropertyId');
+        const tenantTaxIdField = tenantForm.querySelector('#tenantTaxId');
+        const tenantBusinessTypeField = tenantForm.querySelector('#tenantBusinessType');
+        const tenantNumberOfEmployeesField = tenantForm.querySelector('#tenantNumberOfEmployees');
+        const tenantWebsiteField = tenantForm.querySelector('#tenantWebsite');
+        const tenantDateOfBirthField = tenantForm.querySelector('#tenantDateOfBirth');
+        
+        // Validate critical fields exist
+        if (!tenantNameField) {
+            console.error('tenantName field not found in tenantForm');
+            alert('Error: Tenant name field not found. Please refresh the page.');
+            return;
+        }
+        
+        // Debug: Log what we're about to set
+        console.log('Setting tenant name to:', tenant.tenantName);
+        console.log('Tenant data:', tenant);
+        
+        // Set basic fields - DO THIS FIRST, before any async operations
+        tenantNameField.value = tenant.tenantName || '';
             if (tenantTypeField) tenantTypeField.value = tenant.tenantType || '';
             if (tenantStatusField) tenantStatusField.value = tenant.status || 'Active';
             if (tenantMailingAddressField) tenantMailingAddressField.value = tenant.mailingAddress || '';
             if (tenantNotesField) tenantNotesField.value = tenant.notes || '';
             
-            // Update field visibility based on tenant type BEFORE setting type-specific fields
+        // Debug: Verify the value was set
+        console.log('Tenant name field value after setting:', tenantNameField.value);
+        
+        // Update field visibility based on tenant type AFTER setting tenant type
             updateTenantTypeFields();
             
-            // Commercial fields
-            const tenantTaxIdField = document.getElementById('tenantTaxId');
-            const tenantBusinessTypeField = document.getElementById('tenantBusinessType');
-            const tenantNumberOfEmployeesField = document.getElementById('tenantNumberOfEmployees');
-            const tenantWebsiteField = document.getElementById('tenantWebsite');
-            
+        // Set type-specific fields
             if (tenantTaxIdField) tenantTaxIdField.value = tenant.taxId || '';
             if (tenantBusinessTypeField) tenantBusinessTypeField.value = tenant.businessType || '';
             if (tenantNumberOfEmployeesField) tenantNumberOfEmployeesField.value = tenant.numberOfEmployees || '';
             if (tenantWebsiteField) tenantWebsiteField.value = tenant.website || '';
             
             // Residential fields
-            const tenantDateOfBirthField = document.getElementById('tenantDateOfBirth');
             if (tenantDateOfBirthField) {
                 if (tenant.dateOfBirth) {
+                try {
                     const dob = tenant.dateOfBirth.toDate ? tenant.dateOfBirth.toDate() : new Date(tenant.dateOfBirth);
                     tenantDateOfBirthField.value = dob.toISOString().split('T')[0];
+                } catch (e) {
+                    console.error('Error parsing date of birth:', e);
+                    tenantDateOfBirthField.value = '';
+                }
                 } else {
                     tenantDateOfBirthField.value = '';
                 }
+            }
+        
+        // Load and set propertyId (async, but don't wait for it)
+        if (tenantPropertyIdField) {
+            loadPropertiesForTenantPropertySelect().then(() => {
+                if (tenant.propertyId) {
+                    tenantPropertyIdField.value = tenant.propertyId;
+                }
+            }).catch((error) => {
+                console.error('Error loading properties for tenant:', error);
+            });
             }
             
             // Reset button state
@@ -5691,7 +6097,6 @@ window.editTenant = function(tenantId) {
             setTimeout(() => {
                 if (tenantNameField) tenantNameField.focus();
             }, 100);
-        }
     }).catch((error) => {
         console.error('Error loading tenant:', error);
         alert('Error loading tenant: ' + error.message);
@@ -5798,12 +6203,15 @@ function handleTenantSubmit(e) {
         alert('The save operation is taking longer than expected. Please check your connection and try again.');
     }, 30000);
     
+    const propertyId = tenantForm.querySelector('#tenantPropertyId')?.value || null;
+    
     const tenantData = {
         tenantName,
         tenantType,
         status,
         mailingAddress: mailingAddress || null,
         notes: notes || null,
+        propertyId: propertyId || null, // Allow null for orphan tenants
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
     
@@ -5971,6 +6379,9 @@ window.addContact = async function(tenantId) {
     
     // Load tenants into dropdown (grouped by building)
     await loadTenantsForContactSelect(tenantId || null);
+    
+    // Load properties for property dropdown
+    await loadPropertiesForContactPropertySelect();
     
     const submitBtn = document.querySelector('#contactForm button[type="submit"]');
     if (submitBtn) {
@@ -6160,11 +6571,20 @@ window.editContact = async function(contactId) {
             // Load tenants and set selected tenant (grouped by building)
             await loadTenantsForContactSelect(contact.tenantId || null);
             
+            // Load properties for property dropdown
+            await loadPropertiesForContactPropertySelect();
+            
             document.getElementById('contactName').value = contact.contactName || '';
             document.getElementById('contactEmail').value = contact.contactEmail || '';
             document.getElementById('contactPhone').value = contact.contactPhone || '';
             document.getElementById('contactTitle').value = contact.contactTitle || '';
             document.getElementById('contactNotes').value = contact.notes || '';
+            
+            // Set propertyId if it exists
+            const contactPropertyIdField = document.getElementById('contactPropertyId');
+            if (contactPropertyIdField && contact.propertyId) {
+                contactPropertyIdField.value = contact.propertyId;
+            }
             
             const classifications = contact.classifications || [];
             document.getElementById('contactPrimary').checked = classifications.includes('Primary');
@@ -6282,8 +6702,11 @@ function handleContactSubmit(e) {
         alert('The save operation is taking longer than expected. Please check your connection and try again.');
     }, 30000);
     
+    const propertyId = document.getElementById('contactPropertyId')?.value || null;
+    
     const contactData = {
         tenantId: tenantId || null, // Allow null for orphan contacts
+        propertyId: propertyId || null, // Allow null for orphan contacts
         contactName,
         contactEmail: contactEmail || null,
         contactPhone: contactPhone || null,
@@ -7046,3 +7469,2313 @@ function handleOccupancySubmit(e) {
     }
 }
 
+// ============================================
+// LEASE MANAGEMENT
+// ============================================
+
+// Load leases from Firestore
+async function loadLeases() {
+    try {
+        const leasesSnapshot = await db.collection('leases').orderBy('leaseStartDate', 'desc').get();
+        const leases = {};
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        leasesSnapshot.forEach((doc) => {
+            const leaseData = { id: doc.id, ...doc.data() };
+            // Calculate days until expiration
+            if (leaseData.leaseEndDate) {
+                const endDate = leaseData.leaseEndDate.toDate();
+                const daysUntilExpiration = Math.ceil((endDate - today) / (1000 * 60 * 60 * 24));
+                leaseData.daysUntilExpiration = daysUntilExpiration;
+                
+                // Only auto-update status if NOT deprecated and NOT auto-renewal
+                const isDeprecated = isLeaseDeprecated(leaseData);
+                const hasAutoRenewal = leaseData.autoRenewal === true || leaseData.autoRenewal === 'true';
+                
+                if (!isDeprecated && !hasAutoRenewal) {
+                    // Auto-update status if expired (only if no auto-renewal)
+                    if (daysUntilExpiration < 0 && leaseData.status === 'Active') {
+                        leaseData.status = 'Expired';
+                        db.collection('leases').doc(doc.id).update({ status: 'Expired' });
+                    } else if (daysUntilExpiration >= 0 && daysUntilExpiration <= 90 && leaseData.status === 'Active') {
+                        leaseData.status = 'Expiring Soon';
+                        db.collection('leases').doc(doc.id).update({ status: 'Expiring Soon' });
+                    }
+                } else if (hasAutoRenewal && leaseData.status !== 'Active' && leaseData.status !== 'Expiring Soon') {
+                    // If has auto-renewal and status is not Active/Expiring Soon, set to Active
+                    if (leaseData.status === 'Expired') {
+                        leaseData.status = 'Active';
+                        db.collection('leases').doc(doc.id).update({ status: 'Active' });
+                    }
+                }
+            }
+            leases[doc.id] = leaseData;
+        });
+        
+        // Load related data
+        const [propertiesSnapshot, tenantsSnapshot, unitsSnapshot, buildingsSnapshot, occupanciesSnapshot] = await Promise.all([
+            db.collection('properties').get(),
+            db.collection('tenants').get(),
+            db.collection('units').get(),
+            db.collection('buildings').get(),
+            db.collection('occupancies').get()
+        ]);
+        
+        const properties = {};
+        propertiesSnapshot.forEach((doc) => {
+            properties[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        
+        const tenants = {};
+        tenantsSnapshot.forEach((doc) => {
+            tenants[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        
+        const units = {};
+        unitsSnapshot.forEach((doc) => {
+            units[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        
+        const buildings = {};
+        buildingsSnapshot.forEach((doc) => {
+            buildings[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        
+        // Map occupancies by unitId to determine which tenant is in which unit
+        const occupanciesByUnitId = {};
+        occupanciesSnapshot.forEach((doc) => {
+            const occ = doc.data();
+            // Only consider active occupancies
+            if (occ.unitId && (occ.status === 'Active' || !occ.status)) {
+                if (!occupanciesByUnitId[occ.unitId]) {
+                    occupanciesByUnitId[occ.unitId] = [];
+                }
+                occupanciesByUnitId[occ.unitId].push({ id: doc.id, ...occ });
+            }
+        });
+        
+        renderLeasesTableView(leases, properties, tenants, units, buildings, occupanciesByUnitId);
+        populateLeaseFilters(properties);
+    } catch (error) {
+        console.error('Error loading leases:', error);
+        alert('Error loading leases: ' + error.message);
+    }
+}
+
+// Render leases list
+function renderLeases(leases, properties, tenants, units) {
+    const leasesList = document.getElementById('leasesList');
+    if (!leasesList) return;
+    
+    // Filter by view (current vs previous)
+    const filteredLeases = Object.values(leases).filter(lease => {
+        if (currentLeaseView === 'current') {
+            return ['Active', 'Expiring Soon'].includes(lease.status);
+        } else {
+            return ['Expired', 'Terminated', 'Renewed'].includes(lease.status);
+        }
+    });
+    
+    // Apply additional filters
+    const propertyFilter = document.getElementById('leasePropertyFilter')?.value || '';
+    const statusFilter = document.getElementById('leaseStatusFilter')?.value || '';
+    const searchTerm = (document.getElementById('leaseSearch')?.value || '').toLowerCase();
+    
+    let displayLeases = filteredLeases.filter(lease => {
+        if (propertyFilter && lease.propertyId !== propertyFilter) return false;
+        if (statusFilter && lease.status !== statusFilter) return false;
+        if (searchTerm) {
+            const leaseNumber = (lease.leaseNumber || '').toLowerCase();
+            const tenantName = (tenants[lease.tenantId]?.tenantName || '').toLowerCase();
+            const propertyName = (properties[lease.propertyId]?.name || '').toLowerCase();
+            if (!leaseNumber.includes(searchTerm) && !tenantName.includes(searchTerm) && !propertyName.includes(searchTerm)) {
+                return false;
+            }
+        }
+        return true;
+    });
+    
+    if (displayLeases.length === 0) {
+        leasesList.innerHTML = '<p style="text-align: center; padding: 40px; color: #666;">No leases found.</p>';
+        return;
+    }
+    
+    // Create table
+    let html = `
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Lease #</th>
+                    <th>Tenant</th>
+                    <th>Property</th>
+                    <th>Unit</th>
+                    <th>Start Date</th>
+                    <th>End Date</th>
+                    <th>Monthly Rent</th>
+                    <th>Status</th>
+                    <th>Days Until Expiration</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    displayLeases.forEach(lease => {
+        const tenant = tenants[lease.tenantId];
+        const property = properties[lease.propertyId];
+        const unit = lease.unitId ? units[lease.unitId] : null;
+        
+        const startDate = lease.leaseStartDate ? lease.leaseStartDate.toDate().toLocaleDateString() : 'N/A';
+        const endDate = lease.leaseEndDate ? lease.leaseEndDate.toDate().toLocaleDateString() : 'N/A';
+        const daysUntilExpiration = lease.daysUntilExpiration !== undefined ? lease.daysUntilExpiration : 'N/A';
+        
+        const statusClass = lease.status === 'Active' ? 'status-active' : 
+                           lease.status === 'Expiring Soon' ? 'status-warning' : 
+                           lease.status === 'Expired' ? 'status-expired' : 'status-inactive';
+        
+        html += `
+            <tr>
+                <td>${lease.leaseNumber || lease.id.substring(0, 8)}</td>
+                <td>${tenant?.tenantName || 'N/A'}</td>
+                <td>${property?.name || 'N/A'}</td>
+                <td>${unit?.unitNumber || 'N/A'}</td>
+                <td>${startDate}</td>
+                <td>${endDate}</td>
+                <td>$${lease.monthlyRent?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}</td>
+                <td><span class="status-badge ${statusClass}">${lease.status}</span></td>
+                <td>${daysUntilExpiration !== 'N/A' ? (daysUntilExpiration < 0 ? `Expired ${Math.abs(daysUntilExpiration)} days ago` : `${daysUntilExpiration} days`) : 'N/A'}</td>
+                <td>
+                    <button class="btn-sm btn-primary" onclick="window.openLeaseModal('${lease.id}')">View</button>
+                    <button class="btn-sm btn-secondary" onclick="window.openLeaseModal('${lease.id}', true)">Edit</button>
+                </td>
+            </tr>
+        `;
+    });
+    
+    html += `
+            </tbody>
+        </table>
+    `;
+    
+    leasesList.innerHTML = html;
+}
+
+// Populate lease filters
+function populateLeaseFilters(properties) {
+    const propertyFilter = document.getElementById('leasePropertyFilter');
+    if (propertyFilter) {
+        propertyFilter.innerHTML = '<option value="">All Properties</option>';
+        Object.values(properties).forEach(property => {
+            const option = document.createElement('option');
+            option.value = property.id;
+            option.textContent = property.name;
+            propertyFilter.appendChild(option);
+        });
+    }
+}
+
+// Open lease modal - make it globally accessible immediately
+window.openLeaseModal = async function(leaseId = null, editMode = false, unitId = null) {
+    try {
+        editingLeaseId = leaseId;
+        leaseDocumentFile = null;
+        
+        const modal = document.getElementById('leaseModal');
+        const form = document.getElementById('leaseForm');
+        const title = document.getElementById('leaseModalTitle');
+        
+        if (!modal || !form || !title) return;
+        
+        // Reset form
+        form.reset();
+        document.getElementById('leaseId').value = '';
+        
+        // Reset drag-and-drop UI
+        const dropZoneContent = document.getElementById('leaseDocumentDropZoneContent');
+        const fileNameDiv = document.getElementById('leaseDocumentFileName');
+        const fileInput = document.getElementById('leaseDocument');
+        if (dropZoneContent) dropZoneContent.style.display = 'block';
+        if (fileNameDiv) fileNameDiv.style.display = 'none';
+        if (fileInput) fileInput.value = '';
+        
+        // Load properties and tenants for dropdowns
+        await populateLeaseFormDropdowns();
+        
+        if (leaseId) {
+            // Load existing lease
+            const leaseDoc = await db.collection('leases').doc(leaseId).get();
+            if (leaseDoc.exists) {
+                const lease = { id: leaseDoc.id, ...leaseDoc.data() };
+                populateLeaseForm(lease);
+                title.textContent = editMode ? 'Edit Lease' : 'View Lease';
+                
+                // Display existing lease document if it exists
+                if (lease.leaseDocument && lease.leaseDocument.fileUrl) {
+                    const dropZoneContent = document.getElementById('leaseDocumentDropZoneContent');
+                    const fileNameDiv = document.getElementById('leaseDocumentFileName');
+                    const fileNameText = document.getElementById('leaseDocumentFileNameText');
+                    
+                    if (dropZoneContent) dropZoneContent.style.display = 'none';
+                    if (fileNameDiv) {
+                        fileNameDiv.style.display = 'block';
+                        if (fileNameText) {
+                            fileNameText.innerHTML = `
+                                <a href="${lease.leaseDocument.fileUrl}" target="_blank" style="color: #667eea; text-decoration: none; font-weight: 500;">
+                                    ${escapeHtml(lease.leaseDocument.fileName || 'Lease Document')}
+                                </a>
+                                <span style="color: #999; margin-left: 8px; font-size: 0.85em;">(Click to view)</span>
+                            `;
+                        }
+                    }
+                    // Don't clear file input - allow user to replace if needed
+                }
+            } else {
+                alert('Lease not found.');
+                closeLeaseModal();
+                return;
+            }
+        } else {
+            title.textContent = 'Add Lease';
+            // Auto-generate lease number
+            const leaseNumberInput = document.getElementById('leaseNumber');
+            if (leaseNumberInput) {
+                const timestamp = Date.now().toString().slice(-6);
+                leaseNumberInput.value = `LEASE-${timestamp}`;
+            }
+            
+            // Pre-populate unit if provided
+            if (unitId) {
+                const unitDoc = await db.collection('units').doc(unitId).get();
+                if (unitDoc.exists) {
+                    const unit = unitDoc.data();
+                    const propertySelect = document.getElementById('leasePropertyId');
+                    const unitSelect = document.getElementById('leaseUnitId');
+                    
+                    if (propertySelect && unit.propertyId) {
+                        propertySelect.value = unit.propertyId;
+                        // Trigger change to load units
+                        propertySelect.dispatchEvent(new Event('change'));
+                        // Wait a bit for units to load, then set unit
+                        setTimeout(() => {
+                            if (unitSelect) {
+                                unitSelect.value = unitId;
+                            }
+                        }, 300);
+                    }
+                }
+            }
+        }
+        
+        // Show/hide edit fields based on mode
+        const formInputs = form.querySelectorAll('input, select, textarea');
+        formInputs.forEach(input => {
+            input.disabled = !editMode && leaseId !== null;
+        });
+        
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const editBtn = document.getElementById('editLeaseBtn');
+        
+        if (submitBtn) {
+            submitBtn.style.display = editMode || !leaseId ? 'block' : 'none';
+        }
+        
+        // Show Edit button when viewing (not editing) an existing lease
+        if (editBtn) {
+            editBtn.style.display = (!editMode && leaseId !== null) ? 'inline-block' : 'none';
+        }
+        
+        modal.classList.add('show');
+        document.body.style.overflow = 'hidden';
+    } catch (error) {
+        console.error('Error opening lease modal:', error);
+        alert('Error opening lease form: ' + error.message);
+    }
+};
+
+// Populate lease form dropdowns
+async function populateLeaseFormDropdowns() {
+    // Load tenants grouped by property (via occupancies)
+    const [tenantsSnapshot, occupanciesSnapshot, propertiesDataSnapshot] = await Promise.all([
+        db.collection('tenants').get(),
+        db.collection('occupancies').get(),
+        db.collection('properties').get()
+    ]);
+    
+    // Create properties map
+    const propertiesMap = {};
+    propertiesDataSnapshot.forEach(doc => {
+        propertiesMap[doc.id] = { id: doc.id, ...doc.data() };
+    });
+    
+    // Create tenants map
+    const tenantsMap = {};
+    tenantsSnapshot.forEach(doc => {
+        tenantsMap[doc.id] = { id: doc.id, ...doc.data() };
+    });
+    
+    // Group tenants by property via occupancies
+    const tenantsByProperty = {};
+    const tenantsWithoutProperty = [];
+    
+    tenantsSnapshot.forEach(doc => {
+        const tenant = { id: doc.id, ...doc.data() };
+        // Find active occupancies for this tenant
+        const tenantOccupancies = [];
+        occupanciesSnapshot.forEach(occDoc => {
+            const occ = occDoc.data();
+            if (occ.tenantId === doc.id && (occ.status === 'Active' || !occ.status)) {
+                tenantOccupancies.push(occ);
+            }
+        });
+        
+        if (tenantOccupancies.length > 0) {
+            // Group by property
+            tenantOccupancies.forEach(occ => {
+                if (occ.propertyId && propertiesMap[occ.propertyId]) {
+                    if (!tenantsByProperty[occ.propertyId]) {
+                        tenantsByProperty[occ.propertyId] = [];
+                    }
+                    // Avoid duplicates
+                    if (!tenantsByProperty[occ.propertyId].find(t => t.id === tenant.id)) {
+                        tenantsByProperty[occ.propertyId].push(tenant);
+                    }
+                }
+            });
+        } else {
+            // Tenant has no active occupancies
+            tenantsWithoutProperty.push(tenant);
+        }
+    });
+    
+    const tenantSelect = document.getElementById('leaseTenantId');
+    if (tenantSelect) {
+        tenantSelect.innerHTML = '<option value="">Select tenant...</option>';
+        
+        // Sort properties by name
+        const sortedProperties = Object.keys(tenantsByProperty).map(propId => ({
+            id: propId,
+            ...propertiesMap[propId]
+        })).sort((a, b) => {
+            const aName = a.name || '';
+            const bName = b.name || '';
+            return aName.localeCompare(bName, undefined, { numeric: true, sensitivity: 'base' });
+        });
+        
+        // Add tenants grouped by property
+        sortedProperties.forEach(property => {
+            const propertyTenants = tenantsByProperty[property.id] || [];
+            if (propertyTenants.length > 0) {
+                // Property optgroup
+                const optgroup = document.createElement('optgroup');
+                optgroup.label = property.name || `Property ${property.id}`;
+                
+                // Sort tenants by name
+                propertyTenants.sort((a, b) => {
+                    const aName = a.tenantName || '';
+                    const bName = b.tenantName || '';
+                    return aName.localeCompare(bName, undefined, { numeric: true, sensitivity: 'base' });
+                });
+                
+                propertyTenants.forEach(tenant => {
+                    const option = document.createElement('option');
+                    option.value = tenant.id;
+                    option.textContent = tenant.tenantName || 'Unnamed Tenant';
+                    optgroup.appendChild(option);
+                });
+                
+                tenantSelect.appendChild(optgroup);
+            }
+        });
+        
+        // Add tenants without property
+        if (tenantsWithoutProperty.length > 0) {
+            tenantsWithoutProperty.sort((a, b) => {
+                const aName = a.tenantName || '';
+                const bName = b.tenantName || '';
+                return aName.localeCompare(bName, undefined, { numeric: true, sensitivity: 'base' });
+            });
+            
+            tenantsWithoutProperty.forEach(tenant => {
+                const option = document.createElement('option');
+                option.value = tenant.id;
+                option.textContent = `${tenant.tenantName || 'Unnamed Tenant'} (No Property)`;
+                tenantSelect.appendChild(option);
+            });
+        }
+    }
+    
+    // Load properties
+    const propertiesSnapshot = await db.collection('properties').get();
+    const propertySelect = document.getElementById('leasePropertyId');
+    if (propertySelect) {
+        propertySelect.innerHTML = '<option value="">Select property...</option>';
+        propertiesSnapshot.forEach(doc => {
+            const property = doc.data();
+            const option = document.createElement('option');
+            option.value = doc.id;
+            option.textContent = property.name;
+            propertySelect.appendChild(option);
+        });
+    }
+    
+    // Load units when property is selected - grouped by building
+    const propertySelectEl = document.getElementById('leasePropertyId');
+    if (propertySelectEl) {
+        // Remove existing listeners to avoid duplicates
+        const newPropertySelectEl = propertySelectEl.cloneNode(true);
+        propertySelectEl.parentNode.replaceChild(newPropertySelectEl, propertySelectEl);
+        
+        newPropertySelectEl.addEventListener('change', async function() {
+            const propertyId = this.value;
+            const unitSelect = document.getElementById('leaseUnitId');
+            if (unitSelect && propertyId) {
+                unitSelect.innerHTML = '<option value="">No Unit (Property Level)</option>';
+                
+                // Load buildings and units for this property
+                const [buildingsSnapshot, unitsSnapshot] = await Promise.all([
+                    db.collection('buildings').where('propertyId', '==', propertyId).get(),
+                    db.collection('units').where('propertyId', '==', propertyId).get()
+                ]);
+                
+                // Create buildings map
+                const buildingsMap = {};
+                buildingsSnapshot.forEach(doc => {
+                    buildingsMap[doc.id] = { id: doc.id, ...doc.data() };
+                });
+                
+                // Group units by building
+                const unitsByBuilding = {};
+                const unitsWithoutBuilding = [];
+                
+                unitsSnapshot.forEach(doc => {
+                    const unit = { id: doc.id, ...doc.data() };
+                    if (unit.buildingId && buildingsMap[unit.buildingId]) {
+                        if (!unitsByBuilding[unit.buildingId]) {
+                            unitsByBuilding[unit.buildingId] = [];
+                        }
+                        unitsByBuilding[unit.buildingId].push(unit);
+                    } else {
+                        unitsWithoutBuilding.push(unit);
+                    }
+                });
+                
+                // Sort buildings by name
+                const sortedBuildings = Object.values(buildingsMap).sort((a, b) => {
+                    const aName = a.buildingName || '';
+                    const bName = b.buildingName || '';
+                    return aName.localeCompare(bName, undefined, { numeric: true, sensitivity: 'base' });
+                });
+                
+                // Add units grouped by building
+                sortedBuildings.forEach(building => {
+                    const buildingUnits = unitsByBuilding[building.id] || [];
+                    if (buildingUnits.length > 0) {
+                        // Building optgroup
+                        const optgroup = document.createElement('optgroup');
+                        optgroup.label = building.buildingName || `Building ${building.id}`;
+                        
+                        // Sort units by unit number
+                        buildingUnits.sort((a, b) => {
+                            const aNum = a.unitNumber || '';
+                            const bNum = b.unitNumber || '';
+                            return aNum.localeCompare(bNum, undefined, { numeric: true, sensitivity: 'base' });
+                        });
+                        
+                        buildingUnits.forEach(unit => {
+                            const option = document.createElement('option');
+                            option.value = unit.id;
+                            option.textContent = unit.unitNumber || 'Unnamed Unit';
+                            optgroup.appendChild(option);
+                        });
+                        
+                        unitSelect.appendChild(optgroup);
+                    }
+                });
+                
+                // Add units without building
+                if (unitsWithoutBuilding.length > 0) {
+                    unitsWithoutBuilding.sort((a, b) => {
+                        const aNum = a.unitNumber || '';
+                        const bNum = b.unitNumber || '';
+                        return aNum.localeCompare(bNum, undefined, { numeric: true, sensitivity: 'base' });
+                    });
+                    
+                    unitsWithoutBuilding.forEach(unit => {
+                        const option = document.createElement('option');
+                        option.value = unit.id;
+                        option.textContent = `${unit.unitNumber || 'Unnamed Unit'} (No Building)`;
+                        unitSelect.appendChild(option);
+                    });
+                }
+            } else if (unitSelect) {
+                unitSelect.innerHTML = '<option value="">No Unit (Property Level)</option>';
+            }
+        });
+    }
+    
+    // Calculate lease term/end date when dates or term change
+    const startDateInput = document.getElementById('leaseStartDate');
+    const endDateInput = document.getElementById('leaseEndDate');
+    const termInput = document.getElementById('leaseTerm');
+    const termInputField = document.getElementById('leaseTermInput');
+    const termUnitSelect = document.getElementById('leaseTermUnit');
+    
+    if (startDateInput && endDateInput && termInput && termInputField && termUnitSelect) {
+        const calculateTermFromDates = () => {
+            if (startDateInput.value && endDateInput.value) {
+                const start = new Date(startDateInput.value);
+                const end = new Date(endDateInput.value);
+                const months = Math.round((end - start) / (1000 * 60 * 60 * 24 * 30.44));
+                termInput.value = months > 0 ? months : 0;
+                
+                // Update term input field if it's empty
+                if (!termInputField.value) {
+                    const unit = termUnitSelect.value;
+                    if (unit === 'years') {
+                        termInputField.value = (months / 12).toFixed(1);
+                    } else {
+                        termInputField.value = months;
+                    }
+                }
+            }
+        };
+        
+        const calculateEndDateFromTerm = () => {
+            if (startDateInput.value && termInputField.value) {
+                const start = new Date(startDateInput.value);
+                const termValue = parseFloat(termInputField.value) || 0;
+                const unit = termUnitSelect.value;
+                
+                let months = 0;
+                if (unit === 'years') {
+                    months = Math.round(termValue * 12);
+                } else {
+                    months = Math.round(termValue);
+                }
+                
+                if (months > 0) {
+                    const end = new Date(start);
+                    end.setMonth(end.getMonth() + months);
+                    // Adjust to last day of month if needed
+                    end.setDate(end.getDate() - 1);
+                    endDateInput.value = end.toISOString().split('T')[0];
+                    termInput.value = months;
+                }
+            }
+        };
+        
+        startDateInput.addEventListener('change', () => {
+            if (endDateInput.value) {
+                calculateTermFromDates();
+            } else if (termInputField.value) {
+                calculateEndDateFromTerm();
+            }
+        });
+        
+        endDateInput.addEventListener('change', calculateTermFromDates);
+        
+        termInputField.addEventListener('input', () => {
+            if (termInputField.value && startDateInput.value) {
+                calculateEndDateFromTerm();
+            }
+        });
+        
+        termUnitSelect.addEventListener('change', () => {
+            if (termInputField.value && startDateInput.value) {
+                calculateEndDateFromTerm();
+            }
+        });
+    }
+    
+    // Show/hide CAM charges and commercial features based on lease type
+    const leaseTypeSelect = document.getElementById('leaseType');
+    const camChargesGroup = document.getElementById('camChargesGroup');
+    const commercialFeatures = document.getElementById('commercialLeasingFeatures');
+    
+    if (leaseTypeSelect) {
+        const toggleCommercialFeatures = function(isCommercial) {
+            if (camChargesGroup) camChargesGroup.style.display = isCommercial ? 'block' : 'none';
+            if (commercialFeatures) commercialFeatures.style.display = isCommercial ? 'block' : 'none';
+        };
+        
+        leaseTypeSelect.addEventListener('change', function() {
+            toggleCommercialFeatures(this.value === 'Commercial');
+        });
+        
+        // Set initial state
+        toggleCommercialFeatures(leaseTypeSelect.value === 'Commercial');
+    }
+    
+    // Handle escalation type changes
+    const escalationTypeSelect = document.getElementById('escalationType');
+    if (escalationTypeSelect) {
+        escalationTypeSelect.addEventListener('change', function() {
+            const type = this.value;
+            const amountGroup = document.getElementById('escalationAmountGroup');
+            const percentageGroup = document.getElementById('escalationPercentageGroup');
+            const frequencyGroup = document.getElementById('escalationFrequencyGroup');
+            const firstDateGroup = document.getElementById('firstEscalationDateGroup');
+            
+            if (type === 'None') {
+                if (amountGroup) amountGroup.style.display = 'none';
+                if (percentageGroup) percentageGroup.style.display = 'none';
+                if (frequencyGroup) frequencyGroup.style.display = 'none';
+                if (firstDateGroup) firstDateGroup.style.display = 'none';
+            } else {
+                if (frequencyGroup) frequencyGroup.style.display = 'block';
+                if (firstDateGroup) firstDateGroup.style.display = 'block';
+                
+                if (type === 'Fixed Amount') {
+                    if (amountGroup) amountGroup.style.display = 'block';
+                    if (percentageGroup) percentageGroup.style.display = 'none';
+                } else if (type === 'Percentage' || type === 'CPI') {
+                    if (amountGroup) amountGroup.style.display = 'none';
+                    if (percentageGroup) percentageGroup.style.display = 'block';
+                }
+            }
+        });
+    }
+    
+    // Handle extension options checkbox
+    const hasExtensionOptionsCheckbox = document.getElementById('hasExtensionOptions');
+    const extensionOptionsGroup = document.getElementById('extensionOptionsGroup');
+    if (hasExtensionOptionsCheckbox && extensionOptionsGroup) {
+        hasExtensionOptionsCheckbox.addEventListener('change', function() {
+            extensionOptionsGroup.style.display = this.checked ? 'block' : 'none';
+        });
+    }
+    
+    // Handle extension rent type changes
+    const extensionRentTypeSelect = document.getElementById('extensionRentType');
+    if (extensionRentTypeSelect) {
+        extensionRentTypeSelect.addEventListener('change', function() {
+            const type = this.value;
+            const amountGroup = document.getElementById('extensionRentAmountGroup');
+            const percentageGroup = document.getElementById('extensionRentPercentageGroup');
+            
+            if (amountGroup) amountGroup.style.display = (type === 'Fixed Amount') ? 'block' : 'none';
+            if (percentageGroup) percentageGroup.style.display = (type === 'Percentage Increase') ? 'block' : 'none';
+        });
+    }
+    
+    // Handle auto renewal checkbox
+    const autoRenewalCheckbox = document.getElementById('autoRenewal');
+    const autoRenewalTermGroup = document.getElementById('autoRenewalTermGroup');
+    if (autoRenewalCheckbox && autoRenewalTermGroup) {
+        autoRenewalCheckbox.addEventListener('change', function() {
+            autoRenewalTermGroup.style.display = this.checked ? 'block' : 'none';
+        });
+    }
+    
+    // Setup drag-and-drop for lease document
+    setupLeaseDocumentDragDrop();
+}
+
+// Setup drag-and-drop for lease document upload
+function setupLeaseDocumentDragDrop() {
+    const dropZone = document.getElementById('leaseDocumentDropZone');
+    const fileInput = document.getElementById('leaseDocument');
+    const dropZoneContent = document.getElementById('leaseDocumentDropZoneContent');
+    const fileNameDiv = document.getElementById('leaseDocumentFileName');
+    const fileNameText = document.getElementById('leaseDocumentFileNameText');
+    const removeBtn = document.getElementById('leaseDocumentRemoveBtn');
+    
+    if (!dropZone || !fileInput) return;
+    
+    // Handle file selection from input
+    fileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            handleLeaseDocumentFile(file);
+        }
+    });
+    
+    // Handle drag and drop
+    dropZone.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.style.borderColor = '#667eea';
+        dropZone.style.backgroundColor = '#f0f4ff';
+    });
+    
+    dropZone.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.style.borderColor = '#ccc';
+        dropZone.style.backgroundColor = '#f9f9f9';
+    });
+    
+    dropZone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.style.borderColor = '#ccc';
+        dropZone.style.backgroundColor = '#f9f9f9';
+        
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            const file = files[0];
+            if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+                handleLeaseDocumentFile(file);
+                // Also update the file input
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(file);
+                fileInput.files = dataTransfer.files;
+            } else {
+                alert('Please upload a PDF file only.');
+            }
+        }
+    });
+    
+    // Handle remove button
+    if (removeBtn) {
+        removeBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            fileInput.value = '';
+            leaseDocumentFile = null;
+            if (dropZoneContent) dropZoneContent.style.display = 'block';
+            if (fileNameDiv) fileNameDiv.style.display = 'none';
+        });
+    }
+    
+    // Click on drop zone to trigger file input
+    dropZone.addEventListener('click', function(e) {
+        if (e.target !== removeBtn && e.target !== fileInput) {
+            fileInput.click();
+        }
+    });
+}
+
+// Handle lease document file selection
+function handleLeaseDocumentFile(file) {
+    const dropZoneContent = document.getElementById('leaseDocumentDropZoneContent');
+    const fileNameDiv = document.getElementById('leaseDocumentFileName');
+    const fileNameText = document.getElementById('leaseDocumentFileNameText');
+    
+    if (file) {
+        leaseDocumentFile = file;
+        if (fileNameText) {
+            fileNameText.textContent = file.name;
+        }
+        if (dropZoneContent) dropZoneContent.style.display = 'none';
+        if (fileNameDiv) fileNameDiv.style.display = 'block';
+    }
+}
+
+// Populate lease form with data
+function populateLeaseForm(lease) {
+    document.getElementById('leaseId').value = lease.id;
+    if (document.getElementById('leaseNumber')) document.getElementById('leaseNumber').value = lease.leaseNumber || '';
+    if (document.getElementById('leaseTenantId')) document.getElementById('leaseTenantId').value = lease.tenantId || '';
+    if (document.getElementById('leasePropertyId')) document.getElementById('leasePropertyId').value = lease.propertyId || '';
+    if (document.getElementById('leaseUnitId')) document.getElementById('leaseUnitId').value = lease.unitId || '';
+    if (document.getElementById('leaseType')) document.getElementById('leaseType').value = lease.leaseType || '';
+    if (document.getElementById('leaseStatus')) document.getElementById('leaseStatus').value = lease.status || 'Active';
+    // Set deprecated toggle and show/hide fields
+    const isDeprecatedCheckbox = document.getElementById('isDeprecated');
+    const deprecatedDateGroup = document.getElementById('deprecatedDateGroup');
+    const deprecatedReasonGroup = document.getElementById('deprecatedReasonGroup');
+    
+    if (isDeprecatedCheckbox) {
+        isDeprecatedCheckbox.checked = lease.isDeprecated || false;
+        // Show/hide fields based on toggle state
+        if (deprecatedDateGroup) {
+            deprecatedDateGroup.style.display = isDeprecatedCheckbox.checked ? 'block' : 'none';
+        }
+        if (deprecatedReasonGroup) {
+            deprecatedReasonGroup.style.display = isDeprecatedCheckbox.checked ? 'block' : 'none';
+        }
+    }
+    
+    // Populate deprecated date if it exists (in lease form)
+    if (lease.deprecatedDate && document.getElementById('deprecatedDate')) {
+        const deprecatedDate = lease.deprecatedDate.toDate ? lease.deprecatedDate.toDate() : new Date(lease.deprecatedDate);
+        document.getElementById('deprecatedDate').value = deprecatedDate.toISOString().split('T')[0];
+    }
+    
+    // Populate deprecated reason if it exists (in lease form)
+    if (lease.deprecatedReason && document.getElementById('deprecatedReasonInForm')) {
+        document.getElementById('deprecatedReasonInForm').value = lease.deprecatedReason;
+    }
+    
+    if (lease.leaseStartDate) {
+        const startDate = lease.leaseStartDate.toDate().toISOString().split('T')[0];
+        if (document.getElementById('leaseStartDate')) document.getElementById('leaseStartDate').value = startDate;
+    }
+    if (lease.leaseEndDate) {
+        const endDate = lease.leaseEndDate.toDate().toISOString().split('T')[0];
+        if (document.getElementById('leaseEndDate')) document.getElementById('leaseEndDate').value = endDate;
+    }
+    
+    if (document.getElementById('leaseTerm')) {
+        const term = lease.leaseTerm || '';
+        document.getElementById('leaseTerm').value = term;
+        
+        // Populate term input field if term exists
+        if (term && document.getElementById('leaseTermInput')) {
+            const termUnitSelect = document.getElementById('leaseTermUnit');
+            // Default to months, but allow years if term is large
+            if (termUnitSelect) {
+                if (term >= 24) {
+                    termUnitSelect.value = 'years';
+                    document.getElementById('leaseTermInput').value = (term / 12).toFixed(1);
+                } else {
+                    termUnitSelect.value = 'months';
+                    document.getElementById('leaseTermInput').value = term;
+                }
+            }
+        }
+    }
+    
+    if (document.getElementById('autoRenewal')) {
+        const autoRenewalCheckbox = document.getElementById('autoRenewal');
+        autoRenewalCheckbox.checked = lease.autoRenewal || false;
+        // Trigger change to show/hide auto renewal term field
+        autoRenewalCheckbox.dispatchEvent(new Event('change'));
+        
+        // Populate auto renewal term if it exists
+        if (lease.autoRenewalTerm) {
+            const autoRenewalTermInput = document.getElementById('autoRenewalTerm');
+            const autoRenewalTermUnit = document.getElementById('autoRenewalTermUnit');
+            if (autoRenewalTermInput && autoRenewalTermUnit) {
+                if (lease.autoRenewalTermUnit === 'years') {
+                    autoRenewalTermUnit.value = 'years';
+                    autoRenewalTermInput.value = (lease.autoRenewalTerm / 12).toFixed(1);
+                } else {
+                    autoRenewalTermUnit.value = 'months';
+                    autoRenewalTermInput.value = lease.autoRenewalTerm;
+                }
+            }
+        }
+    }
+    
+    if (document.getElementById('monthlyRent')) document.getElementById('monthlyRent').value = lease.monthlyRent || '';
+    if (document.getElementById('securityDeposit')) document.getElementById('securityDeposit').value = lease.securityDeposit || '';
+    
+    // Additional charges
+    if (lease.additionalMonthlyCharges) {
+        if (document.getElementById('utilitiesCharge')) document.getElementById('utilitiesCharge').value = lease.additionalMonthlyCharges.utilities || '';
+        if (document.getElementById('parkingCharge')) document.getElementById('parkingCharge').value = lease.additionalMonthlyCharges.parking || '';
+        if (document.getElementById('petFeeCharge')) document.getElementById('petFeeCharge').value = lease.additionalMonthlyCharges.petFee || '';
+        if (document.getElementById('camCharges')) document.getElementById('camCharges').value = lease.additionalMonthlyCharges.camCharges || '';
+    }
+    
+    if (document.getElementById('specialTerms')) document.getElementById('specialTerms').value = lease.specialTerms || '';
+    if (document.getElementById('leaseNotes')) document.getElementById('leaseNotes').value = lease.notes || '';
+    
+    // Trigger property change to load units, then set unit value after units load
+    if (lease.propertyId && document.getElementById('leasePropertyId')) {
+        const propertySelect = document.getElementById('leasePropertyId');
+        const unitIdToSet = lease.unitId;
+        
+        // First trigger the property change to load units
+        propertySelect.dispatchEvent(new Event('change'));
+        
+        // Wait for units to load, then set the unit value
+        // Use multiple attempts with increasing delays to ensure units are loaded
+        if (unitIdToSet) {
+            const setUnitValue = (attempt = 1) => {
+                const unitSelect = document.getElementById('leaseUnitId');
+                if (unitSelect) {
+                    // Check if the unit option exists in the dropdown
+                    const unitOption = Array.from(unitSelect.options).find(opt => opt.value === unitIdToSet);
+                    if (unitOption) {
+                        unitSelect.value = unitIdToSet;
+                    } else if (attempt < 5) {
+                        // Try again with increasing delay
+                        setTimeout(() => setUnitValue(attempt + 1), 200 * attempt);
+                    }
+                }
+            };
+            
+            // Start trying after initial delay
+            setTimeout(() => setUnitValue(1), 300);
+        }
+    } else if (lease.unitId && document.getElementById('leaseUnitId')) {
+        // If no property but has unit, try to set it directly
+        document.getElementById('leaseUnitId').value = lease.unitId;
+    }
+    
+    // Show CAM charges and commercial features if commercial
+    if (lease.leaseType === 'Commercial') {
+        if (document.getElementById('camChargesGroup')) document.getElementById('camChargesGroup').style.display = 'block';
+        if (document.getElementById('commercialLeasingFeatures')) document.getElementById('commercialLeasingFeatures').style.display = 'block';
+        
+        // Populate rent escalation
+        if (lease.rentEscalation) {
+            const esc = lease.rentEscalation;
+            if (document.getElementById('escalationType')) document.getElementById('escalationType').value = esc.escalationType || 'None';
+            if (document.getElementById('escalationAmount')) document.getElementById('escalationAmount').value = esc.escalationAmount || '';
+            if (document.getElementById('escalationPercentage')) document.getElementById('escalationPercentage').value = esc.escalationPercentage || '';
+            if (document.getElementById('escalationFrequency')) document.getElementById('escalationFrequency').value = esc.escalationFrequency || '';
+            if (esc.firstEscalationDate && document.getElementById('firstEscalationDate')) {
+                const firstEscDate = esc.firstEscalationDate.toDate().toISOString().split('T')[0];
+                document.getElementById('firstEscalationDate').value = firstEscDate;
+            }
+            // Trigger change to show/hide fields
+            if (document.getElementById('escalationType')) {
+                document.getElementById('escalationType').dispatchEvent(new Event('change'));
+            }
+        }
+        
+        // Populate extension options
+        if (lease.extensionOptions) {
+            const ext = lease.extensionOptions;
+            if (document.getElementById('hasExtensionOptions')) {
+                document.getElementById('hasExtensionOptions').checked = ext.hasExtensionOptions || false;
+                document.getElementById('hasExtensionOptions').dispatchEvent(new Event('change'));
+            }
+            if (document.getElementById('numberOfExtensions')) document.getElementById('numberOfExtensions').value = ext.numberOfExtensions || '';
+            
+            // Handle extension term length (could be in months or years)
+            if (ext.extensionTermLength) {
+                const extensionTermInput = document.getElementById('extensionTermLength');
+                const extensionTermUnit = document.getElementById('extensionTermUnit');
+                if (extensionTermInput && extensionTermUnit) {
+                    // Check stored unit or assume months if not specified
+                    if (ext.extensionTermUnit === 'years') {
+                        extensionTermUnit.value = 'years';
+                        extensionTermInput.value = (ext.extensionTermLength / 12).toFixed(1);
+                    } else {
+                        extensionTermUnit.value = 'months';
+                        extensionTermInput.value = ext.extensionTermLength;
+                    }
+                }
+            }
+            
+            // Handle extension notice period (could be in days or months)
+            if (ext.extensionNoticePeriod) {
+                const extensionNoticeInput = document.getElementById('extensionNoticePeriod');
+                const extensionNoticeUnit = document.getElementById('extensionNoticeUnit');
+                if (extensionNoticeInput && extensionNoticeUnit) {
+                    // Check stored unit or assume days if not specified
+                    if (ext.extensionNoticeUnit === 'months') {
+                        extensionNoticeUnit.value = 'months';
+                        extensionNoticeInput.value = (ext.extensionNoticePeriod / 30.44).toFixed(1);
+                    } else {
+                        extensionNoticeUnit.value = 'days';
+                        extensionNoticeInput.value = ext.extensionNoticePeriod;
+                    }
+                }
+            }
+            
+            if (document.getElementById('extensionRentType')) {
+                document.getElementById('extensionRentType').value = ext.extensionRentType || '';
+                document.getElementById('extensionRentType').dispatchEvent(new Event('change'));
+            }
+            if (document.getElementById('extensionRentAmount')) document.getElementById('extensionRentAmount').value = ext.extensionRentAmount || '';
+            if (document.getElementById('extensionRentPercentage')) document.getElementById('extensionRentPercentage').value = ext.extensionRentPercentage || '';
+        }
+        
+        // Populate additional commercial features
+        if (lease.commercialTerms) {
+            const terms = lease.commercialTerms;
+            if (document.getElementById('baseYear')) document.getElementById('baseYear').value = terms.baseYear || '';
+            if (document.getElementById('operatingExpenseCap')) document.getElementById('operatingExpenseCap').value = terms.operatingExpenseCap || '';
+            if (document.getElementById('rentAbatementMonths')) document.getElementById('rentAbatementMonths').value = terms.rentAbatementMonths || '';
+            if (document.getElementById('rentAbatementAmount')) document.getElementById('rentAbatementAmount').value = terms.rentAbatementAmount || '';
+            if (document.getElementById('tenantImprovementAllowance')) document.getElementById('tenantImprovementAllowance').value = terms.tenantImprovementAllowance || '';
+            if (document.getElementById('rightOfFirstRefusal')) document.getElementById('rightOfFirstRefusal').checked = terms.rightOfFirstRefusal || false;
+            if (document.getElementById('exclusiveUse')) document.getElementById('exclusiveUse').checked = terms.exclusiveUse || false;
+            if (document.getElementById('exclusiveUseDescription')) document.getElementById('exclusiveUseDescription').value = terms.exclusiveUseDescription || '';
+            if (document.getElementById('percentageRent')) document.getElementById('percentageRent').value = terms.percentageRent || '';
+            if (document.getElementById('percentageRentRate')) document.getElementById('percentageRentRate').value = terms.percentageRentRate || '';
+        }
+    }
+}
+
+// Handle lease form submit
+async function handleLeaseSubmit(e) {
+    e.preventDefault();
+    
+    const form = e.target;
+    const leaseId = document.getElementById('leaseId').value;
+    const submitBtn = form.querySelector('button[type="submit"]');
+    
+    // Validate that either end date or term is provided
+    const endDateInput = document.getElementById('leaseEndDate');
+    const termInput = document.getElementById('leaseTermInput');
+    const startDateInput = document.getElementById('leaseStartDate');
+    
+    if (!startDateInput.value) {
+        alert('Please enter a lease start date.');
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save Lease';
+        }
+        return;
+    }
+    
+    if ((!endDateInput.value || !endDateInput.value.trim()) && (!termInput.value || !termInput.value.trim())) {
+        alert('Please enter either a lease end date or a lease term.');
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save Lease';
+        }
+        return;
+    }
+    
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
+    }
+    
+    try {
+        const leaseData = {
+            leaseNumber: document.getElementById('leaseNumber').value || `LEASE-${Date.now().toString().slice(-6)}`,
+            tenantId: document.getElementById('leaseTenantId').value,
+            propertyId: document.getElementById('leasePropertyId').value,
+            unitId: document.getElementById('leaseUnitId').value || null,
+            leaseType: document.getElementById('leaseType').value,
+            status: document.getElementById('leaseStatus').value,
+            isDeprecated: document.getElementById('isDeprecated').checked || false,
+            deprecatedDate: (() => {
+                const deprecatedDateInput = document.getElementById('deprecatedDate');
+                if (deprecatedDateInput && deprecatedDateInput.value) {
+                    return firebase.firestore.Timestamp.fromDate(new Date(deprecatedDateInput.value));
+                }
+                // If marking as deprecated but no date set, use current date
+                if (document.getElementById('isDeprecated') && document.getElementById('isDeprecated').checked) {
+                    return firebase.firestore.Timestamp.now();
+                }
+                return null;
+            })(),
+            deprecatedReason: (() => {
+                const deprecatedReasonInput = document.getElementById('deprecatedReasonInForm');
+                return deprecatedReasonInput && deprecatedReasonInput.value ? deprecatedReasonInput.value.trim() : null;
+            })(),
+            leaseStartDate: firebase.firestore.Timestamp.fromDate(new Date(document.getElementById('leaseStartDate').value)),
+            leaseEndDate: (() => {
+                const endDateInput = document.getElementById('leaseEndDate');
+                if (endDateInput && endDateInput.value) {
+                    return firebase.firestore.Timestamp.fromDate(new Date(endDateInput.value));
+                }
+                // Calculate from term if end date not provided
+                const startDate = new Date(document.getElementById('leaseStartDate').value);
+                const termInput = document.getElementById('leaseTermInput');
+                const termUnit = document.getElementById('leaseTermUnit');
+                if (termInput && termInput.value) {
+                    const termValue = parseFloat(termInput.value) || 0;
+                    let months = 0;
+                    if (termUnit && termUnit.value === 'years') {
+                        months = Math.round(termValue * 12);
+                    } else {
+                        months = Math.round(termValue);
+                    }
+                    if (months > 0) {
+                        const endDate = new Date(startDate);
+                        endDate.setMonth(endDate.getMonth() + months);
+                        endDate.setDate(endDate.getDate() - 1);
+                        return firebase.firestore.Timestamp.fromDate(endDate);
+                    }
+                }
+                return null;
+            })(),
+            leaseTerm: parseInt(document.getElementById('leaseTerm').value) || (() => {
+                // Calculate term if not set
+                const startDateInput = document.getElementById('leaseStartDate');
+                const endDateInput = document.getElementById('leaseEndDate');
+                const termInput = document.getElementById('leaseTermInput');
+                const termUnit = document.getElementById('leaseTermUnit');
+                
+                if (endDateInput && endDateInput.value && startDateInput && startDateInput.value) {
+                    const start = new Date(startDateInput.value);
+                    const end = new Date(endDateInput.value);
+                    return Math.round((end - start) / (1000 * 60 * 60 * 24 * 30.44));
+                } else if (termInput && termInput.value) {
+                    const termValue = parseFloat(termInput.value) || 0;
+                    if (termUnit && termUnit.value === 'years') {
+                        return Math.round(termValue * 12);
+                    } else {
+                        return Math.round(termValue);
+                    }
+                }
+                return 0;
+            })(),
+            autoRenewal: document.getElementById('autoRenewal').checked || false,
+            autoRenewalTerm: (() => {
+                if (document.getElementById('autoRenewal').checked) {
+                    const termInput = document.getElementById('autoRenewalTerm');
+                    const termUnit = document.getElementById('autoRenewalTermUnit');
+                    if (termInput && termInput.value && termUnit) {
+                        const value = parseFloat(termInput.value);
+                        if (termUnit.value === 'years') {
+                            return Math.round(value * 12); // Convert to months for storage
+                        } else {
+                            return Math.round(value);
+                        }
+                    }
+                }
+                return null;
+            })(),
+            autoRenewalTermUnit: document.getElementById('autoRenewal').checked ? (document.getElementById('autoRenewalTermUnit')?.value || 'months') : null,
+            monthlyRent: parseFloat(document.getElementById('monthlyRent').value) || 0,
+            securityDeposit: parseFloat(document.getElementById('securityDeposit').value) || 0,
+            additionalMonthlyCharges: {
+                utilities: parseFloat(document.getElementById('utilitiesCharge').value) || null,
+                parking: parseFloat(document.getElementById('parkingCharge').value) || null,
+                petFee: parseFloat(document.getElementById('petFeeCharge').value) || null,
+                camCharges: parseFloat(document.getElementById('camCharges').value) || null
+            },
+            specialTerms: document.getElementById('specialTerms').value || null,
+            notes: document.getElementById('leaseNotes').value || null,
+            
+            // Commercial leasing features (only if commercial)
+            ...(document.getElementById('leaseType').value === 'Commercial' ? {
+                rentEscalation: {
+                    escalationType: document.getElementById('escalationType').value || 'None',
+                    escalationAmount: document.getElementById('escalationAmount').value ? parseFloat(document.getElementById('escalationAmount').value) : null,
+                    escalationPercentage: document.getElementById('escalationPercentage').value ? parseFloat(document.getElementById('escalationPercentage').value) : null,
+                    escalationFrequency: document.getElementById('escalationFrequency').value || null,
+                    firstEscalationDate: document.getElementById('firstEscalationDate').value ? firebase.firestore.Timestamp.fromDate(new Date(document.getElementById('firstEscalationDate').value)) : null
+                },
+                extensionOptions: {
+                    hasExtensionOptions: document.getElementById('hasExtensionOptions').checked || false,
+                    numberOfExtensions: document.getElementById('numberOfExtensions').value ? parseInt(document.getElementById('numberOfExtensions').value) : null,
+                    extensionTermLength: (() => {
+                        const termInput = document.getElementById('extensionTermLength');
+                        const termUnit = document.getElementById('extensionTermUnit');
+                        if (termInput && termInput.value && termUnit) {
+                            const value = parseFloat(termInput.value);
+                            if (termUnit.value === 'years') {
+                                return Math.round(value * 12); // Convert to months for storage
+                            } else {
+                                return Math.round(value);
+                            }
+                        }
+                        return null;
+                    })(),
+                    extensionTermUnit: document.getElementById('extensionTermUnit')?.value || 'months',
+                    extensionNoticePeriod: (() => {
+                        const noticeInput = document.getElementById('extensionNoticePeriod');
+                        const noticeUnit = document.getElementById('extensionNoticeUnit');
+                        if (noticeInput && noticeInput.value && noticeUnit) {
+                            const value = parseFloat(noticeInput.value);
+                            // Store in days for consistency (convert months to days)
+                            if (noticeUnit.value === 'months') {
+                                return Math.round(value * 30.44); // Convert months to days
+                            } else {
+                                return Math.round(value);
+                            }
+                        }
+                        return null;
+                    })(),
+                    extensionNoticeUnit: document.getElementById('extensionNoticeUnit')?.value || 'days',
+                    extensionRentType: document.getElementById('extensionRentType').value || null,
+                    extensionRentAmount: document.getElementById('extensionRentAmount').value ? parseFloat(document.getElementById('extensionRentAmount').value) : null,
+                    extensionRentPercentage: document.getElementById('extensionRentPercentage').value ? parseFloat(document.getElementById('extensionRentPercentage').value) : null
+                },
+                commercialTerms: {
+                    baseYear: document.getElementById('baseYear').value ? parseInt(document.getElementById('baseYear').value) : null,
+                    operatingExpenseCap: document.getElementById('operatingExpenseCap').value ? parseFloat(document.getElementById('operatingExpenseCap').value) : null,
+                    rentAbatementMonths: document.getElementById('rentAbatementMonths').value ? parseInt(document.getElementById('rentAbatementMonths').value) : null,
+                    rentAbatementAmount: document.getElementById('rentAbatementAmount').value ? parseFloat(document.getElementById('rentAbatementAmount').value) : null,
+                    tenantImprovementAllowance: document.getElementById('tenantImprovementAllowance').value ? parseFloat(document.getElementById('tenantImprovementAllowance').value) : null,
+                    rightOfFirstRefusal: document.getElementById('rightOfFirstRefusal').checked || false,
+                    exclusiveUse: document.getElementById('exclusiveUse').checked || false,
+                    exclusiveUseDescription: document.getElementById('exclusiveUseDescription').value || null,
+                    percentageRent: document.getElementById('percentageRent').value ? parseFloat(document.getElementById('percentageRent').value) : null,
+                    percentageRentRate: document.getElementById('percentageRentRate').value ? parseFloat(document.getElementById('percentageRentRate').value) : null
+                }
+            } : {}),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        
+        // Handle document upload if present
+        const documentInput = document.getElementById('leaseDocument');
+        if (documentInput && documentInput.files.length > 0) {
+            const file = documentInput.files[0];
+            const storageRef = firebase.storage().ref();
+            const fileRef = storageRef.child(`leases/${leaseId || Date.now()}/${file.name}`);
+            await fileRef.put(file);
+            const fileUrl = await fileRef.getDownloadURL();
+            leaseData.leaseDocument = {
+                fileName: file.name,
+                fileUrl: fileUrl,
+                uploadedAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+        }
+        
+        if (leaseId) {
+            // Update existing lease
+            await db.collection('leases').doc(leaseId).update(leaseData);
+            console.log('Lease updated successfully');
+        } else {
+            // Create new lease
+            leaseData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+            await db.collection('leases').add(leaseData);
+            console.log('Lease created successfully');
+        }
+        
+        closeLeaseModal();
+        loadLeases();
+        
+    } catch (error) {
+        console.error('Error saving lease:', error);
+        alert('Error saving lease: ' + error.message);
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save Lease';
+        }
+    }
+}
+
+// Close lease modal
+function closeLeaseModal() {
+    const modal = document.getElementById('leaseModal');
+    if (modal) {
+        modal.classList.remove('show');
+        document.body.style.overflow = '';
+    }
+    editingLeaseId = null;
+    leaseDocumentFile = null;
+    document.getElementById('leaseForm')?.reset();
+    
+    // Reset drag-and-drop UI
+    const dropZoneContent = document.getElementById('leaseDocumentDropZoneContent');
+    const fileNameDiv = document.getElementById('leaseDocumentFileName');
+    const fileInput = document.getElementById('leaseDocument');
+    if (dropZoneContent) dropZoneContent.style.display = 'block';
+    if (fileNameDiv) fileNameDiv.style.display = 'none';
+    if (fileInput) fileInput.value = '';
+}
+
+// Setup lease event listeners
+function setupLeaseEventListeners() {
+    // Filters
+    const propertyFilter = document.getElementById('leasePropertyFilter');
+    
+    if (propertyFilter) {
+        propertyFilter.addEventListener('change', () => loadLeases());
+    }
+    
+    // Add lease button - use window.openLeaseModal to ensure it's accessible
+    const addLeaseBtn = document.getElementById('addLeaseBtn');
+    if (addLeaseBtn) {
+        addLeaseBtn.addEventListener('click', () => {
+            if (window.openLeaseModal) {
+                window.openLeaseModal();
+            } else if (typeof openLeaseModal === 'function') {
+                openLeaseModal();
+            } else {
+                console.error('openLeaseModal is not defined');
+                alert('Error: Unable to open lease form. Please refresh the page.');
+            }
+        });
+    } else {
+        console.warn('addLeaseBtn not found');
+    }
+    
+    // Lease form
+    const leaseForm = document.getElementById('leaseForm');
+    if (leaseForm) {
+        leaseForm.addEventListener('submit', handleLeaseSubmit);
+    }
+    
+    // Deprecated lease form
+    const deprecatedLeaseForm = document.getElementById('deprecatedLeaseForm');
+    if (deprecatedLeaseForm) {
+        deprecatedLeaseForm.addEventListener('submit', window.handleDeprecatedLeaseSubmit);
+    }
+    
+    // Show/hide deprecated date and reason fields based on toggle
+    const isDeprecatedCheckbox = document.getElementById('isDeprecated');
+    const deprecatedDateGroup = document.getElementById('deprecatedDateGroup');
+    const deprecatedReasonGroup = document.getElementById('deprecatedReasonGroup');
+    if (isDeprecatedCheckbox) {
+        isDeprecatedCheckbox.addEventListener('change', function() {
+            if (deprecatedDateGroup) {
+                deprecatedDateGroup.style.display = this.checked ? 'block' : 'none';
+            }
+            if (deprecatedReasonGroup) {
+                deprecatedReasonGroup.style.display = this.checked ? 'block' : 'none';
+            }
+        });
+    }
+    
+    // Show/hide additional monthly charges based on toggle
+    const showAdditionalChargesToggle = document.getElementById('showAdditionalCharges');
+    const additionalChargesGroup = document.getElementById('additionalChargesGroup');
+    if (showAdditionalChargesToggle && additionalChargesGroup) {
+        showAdditionalChargesToggle.addEventListener('change', function() {
+            additionalChargesGroup.style.display = this.checked ? 'block' : 'none';
+        });
+    }
+    
+    // Show/hide extension options based on toggle (already exists, but ensure it works)
+    const hasExtensionOptionsCheckbox = document.getElementById('hasExtensionOptions');
+    const extensionOptionsGroup = document.getElementById('extensionOptionsGroup');
+    if (hasExtensionOptionsCheckbox && extensionOptionsGroup) {
+        hasExtensionOptionsCheckbox.addEventListener('change', function() {
+            extensionOptionsGroup.style.display = this.checked ? 'block' : 'none';
+        });
+    }
+    
+    // Show/hide additional commercial terms based on toggle
+    const showCommercialTermsToggle = document.getElementById('showCommercialTerms');
+    const commercialTermsGroup = document.getElementById('commercialTermsGroup');
+    if (showCommercialTermsToggle && commercialTermsGroup) {
+        showCommercialTermsToggle.addEventListener('change', function() {
+            commercialTermsGroup.style.display = this.checked ? 'block' : 'none';
+        });
+    }
+    
+    // Close deprecated modal on outside click
+    const deprecatedModal = document.getElementById('deprecatedLeaseModal');
+    if (deprecatedModal) {
+        deprecatedModal.addEventListener('click', function(e) {
+            if (e.target === deprecatedModal) {
+                closeDeprecatedModal();
+            }
+        });
+    }
+    
+    // Close modal
+    const closeLeaseModalBtn = document.getElementById('closeLeaseModal');
+    const cancelLeaseBtn = document.getElementById('cancelLeaseBtn');
+    const editLeaseBtn = document.getElementById('editLeaseBtn');
+    
+    if (closeLeaseModalBtn) {
+        closeLeaseModalBtn.addEventListener('click', closeLeaseModal);
+    }
+    if (cancelLeaseBtn) {
+        cancelLeaseBtn.addEventListener('click', closeLeaseModal);
+    }
+    if (editLeaseBtn) {
+        editLeaseBtn.addEventListener('click', function() {
+            const leaseId = document.getElementById('leaseId').value;
+            if (leaseId) {
+                // Switch to edit mode
+                openLeaseModal(leaseId, true);
+            }
+        });
+    }
+    
+    // Tab switching for unit lease detail modal
+    const unitLeaseTabButtons = document.querySelectorAll('#unitLeaseDetailModal .tab-btn');
+    unitLeaseTabButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const tabName = this.getAttribute('data-tab');
+            
+            // Remove active class from all tabs and tab contents
+            document.querySelectorAll('#unitLeaseDetailModal .tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('#unitLeaseDetailModal .tab-content').forEach(c => {
+                c.classList.remove('active');
+                c.style.display = 'none';
+            });
+            
+            // Add active class to clicked tab
+            this.classList.add('active');
+            
+            // Show corresponding tab content
+            const tabContent = document.getElementById(tabName + 'Tab');
+            if (tabContent) {
+                tabContent.classList.add('active');
+                tabContent.style.display = 'block';
+            }
+        });
+    });
+    
+    // Close unit lease detail modal
+    const closeUnitLeaseDetailModalBtn = document.getElementById('closeUnitLeaseDetailModal');
+    if (closeUnitLeaseDetailModalBtn) {
+        closeUnitLeaseDetailModalBtn.addEventListener('click', function() {
+            window.backToLeases();
+        });
+    }
+    
+    // Close modal when clicking outside
+    const unitLeaseDetailModal = document.getElementById('unitLeaseDetailModal');
+    if (unitLeaseDetailModal) {
+        unitLeaseDetailModal.addEventListener('click', function(e) {
+            if (e.target === unitLeaseDetailModal) {
+                window.backToLeases();
+            }
+        });
+    }
+    
+    // Add lease from unit button
+    const addLeaseFromUnitBtn = document.getElementById('addLeaseFromUnitBtn');
+    if (addLeaseFromUnitBtn) {
+        addLeaseFromUnitBtn.addEventListener('click', function() {
+            const unitId = unitLeaseDetailModal?.getAttribute('data-unit-id');
+            if (unitId) {
+                openLeaseModal(null, true, unitId);
+            } else {
+                openLeaseModal();
+            }
+        });
+    }
+}
+// ============================================
+// NEW LEASE MANAGEMENT FUNCTIONS
+// Add these functions to app.js after setupLeaseEventListeners
+// ============================================
+
+// Render leases table view grouped by properties/buildings/units
+async function renderLeasesTableView(leases, properties, tenants, units, buildings, occupanciesByUnitId = {}) {
+    const leasesList = document.getElementById('leasesList');
+    const leasesTable = document.getElementById('leasesTable');
+    
+    if (leasesList) leasesList.style.display = 'none';
+    if (leasesTable) leasesTable.style.display = 'block';
+    
+    if (!leasesTable) return;
+    
+    // Filter by property if needed
+    const propertyFilter = document.getElementById('leasePropertyFilter')?.value || '';
+    let filteredProperties = Object.values(properties);
+    if (propertyFilter) {
+        filteredProperties = filteredProperties.filter(p => p.id === propertyFilter);
+    }
+    
+    // Filter units and buildings by selected property(s)
+    const filteredUnits = {};
+    const filteredBuildings = {};
+    
+    if (propertyFilter) {
+        // Only show units and buildings for the selected property
+        // First, filter buildings by property
+        Object.values(buildings).forEach(building => {
+            if (building.propertyId === propertyFilter) {
+                filteredBuildings[building.id] = building;
+            }
+        });
+        // Then filter units by property
+        Object.values(units).forEach(unit => {
+            if (unit.propertyId === propertyFilter) {
+                filteredUnits[unit.id] = unit;
+            }
+        });
+    } else {
+        // Show all units and buildings
+        Object.values(buildings).forEach(building => {
+            filteredBuildings[building.id] = building;
+        });
+        Object.values(units).forEach(unit => {
+            filteredUnits[unit.id] = unit;
+        });
+    }
+    
+    // Group leases by unit and property
+    const leasesByUnit = {};
+    const leasesByProperty = {};
+    
+    Object.values(leases).forEach(lease => {
+        // Only include leases for filtered properties
+        if (!propertyFilter || lease.propertyId === propertyFilter) {
+            if (lease.unitId) {
+                if (!leasesByUnit[lease.unitId]) {
+                    leasesByUnit[lease.unitId] = [];
+                }
+                leasesByUnit[lease.unitId].push(lease);
+            } else if (lease.propertyId) {
+                if (!leasesByProperty[lease.propertyId]) {
+                    leasesByProperty[lease.propertyId] = [];
+                }
+                leasesByProperty[lease.propertyId].push(lease);
+            }
+        }
+    });
+    
+    // Group filtered units by building
+    const unitsByBuilding = {};
+    const unitsWithoutBuilding = {};
+    
+    Object.values(filteredUnits).forEach(unit => {
+        if (unit.buildingId && filteredBuildings[unit.buildingId]) {
+            if (!unitsByBuilding[unit.buildingId]) {
+                unitsByBuilding[unit.buildingId] = [];
+            }
+            unitsByBuilding[unit.buildingId].push(unit);
+        } else {
+            if (!unitsWithoutBuilding[unit.propertyId]) {
+                unitsWithoutBuilding[unit.propertyId] = [];
+            }
+            unitsWithoutBuilding[unit.propertyId].push(unit);
+        }
+    });
+    
+    // Sort buildings (only filtered ones)
+    const sortedBuildings = Object.keys(filteredBuildings).map(id => ({ id, ...filteredBuildings[id] })).sort((a, b) => {
+        const aName = a.buildingName || '';
+        const bName = b.buildingName || '';
+        return aName.localeCompare(bName, undefined, { numeric: true, sensitivity: 'base' });
+    });
+    
+    // Build HTML
+    let html = '<table class="data-table" style="width: 100%;">';
+    html += '<thead><tr>';
+    html += '<th style="padding: 12px 10px;">Unit / Tenant</th>';
+    html += '<th style="padding: 12px 10px;">Active Leases</th>';
+    html += '<th style="padding: 12px 10px;">Legacy Leases</th>';
+    html += '<th style="padding: 12px 10px;">Actions</th>';
+    html += '</tr></thead><tbody>';
+    
+    // Render by property
+    filteredProperties.forEach(property => {
+        // Property header row
+        html += `<tr class="property-header-row" style="background-color: #f8f9fa; font-weight: bold;">
+            <td colspan="4" style="padding: 15px; border-bottom: 2px solid #dee2e6;">
+                ${escapeHtml(property.name || 'Unnamed Property')}
+            </td>
+        </tr>`;
+        
+        // Buildings for this property - filter by propertyId to ensure buildings belong to this property
+        sortedBuildings.filter(building => building.propertyId === property.id).forEach(building => {
+            const buildingUnits = unitsByBuilding[building.id] || [];
+            if (buildingUnits.length === 0) return;
+            
+            // Building header row
+            html += `<tr class="building-header-row" style="background-color: #f0f4f8; font-weight: 600;">
+                <td colspan="4" style="padding: 12px 20px; border-bottom: 1px solid #dee2e6;">
+                    ${escapeHtml(building.buildingName || 'Unnamed Building')}
+                </td>
+            </tr>`;
+            
+            // Units in this building
+            buildingUnits.sort((a, b) => {
+                const aNum = a.unitNumber || '';
+                const bNum = b.unitNumber || '';
+                return aNum.localeCompare(bNum, undefined, { numeric: true, sensitivity: 'base' });
+            }).forEach(unit => {
+                const unitLeases = leasesByUnit[unit.id] || [];
+                const activeLeases = unitLeases.filter(l => isLeaseActive(l));
+                const legacyLeases = unitLeases.filter(l => isLeaseDeprecated(l));
+                
+                html += buildUnitLeaseRow(unit, activeLeases, legacyLeases, tenants, occupanciesByUnitId);
+            });
+        });
+        
+        // Units without building for this property
+        const propertyUnitsWithoutBuilding = unitsWithoutBuilding[property.id] || [];
+        if (propertyUnitsWithoutBuilding.length > 0) {
+            propertyUnitsWithoutBuilding.sort((a, b) => {
+                const aNum = a.unitNumber || '';
+                const bNum = b.unitNumber || '';
+                return aNum.localeCompare(bNum, undefined, { numeric: true, sensitivity: 'base' });
+            }).forEach(unit => {
+                const unitLeases = leasesByUnit[unit.id] || [];
+                const activeLeases = unitLeases.filter(l => isLeaseActive(l));
+                const legacyLeases = unitLeases.filter(l => isLeaseDeprecated(l));
+                
+                html += buildUnitLeaseRow(unit, activeLeases, legacyLeases, tenants, occupanciesByUnitId);
+            });
+        }
+        
+        // Property-level leases (no unit)
+        const propertyLeases = leasesByProperty[property.id] || [];
+        if (propertyLeases.length > 0) {
+            const activeLeases = propertyLeases.filter(l => isLeaseActive(l));
+            const legacyLeases = propertyLeases.filter(l => isLeaseDeprecated(l));
+            
+            // Get tenant names for property-level leases
+            const propertyActiveTenantNames = activeLeases.map(lease => {
+                const tenant = tenants[lease.tenantId];
+                return tenant?.tenantName || 'Unknown Tenant';
+            });
+            
+            let propertyLevelDisplay = '';
+            if (propertyActiveTenantNames.length > 0) {
+                const tenantNamesHtml = propertyActiveTenantNames.map(name => escapeHtml(name)).join(', ');
+                propertyLevelDisplay = `
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                        <span class="occupancy-info" style="font-size: 0.75rem; color: #4a4a4a; padding: 4px 8px; background: #f0f0f0; border-radius: 4px; display: inline-block; font-weight: 500; white-space: nowrap; margin-bottom: 4px; font-style: italic;">Property Level</span>
+                        <div style="font-size: 0.85rem; color: #1a202c; font-weight: 600; line-height: 1.3; word-wrap: break-word;">${tenantNamesHtml}</div>
+                    </div>
+                `;
+            } else {
+                propertyLevelDisplay = `
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                        <span class="occupancy-info" style="font-size: 0.75rem; color: #4a4a4a; padding: 4px 8px; background: #f0f0f0; border-radius: 4px; display: inline-block; font-weight: 500; white-space: nowrap; margin-bottom: 4px; font-style: italic;">Property Level</span>
+                        <div style="font-size: 0.8rem; color: #9ca3af; font-style: italic;">No active leases</div>
+                    </div>
+                `;
+            }
+            
+            html += `<tr class="property-level-lease-row">
+                <td class="tenant-occupancies-cell" style="vertical-align: top; width: 180px; max-width: 180px; padding: 10px 12px; word-wrap: break-word; overflow-wrap: break-word;">${propertyLevelDisplay}</td>
+                <td style="padding: 10px; vertical-align: top;">${formatLeaseSummaries(activeLeases, tenants)}</td>
+                <td style="padding: 10px; vertical-align: top;">${formatLeaseSummaries(legacyLeases, tenants)}</td>
+                <td style="padding: 10px; vertical-align: top;">
+                    <button class="btn-sm btn-primary" onclick="viewPropertyLeasesDetail('${property.id}')">View</button>
+                </td>
+            </tr>`;
+        }
+    });
+    
+    html += '</tbody></table>';
+    
+    if (filteredProperties.length === 0) {
+        leasesTable.innerHTML = '<p style="text-align: center; padding: 40px; color: #666;">No properties found.</p>';
+    } else {
+        leasesTable.innerHTML = html;
+    }
+}
+
+// Helper function to check if a lease is deprecated
+function isLeaseDeprecated(lease) {
+    return lease.isDeprecated === true || lease.isDeprecated === 'true' || lease.isDeprecated === 1;
+}
+
+// Helper function to determine if a lease should be considered active
+function isLeaseActive(lease) {
+    // If deprecated, never active
+    if (isLeaseDeprecated(lease)) {
+        return false;
+    }
+    
+    // If explicitly terminated or renewed, not active
+    if (lease.status === 'Terminated' || lease.status === 'Renewed') {
+        return false;
+    }
+    
+    // If has auto-renewal, always active (even if end date passed)
+    if (lease.autoRenewal === true || lease.autoRenewal === 'true') {
+        return true;
+    }
+    
+    // If status is explicitly Active or Expiring Soon, it's active
+    if (lease.status === 'Active' || lease.status === 'Expiring Soon') {
+        return true;
+    }
+    
+    // If status is Expired but no auto-renewal, check if end date has passed
+    if (lease.status === 'Expired') {
+        // If explicitly marked as expired and no auto-renewal, not active
+        return false;
+    }
+    
+    // Default: if no explicit status or status is unclear, consider active (unless deprecated)
+    return true;
+}
+
+// Build a unit lease row
+function buildUnitLeaseRow(unit, activeLeases, legacyLeases, tenants, occupanciesByUnitId = {}) {
+    // Get tenant names from occupancies (this is the source of truth for which tenant is in which unit)
+    const unitOccupancies = occupanciesByUnitId[unit.id] || [];
+    const activeTenantNames = unitOccupancies.map(occ => {
+        const tenant = tenants[occ.tenantId];
+        return tenant?.tenantName || 'Unknown Tenant';
+    });
+    
+    // Build unit display with tenant name(s) - similar to tenant page styling
+    let unitDisplay = '';
+    const unitNumber = escapeHtml(unit.unitNumber || 'Unnamed Unit');
+    
+    if (activeTenantNames.length > 0) {
+        // Show unit number with tenant name(s) - styled like tenant page
+        const tenantNamesHtml = activeTenantNames.map(name => escapeHtml(name)).join(', ');
+        unitDisplay = `
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+                <span class="occupancy-info" style="font-size: 0.75rem; color: #4a4a4a; padding: 4px 8px; background: #f0f0f0; border-radius: 4px; display: inline-block; font-weight: 500; white-space: nowrap; margin-bottom: 4px;">Unit ${unitNumber}</span>
+                <div style="font-size: 0.85rem; color: #1a202c; font-weight: 600; line-height: 1.3; word-wrap: break-word;">${tenantNamesHtml}</div>
+            </div>
+        `;
+    } else {
+        // No active occupancies - just show unit number with "Vacant"
+        unitDisplay = `
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+                <span class="occupancy-info" style="font-size: 0.75rem; color: #4a4a4a; padding: 4px 8px; background: #f0f0f0; border-radius: 4px; display: inline-block; font-weight: 500; white-space: nowrap; margin-bottom: 4px;">Unit ${unitNumber}</span>
+                <div style="font-size: 0.8rem; color: #9ca3af; font-style: italic;">Vacant</div>
+            </div>
+        `;
+    }
+    
+    return `
+        <tr class="unit-lease-row" data-unit-id="${unit.id}">
+            <td class="tenant-occupancies-cell" style="vertical-align: top; width: 180px; max-width: 180px; padding: 10px 12px; word-wrap: break-word; overflow-wrap: break-word;">${unitDisplay}</td>
+            <td style="padding: 10px; vertical-align: top;">${formatLeaseSummaries(activeLeases, tenants)}</td>
+            <td style="padding: 10px; vertical-align: top;">${formatLeaseSummaries(legacyLeases || [], tenants)}</td>
+            <td style="padding: 10px; vertical-align: top;">
+                <button class="btn-sm btn-primary" onclick="viewUnitLeasesDetail('${unit.id}')">View</button>
+            </td>
+        </tr>
+    `;
+}
+
+// Calculate current rent based on escalations
+function calculateCurrentRent(lease) {
+    if (!lease.monthlyRent) return null;
+    
+    const initialRent = lease.monthlyRent;
+    
+    // If no escalations, current rent is initial rent
+    if (!lease.rentEscalation || !lease.rentEscalation.escalationType || lease.rentEscalation.escalationType === 'None') {
+        return initialRent;
+    }
+    
+    // Need lease start date and first escalation date to calculate
+    if (!lease.leaseStartDate || !lease.rentEscalation.firstEscalationDate) {
+        return initialRent;
+    }
+    
+    const startDate = lease.leaseStartDate.toDate();
+    const firstEscDate = lease.rentEscalation.firstEscalationDate.toDate();
+    const today = new Date();
+    
+    // If we haven't reached the first escalation date, return initial rent
+    if (today < firstEscDate) {
+        return initialRent;
+    }
+    
+    const esc = lease.rentEscalation;
+    let currentRent = initialRent;
+    
+    // Calculate number of escalation periods
+    let periods = 0;
+    const frequency = esc.escalationFrequency;
+    
+    if (frequency === 'Monthly') {
+        const monthsDiff = (today.getFullYear() - firstEscDate.getFullYear()) * 12 + (today.getMonth() - firstEscDate.getMonth());
+        periods = Math.floor(monthsDiff);
+    } else if (frequency === 'Quarterly') {
+        const monthsDiff = (today.getFullYear() - firstEscDate.getFullYear()) * 12 + (today.getMonth() - firstEscDate.getMonth());
+        periods = Math.floor(monthsDiff / 3);
+    } else if (frequency === 'Annually') {
+        const yearsDiff = today.getFullYear() - firstEscDate.getFullYear();
+        if (today.getMonth() > firstEscDate.getMonth() || (today.getMonth() === firstEscDate.getMonth() && today.getDate() >= firstEscDate.getDate())) {
+            periods = yearsDiff;
+        } else {
+            periods = yearsDiff - 1;
+        }
+    }
+    
+    // Apply escalations
+    if (periods > 0) {
+        if (esc.escalationType === 'Fixed Amount' && esc.escalationAmount) {
+            currentRent = initialRent + (esc.escalationAmount * periods);
+        } else if ((esc.escalationType === 'Percentage' || esc.escalationType === 'CPI') && esc.escalationPercentage) {
+            // Compound percentage increase
+            const rate = esc.escalationPercentage / 100;
+            currentRent = initialRent * Math.pow(1 + rate, periods);
+        }
+    }
+    
+    return Math.round(currentRent * 100) / 100; // Round to 2 decimal places
+}
+
+// Format lease summaries for display
+function formatLeaseSummaries(leases, tenants) {
+    if (leases.length === 0) {
+        return '<span style="color: #999; font-style: italic;">None</span>';
+    }
+    
+    return leases.map(lease => {
+        const tenant = tenants[lease.tenantId];
+        const tenantName = tenant?.tenantName || 'Unknown Tenant';
+        const startDate = lease.leaseStartDate ? lease.leaseStartDate.toDate().toLocaleDateString() : 'N/A';
+        const endDate = lease.leaseEndDate ? lease.leaseEndDate.toDate().toLocaleDateString() : 'N/A';
+        
+        const initialRent = lease.monthlyRent ? lease.monthlyRent : 0;
+        const currentRent = calculateCurrentRent(lease);
+        const hasEscalation = lease.rentEscalation && lease.rentEscalation.escalationType && lease.rentEscalation.escalationType !== 'None';
+        
+        const initialRentFormatted = initialRent ? `$${initialRent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A';
+        const currentRentFormatted = currentRent ? `$${currentRent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A';
+        
+        const statusClass = lease.status === 'Active' ? 'status-active' : 
+                           lease.status === 'Expiring Soon' ? 'status-warning' : 
+                           lease.status === 'Expired' ? 'status-expired' : 'status-inactive';
+        
+        // Calculate annual rent (PPF - Per Year)
+        const initialAnnualRent = initialRent ? (initialRent * 12) : 0;
+        const currentAnnualRent = currentRent ? (currentRent * 12) : 0;
+        const initialAnnualFormatted = initialAnnualRent ? `$${initialAnnualRent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A';
+        const currentAnnualFormatted = currentAnnualRent ? `$${currentAnnualRent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A';
+        
+        // Show rent display - always show initial and current if escalations exist
+        let rentDisplay = '';
+        if (hasEscalation && currentRent) {
+            // Always show both initial and current rent when escalations are configured
+            rentDisplay = `
+                <div style="font-size: 0.85em; color: #666; margin-top: 2px;">
+                    <div style="margin-bottom: 4px;">
+                        <div><strong>Initial:</strong> ${initialRentFormatted}/mo (${initialAnnualFormatted}/yr)</div>
+                        <div style="font-weight: 600; color: #1e293b;"><strong>Current:</strong> ${currentRentFormatted}/mo (${currentAnnualFormatted}/yr)</div>
+                    </div>
+                </div>
+            `;
+        } else {
+            rentDisplay = `
+                <div style="font-size: 0.85em; color: #666; margin-top: 2px;">
+                    <div>${initialRentFormatted}/mo (${initialAnnualFormatted}/yr)</div>
+                </div>
+            `;
+        }
+        
+        return `
+            <div style="margin-bottom: 8px; padding: 8px; background: #f8f9fa; border-radius: 4px; border-left: 3px solid ${getStatusColor(lease.status)};">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 4px;">
+                    <div style="flex: 1;">
+                        <div style="font-weight: 600; margin-bottom: 4px;">${escapeHtml(tenantName)}</div>
+                        <div style="font-size: 0.85em; color: #666;">
+                            <span class="status-badge ${statusClass}" style="margin-right: 8px;">${lease.status}</span>
+                            ${startDate} - ${endDate}
+                        </div>
+                        ${rentDisplay}
+                    </div>
+                    <div style="display: flex; gap: 4px; margin-left: 8px;">
+                        <button class="btn-sm btn-primary" onclick="window.openLeaseModal('${lease.id}')" style="font-size: 0.75em; padding: 4px 8px;" title="View">View</button>
+                        <button class="btn-sm btn-secondary" onclick="window.openLeaseModal('${lease.id}', true)" style="font-size: 0.75em; padding: 4px 8px;" title="Edit">Edit</button>
+                        ${!lease.isDeprecated ? `<button class="btn-sm btn-danger" onclick="window.openDeprecatedModal('${lease.id}')" style="font-size: 0.75em; padding: 4px 8px;" title="Mark as Deprecated/Legacy">Deprecated</button>` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// Get status color
+function getStatusColor(status) {
+    switch(status) {
+        case 'Active': return '#10b981';
+        case 'Expiring Soon': return '#f59e0b';
+        case 'Expired': return '#ef4444';
+        case 'Terminated': return '#6b7280';
+        case 'Renewed': return '#3b82f6';
+        default: return '#6b7280';
+    }
+}
+
+// Unit Lease Detail View
+let currentUnitIdForDetail = null;
+
+window.viewUnitLeasesDetail = async function(unitId) {
+    currentUnitIdForDetail = unitId;
+    const modal = document.getElementById('unitLeaseDetailModal');
+    if (!modal) return;
+    
+    modal.setAttribute('data-unit-id', unitId);
+    modal.removeAttribute('data-property-id');
+    
+    // Load unit info
+    const unitDoc = await db.collection('units').doc(unitId).get();
+    if (unitDoc.exists) {
+        const unit = unitDoc.data();
+        const titleElement = document.getElementById('unitLeaseDetailTitle');
+        if (titleElement) {
+            titleElement.textContent = `Leases - ${unit.unitNumber || 'Unit'}`;
+        }
+    }
+    
+    // Load leases
+    loadUnitActiveLeases(unitId);
+    loadUnitLegacyLeases(unitId);
+    
+    // Show modal
+    modal.classList.add('show');
+    
+    // Reset to active leases tab
+    document.querySelectorAll('#unitLeaseDetailModal .tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#unitLeaseDetailModal .tab-content').forEach(c => {
+        c.classList.remove('active');
+        c.style.display = 'none';
+    });
+    const activeLeasesTabBtn = document.querySelector('#unitLeaseDetailModal .tab-btn[data-tab="activeLeases"]');
+    const activeLeasesTab = document.getElementById('activeLeasesTab');
+    if (activeLeasesTabBtn) activeLeasesTabBtn.classList.add('active');
+    if (activeLeasesTab) {
+        activeLeasesTab.classList.add('active');
+        activeLeasesTab.style.display = 'block';
+    }
+};
+
+window.viewPropertyLeasesDetail = async function(propertyId) {
+    const modal = document.getElementById('unitLeaseDetailModal');
+    if (!modal) return;
+    
+    modal.setAttribute('data-property-id', propertyId);
+    modal.removeAttribute('data-unit-id');
+    
+    // Load property info
+    const propertyDoc = await db.collection('properties').doc(propertyId).get();
+    if (propertyDoc.exists) {
+        const property = propertyDoc.data();
+        const titleElement = document.getElementById('unitLeaseDetailTitle');
+        if (titleElement) {
+            titleElement.textContent = `Leases - ${property.name || 'Property'}`;
+        }
+    }
+    
+    // Load property-level leases
+    loadPropertyActiveLeases(propertyId);
+    loadPropertyLegacyLeases(propertyId);
+    
+    // Show modal
+    modal.classList.add('show');
+    
+    // Reset to active leases tab
+    document.querySelectorAll('#unitLeaseDetailModal .tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#unitLeaseDetailModal .tab-content').forEach(c => {
+        c.classList.remove('active');
+        c.style.display = 'none';
+    });
+    const activeLeasesTabBtn = document.querySelector('#unitLeaseDetailModal .tab-btn[data-tab="activeLeases"]');
+    const activeLeasesTab = document.getElementById('activeLeasesTab');
+    if (activeLeasesTabBtn) activeLeasesTabBtn.classList.add('active');
+    if (activeLeasesTab) {
+        activeLeasesTab.classList.add('active');
+        activeLeasesTab.style.display = 'block';
+    }
+};
+
+window.backToLeases = function() {
+    const modal = document.getElementById('unitLeaseDetailModal');
+    if (modal) {
+        modal.classList.remove('show');
+    }
+    currentUnitIdForDetail = null;
+};
+
+// Load active leases for a unit
+async function loadUnitActiveLeases(unitId) {
+    const activeLeasesList = document.getElementById('activeLeasesList');
+    if (!activeLeasesList) return;
+    
+    try {
+        const leasesSnapshot = await db.collection('leases')
+            .where('unitId', '==', unitId)
+            .get();
+        
+        const leases = [];
+        const tenants = {};
+        
+        // Load tenants
+        const tenantsSnapshot = await db.collection('tenants').get();
+        tenantsSnapshot.forEach(doc => {
+            tenants[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        
+        leasesSnapshot.forEach(doc => {
+            const lease = { id: doc.id, ...doc.data() };
+            if (isLeaseActive(lease)) {
+                leases.push(lease);
+            }
+        });
+        
+        renderLeaseDetailList(leases, tenants, activeLeasesList);
+    } catch (error) {
+        console.error('Error loading active leases:', error);
+        activeLeasesList.innerHTML = '<p style="color: #e74c3c; padding: 20px;">Error loading leases.</p>';
+    }
+}
+
+// Load legacy leases for a unit
+async function loadUnitLegacyLeases(unitId) {
+    const legacyLeasesList = document.getElementById('legacyLeasesList');
+    if (!legacyLeasesList) return;
+    
+    try {
+        const leasesSnapshot = await db.collection('leases')
+            .where('unitId', '==', unitId)
+            .get();
+        
+        const leases = [];
+        const tenants = {};
+        
+        // Load tenants
+        const tenantsSnapshot = await db.collection('tenants').get();
+        tenantsSnapshot.forEach(doc => {
+            tenants[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        
+        leasesSnapshot.forEach(doc => {
+            const lease = { id: doc.id, ...doc.data() };
+            if (isLeaseDeprecated(lease)) {
+                leases.push(lease);
+            }
+        });
+        
+        renderLeaseDetailList(leases, tenants, legacyLeasesList);
+    } catch (error) {
+        console.error('Error loading legacy leases:', error);
+        legacyLeasesList.innerHTML = '<p style="color: #999; text-align: center; padding: 40px;">Error loading legacy leases.</p>';
+    }
+}
+
+// Load active leases for a property (property-level)
+async function loadPropertyActiveLeases(propertyId) {
+    const activeLeasesList = document.getElementById('activeLeasesList');
+    if (!activeLeasesList) return;
+    
+    try {
+        const leasesSnapshot = await db.collection('leases')
+            .where('propertyId', '==', propertyId)
+            .get();
+        
+        const leases = [];
+        const tenants = {};
+        
+        // Load tenants
+        const tenantsSnapshot = await db.collection('tenants').get();
+        tenantsSnapshot.forEach(doc => {
+            tenants[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        
+        leasesSnapshot.forEach(doc => {
+            const lease = { id: doc.id, ...doc.data() };
+            if (!lease.unitId && isLeaseActive(lease)) {
+                leases.push(lease);
+            }
+        });
+        
+        renderLeaseDetailList(leases, tenants, activeLeasesList);
+    } catch (error) {
+        console.error('Error loading active leases:', error);
+        activeLeasesList.innerHTML = '<p style="color: #e74c3c; padding: 20px;">Error loading leases.</p>';
+    }
+}
+
+// Load legacy leases for a property (property-level)
+async function loadPropertyLegacyLeases(propertyId) {
+    const legacyLeasesList = document.getElementById('legacyLeasesList');
+    if (!legacyLeasesList) return;
+    
+    try {
+        const leasesSnapshot = await db.collection('leases')
+            .where('propertyId', '==', propertyId)
+            .get();
+        
+        const leases = [];
+        const tenants = {};
+        
+        // Load tenants
+        const tenantsSnapshot = await db.collection('tenants').get();
+        tenantsSnapshot.forEach(doc => {
+            tenants[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        
+        leasesSnapshot.forEach(doc => {
+            const lease = { id: doc.id, ...doc.data() };
+            if (isLeaseDeprecated(lease)) {
+                leases.push(lease);
+            }
+        });
+        
+        renderLeaseDetailList(leases, tenants, legacyLeasesList);
+    } catch (error) {
+        console.error('Error loading property legacy leases:', error);
+        legacyLeasesList.innerHTML = '<p style="color: #999; text-align: center; padding: 40px;">Error loading legacy leases.</p>';
+    }
+}
+
+// Render lease detail list (full details)
+function renderLeaseDetailList(leases, tenants, container) {
+    if (leases.length === 0) {
+        container.innerHTML = '<p style="color: #999; text-align: center; padding: 40px;">No leases found.</p>';
+        return;
+    }
+    
+    let html = '';
+    leases.forEach(lease => {
+        const tenant = tenants[lease.tenantId];
+        const tenantName = tenant?.tenantName || 'Unknown Tenant';
+        const startDate = lease.leaseStartDate ? lease.leaseStartDate.toDate().toLocaleDateString() : 'N/A';
+        const endDate = lease.leaseEndDate ? lease.leaseEndDate.toDate().toLocaleDateString() : 'N/A';
+        const initialRent = lease.monthlyRent ? lease.monthlyRent : 0;
+        const currentRent = calculateCurrentRent(lease);
+        const hasEscalation = lease.rentEscalation && lease.rentEscalation.escalationType && lease.rentEscalation.escalationType !== 'None';
+        
+        const initialRentFormatted = initialRent ? `$${initialRent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A';
+        const currentRentFormatted = currentRent ? `$${currentRent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A';
+        const deposit = lease.securityDeposit ? `$${lease.securityDeposit.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : 'N/A';
+        const statusClass = lease.status === 'Active' ? 'status-active' : 
+                           lease.status === 'Expiring Soon' ? 'status-warning' : 
+                           lease.status === 'Expired' ? 'status-expired' : 'status-inactive';
+        
+        // Calculate annual rent (PPF - Per Year)
+        const initialAnnualRent = initialRent ? (initialRent * 12) : 0;
+        const currentAnnualRent = currentRent ? (currentRent * 12) : 0;
+        const initialAnnualFormatted = initialAnnualRent ? `$${initialAnnualRent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A';
+        const currentAnnualFormatted = currentAnnualRent ? `$${currentAnnualRent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A';
+        
+        // Rent display based on escalations - always show both if escalations exist
+        let rentDisplay = '';
+        if (hasEscalation && currentRent) {
+            // Always show both initial and current rent when escalations are configured
+            rentDisplay = `
+                <div>
+                    <div style="color: #64748b; font-size: 0.85em; margin-bottom: 4px;">Initial Rent</div>
+                    <div style="font-weight: 600;">${initialRentFormatted}/mo</div>
+                    <div style="font-size: 0.8em; color: #999;">${initialAnnualFormatted}/yr</div>
+                </div>
+                <div>
+                    <div style="color: #64748b; font-size: 0.85em; margin-bottom: 4px;">Current Rent</div>
+                    <div style="font-weight: 600; color: #667eea;">${currentRentFormatted}/mo</div>
+                    <div style="font-size: 0.8em; color: #999;">${currentAnnualFormatted}/yr</div>
+                </div>
+            `;
+        } else {
+            rentDisplay = `
+                <div>
+                    <div style="color: #64748b; font-size: 0.85em; margin-bottom: 4px;">Monthly Rent</div>
+                    <div style="font-weight: 600;">${initialRentFormatted}/mo</div>
+                    <div style="font-size: 0.8em; color: #999;">${initialAnnualFormatted}/yr</div>
+                </div>
+            `;
+        }
+        
+        html += `
+            <div class="lease-detail-card" style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 20px; background: white;">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px;">
+                    <div>
+                        <h4 style="margin: 0 0 8px 0; color: #1e293b;">${escapeHtml(tenantName)}</h4>
+                        <div style="color: #64748b; font-size: 0.9em;">
+                            <span class="status-badge ${statusClass}">${lease.status}</span>
+                            <span style="margin-left: 10px;">Lease #: ${escapeHtml(lease.leaseNumber || lease.id.substring(0, 8))}</span>
+                        </div>
+                    </div>
+                    <div>
+                        <button class="btn-sm btn-primary" onclick="window.openLeaseModal('${lease.id}')" style="margin-right: 8px;">View</button>
+                        <button class="btn-sm btn-secondary" onclick="window.openLeaseModal('${lease.id}', true)" style="margin-right: 8px;">Edit</button>
+                        ${!lease.isDeprecated ? `<button class="btn-sm btn-danger" onclick="window.openDeprecatedModal('${lease.id}')">Mark as Deprecated</button>` : ''}
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">
+                    <div>
+                        <div style="color: #64748b; font-size: 0.85em; margin-bottom: 4px;">Start Date</div>
+                        <div style="font-weight: 600;">${startDate}</div>
+                    </div>
+                    <div>
+                        <div style="color: #64748b; font-size: 0.85em; margin-bottom: 4px;">End Date</div>
+                        <div style="font-weight: 600;">${endDate}</div>
+                    </div>
+                    ${rentDisplay}
+                    <div>
+                        <div style="color: #64748b; font-size: 0.85em; margin-bottom: 4px;">Security Deposit</div>
+                        <div style="font-weight: 600;">${deposit}</div>
+                    </div>
+                </div>
+                ${lease.specialTerms ? `<div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e2e8f0;"><div style="color: #64748b; font-size: 0.85em; margin-bottom: 4px;">Special Terms</div><div>${escapeHtml(lease.specialTerms)}</div></div>` : ''}
+                ${lease.notes ? `<div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e2e8f0;"><div style="color: #64748b; font-size: 0.85em; margin-bottom: 4px;">Notes</div><div>${escapeHtml(lease.notes)}</div></div>` : ''}
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+// Open deprecated lease modal
+window.openDeprecatedModal = function(leaseId) {
+    if (!leaseId) {
+        alert('Lease ID is required');
+        return;
+    }
+    
+    const modal = document.getElementById('deprecatedLeaseModal');
+    const form = document.getElementById('deprecatedLeaseForm');
+    const leaseIdInput = document.getElementById('deprecatedLeaseId');
+    const dateInput = document.getElementById('deprecatedLeaseDate');
+    
+    if (!modal || !form || !leaseIdInput || !dateInput) return;
+    
+    // Set lease ID
+    leaseIdInput.value = leaseId;
+    
+    // Set default date to today
+    dateInput.value = new Date().toISOString().split('T')[0];
+    
+    // Clear reason
+    const reasonInput = document.getElementById('deprecatedReason');
+    if (reasonInput) {
+        reasonInput.value = '';
+    }
+    
+    // Show modal
+    modal.classList.add('show');
+    document.body.style.overflow = 'hidden';
+    
+    // Focus on date input
+    setTimeout(() => {
+        dateInput.focus();
+    }, 100);
+};
+
+// Close deprecated lease modal
+function closeDeprecatedModal() {
+    const modal = document.getElementById('deprecatedLeaseModal');
+    if (modal) {
+        modal.classList.remove('show');
+        document.body.style.overflow = '';
+    }
+    
+    // Reset form
+    const form = document.getElementById('deprecatedLeaseForm');
+    if (form) {
+        form.reset();
+    }
+}
+
+// Handle deprecated lease form submission
+window.handleDeprecatedLeaseSubmit = async function(e) {
+    e.preventDefault();
+    
+    const leaseId = document.getElementById('deprecatedLeaseId').value;
+    const dateInput = document.getElementById('deprecatedLeaseDate');
+    const reasonInput = document.getElementById('deprecatedReason');
+    
+    if (!leaseId) {
+        alert('Lease ID is required');
+        return;
+    }
+    
+    if (!dateInput || !dateInput.value) {
+        alert('Deprecated date is required');
+        return;
+    }
+    
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
+    }
+    
+    try {
+        const deprecatedDate = firebase.firestore.Timestamp.fromDate(new Date(dateInput.value));
+        const deprecatedReason = reasonInput ? reasonInput.value.trim() : null;
+        
+        await db.collection('leases').doc(leaseId).update({
+            isDeprecated: true,
+            deprecatedDate: deprecatedDate,
+            deprecatedReason: deprecatedReason || null,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        console.log('Lease marked as deprecated successfully');
+        
+        // Close modal
+        closeDeprecatedModal();
+        
+        // Refresh leases
+        loadLeases();
+        
+        // If viewing lease detail modal, refresh it
+        if (editingLeaseId === leaseId) {
+            await window.openLeaseModal(leaseId, false);
+        }
+        
+        // If viewing unit lease detail, refresh it
+        if (currentUnitIdForDetail) {
+            await window.viewUnitLeasesDetail(currentUnitIdForDetail);
+        }
+        
+        // If viewing property lease detail, refresh it
+        if (currentPropertyIdForLeaseDetail) {
+            await window.viewPropertyLeasesDetail(currentPropertyIdForLeaseDetail);
+        }
+        
+    } catch (error) {
+        console.error('Error marking lease as deprecated:', error);
+        alert('Error marking lease as deprecated: ' + error.message);
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Mark as Deprecated';
+        }
+    }
+};
+
+// openLeaseModal is already globally accessible (defined above as window.openLeaseModal)

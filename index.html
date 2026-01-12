@@ -26,6 +26,7 @@
                 <button class="nav-link active" data-page="maintenance">Maintenance</button>
                 <button class="nav-link" data-page="properties">Properties</button>
                 <button class="nav-link" data-page="tenants">Tenants</button>
+                <button class="nav-link" data-page="leases">Leases</button>
             </div>
         </nav>
 
@@ -669,6 +670,14 @@
                                 </select>
                             </div>
                             
+                            <div class="form-group">
+                                <label for="tenantPropertyId">Associated Property (Optional)</label>
+                                <select id="tenantPropertyId">
+                                    <option value="">No Property (Orphan Tenant)</option>
+                                </select>
+                                <small style="color: #666; font-size: 12px;">Associate tenant with a property to filter them by property. Leave blank for orphan tenants.</small>
+                            </div>
+                            
                             <!-- Unit Assignment Section (shown only when editing) -->
                             <div id="tenantUnitAssignmentSection" style="display: none;">
                                 <h3 style="margin: 20px 0 15px 0; color: #2563EB; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px;">Unit Assignment</h3>
@@ -865,6 +874,14 @@
                             </div>
                             
                             <div class="form-group">
+                                <label for="contactPropertyId">Associated Property (Optional)</label>
+                                <select id="contactPropertyId">
+                                    <option value="">No Property (Orphan Contact)</option>
+                                </select>
+                                <small style="color: #666; font-size: 12px;">Associate contact with a property to filter them by property. Leave blank for orphan contacts.</small>
+                            </div>
+                            
+                            <div class="form-group">
                                 <label for="contactName">Contact Name *</label>
                                 <input type="text" id="contactName" required placeholder="e.g., John Doe">
                             </div>
@@ -988,6 +1005,492 @@
         </div>
     </div>
 
+        <!-- Leases Page -->
+        <div id="leasesPage" class="page" style="display: none;">
+            <header>
+                <h2>Lease Management</h2>
+            </header>
+
+            <main>
+                <div class="leases-page-content">
+                    <div class="section">
+                        <div class="section-header-controls">
+                            <div class="filter-controls" style="display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 20px;">
+                                <div>
+                                    <label for="leasePropertyFilter">Filter by Property:</label>
+                                    <select id="leasePropertyFilter">
+                                        <option value="">All Properties</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="leasesList" style="display: none;"></div>
+                        <div id="leasesTable" class="leases-table-container"></div>
+                    </div>
+                </div>
+            </main>
+            
+            <!-- Unit Lease Detail Modal -->
+            <div id="unitLeaseDetailModal" class="modal">
+                <div class="modal-content" style="max-width: 900px; max-height: 90vh; overflow-y: auto;">
+                    <div class="modal-header">
+                        <h2 id="unitLeaseDetailTitle">Unit Leases</h2>
+                        <button class="close-btn" id="closeUnitLeaseDetailModal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="property-detail-tabs" style="margin-bottom: 20px; border-bottom: 2px solid #e2e8f0;">
+                            <button class="tab-btn active" data-tab="activeLeases">Active Leases</button>
+                            <button class="tab-btn" data-tab="legacyLeases">Legacy Leases</button>
+                        </div>
+                        <div id="activeLeasesTab" class="tab-content active">
+                            <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <h4 style="margin: 0;">Active Leases</h4>
+                                <button id="addLeaseFromUnitBtn" class="btn-primary btn-small">+ Add Lease</button>
+                            </div>
+                            <div id="activeLeasesList" class="leases-list"></div>
+                        </div>
+                        <div id="legacyLeasesTab" class="tab-content" style="display: none;">
+                            <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <h4 style="margin: 0;">Legacy Leases</h4>
+                            </div>
+                            <div id="legacyLeasesList" class="leases-list"></div>
+                        </div>
+                    </div>
+            </div>
+        </div>
+        
+        <!-- Deprecated Lease Modal -->
+        <div id="deprecatedLeaseModal" class="modal">
+            <div class="modal-content" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h2>Mark Lease as Deprecated/Legacy</h2>
+                    <button class="modal-close" onclick="closeDeprecatedModal()">&times;</button>
+                </div>
+                <form id="deprecatedLeaseForm" style="padding: 0 30px 30px 30px;">
+                    <input type="hidden" id="deprecatedLeaseId">
+                    <div class="form-group">
+                        <label for="deprecatedLeaseDate">Deprecated/Legacy Date *</label>
+                        <input type="date" id="deprecatedLeaseDate" required>
+                        <small style="color: #666; display: block; margin-top: 5px;">Date when this lease was marked as deprecated/legacy</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="deprecatedReason">Deprecation Reason</label>
+                        <textarea id="deprecatedReason" rows="4" placeholder="Enter reason for marking this lease as deprecated/legacy (optional)"></textarea>
+                        <small style="color: #666; display: block; margin-top: 5px;">Optional: Provide context for why this lease is being marked as deprecated</small>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn-secondary" onclick="closeDeprecatedModal()">Cancel</button>
+                        <button type="submit" class="btn-danger">Mark as Deprecated</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Lease Modal -->
+        <div id="leaseModal" class="modal">
+                <div class="modal-content" style="max-width: 900px;">
+                    <div class="modal-header">
+                        <h2 id="leaseModalTitle">Add Lease</h2>
+                        <button class="close-btn" id="closeLeaseModal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="leaseForm">
+                            <input type="hidden" id="leaseId">
+                            
+                            <!-- Basic Information -->
+                            <h3 style="margin: 20px 0 15px 0; color: #667eea; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px;">Basic Information</h3>
+                            
+                            <div class="form-group">
+                                <label for="leaseNumber">Lease Number</label>
+                                <input type="text" id="leaseNumber" placeholder="Auto-generated or manual">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="leaseTenantId">Tenant *</label>
+                                <select id="leaseTenantId" required>
+                                    <option value="">Select tenant...</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="leasePropertyId">Property *</label>
+                                <select id="leasePropertyId" required>
+                                    <option value="">Select property...</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="leaseUnitId">Unit/Space (Optional)</label>
+                                <select id="leaseUnitId">
+                                    <option value="">No Unit (Property Level)</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="leaseType">Lease Type *</label>
+                                <select id="leaseType" required>
+                                    <option value="">Select type...</option>
+                                    <option value="Commercial">Commercial</option>
+                                    <option value="Residential">Residential</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="leaseStatus">Status *</label>
+                                <select id="leaseStatus" required>
+                                    <option value="Active">Active</option>
+                                    <option value="Expiring Soon">Expiring Soon</option>
+                                    <option value="Expired">Expired</option>
+                                    <option value="Terminated">Terminated</option>
+                                    <option value="Renewed">Renewed</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label style="display: flex; align-items: center; gap: 12px; cursor: pointer;">
+                                    <span style="font-weight: 600; color: #555;">Mark as Deprecated/Legacy</span>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="isDeprecated">
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </label>
+                                <small style="color: #666; display: block; margin-top: 5px;">Mark this lease as deprecated or legacy for archival purposes</small>
+                            </div>
+                            
+                            <div class="form-group" id="deprecatedDateGroup" style="display: none;">
+                                <label for="deprecatedDate">Deprecated/Legacy Date</label>
+                                <input type="date" id="deprecatedDate">
+                                <small style="color: #666; display: block; margin-top: 5px;">Date when this lease was marked as deprecated/legacy</small>
+                            </div>
+                            
+                            <div class="form-group" id="deprecatedReasonGroup" style="display: none;">
+                                <label for="deprecatedReasonInForm">Deprecation Reason</label>
+                                <textarea id="deprecatedReasonInForm" rows="3" placeholder="Enter reason for marking this lease as deprecated/legacy (optional)"></textarea>
+                                <small style="color: #666; display: block; margin-top: 5px;">Optional: Provide context for why this lease is being marked as deprecated</small>
+                            </div>
+                            
+                            <!-- Lease Dates -->
+                            <h3 style="margin: 30px 0 15px 0; color: #667eea; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px;">Lease Dates</h3>
+                            
+                            <div class="form-group">
+                                <label for="leaseStartDate">Lease Start Date *</label>
+                                <input type="date" id="leaseStartDate" required>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Lease Duration</label>
+                                <div style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
+                                    <div style="flex: 1; min-width: 200px;">
+                                        <label for="leaseEndDate" style="display: block; margin-bottom: 5px;">Lease End Date</label>
+                                        <input type="date" id="leaseEndDate">
+                                    </div>
+                                    <div style="text-align: center; padding: 0 10px; color: #999;">OR</div>
+                                    <div style="flex: 1; min-width: 200px;">
+                                        <label for="leaseTermInput" style="display: block; margin-bottom: 5px;">Lease Term</label>
+                                        <div style="display: flex; gap: 5px;">
+                                            <input type="number" id="leaseTermInput" min="0" step="0.5" placeholder="0" style="flex: 1;">
+                                            <select id="leaseTermUnit" style="width: 100px;">
+                                                <option value="months">Months</option>
+                                                <option value="years">Years</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <small style="color: #666; display: block; margin-top: 5px;">Enter either end date or term - the other will be calculated automatically</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="leaseTerm">Calculated Term (months)</label>
+                                <input type="number" id="leaseTerm" readonly placeholder="Auto-calculated">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>
+                                    <input type="checkbox" id="autoRenewal" style="margin-right: 8px;">
+                                    Auto Renewal
+                                </label>
+                                <small style="color: #666; display: block; margin-top: 5px;">Lease will automatically renew at expiration</small>
+                            </div>
+                            
+                            <div id="autoRenewalTermGroup" style="display: none;">
+                                <div class="form-group">
+                                    <label for="autoRenewalTerm">Auto Renewal Term</label>
+                                    <div style="display: flex; gap: 5px;">
+                                        <input type="number" id="autoRenewalTerm" min="1" step="0.5" placeholder="12" style="flex: 1;">
+                                        <select id="autoRenewalTermUnit" style="width: 100px;">
+                                            <option value="months">Months</option>
+                                            <option value="years">Years</option>
+                                        </select>
+                                    </div>
+                                    <small style="color: #666;">Term length for each auto renewal</small>
+                                </div>
+                            </div>
+                            
+                            <!-- Financial Information -->
+                            <h3 style="margin: 30px 0 15px 0; color: #667eea; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px;">Financial Information</h3>
+                            
+                            <div class="form-group">
+                                <label for="monthlyRent">Monthly Rent *</label>
+                                <input type="number" id="monthlyRent" step="0.01" required>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="securityDeposit">Security Deposit *</label>
+                                <input type="number" id="securityDeposit" step="0.01" required>
+                            </div>
+                            
+                            <!-- Additional Monthly Charges -->
+                            <div class="form-group" style="margin: 20px 0 10px 0;">
+                                <label style="display: flex; align-items: center; gap: 12px; cursor: pointer;">
+                                    <span style="font-weight: 600; color: #555;">Additional Monthly Charges</span>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="showAdditionalCharges">
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </label>
+                            </div>
+                            
+                            <div id="additionalChargesGroup" style="display: none;">
+                                <div class="form-group">
+                                    <label for="utilitiesCharge">Utilities</label>
+                                    <input type="number" id="utilitiesCharge" step="0.01" placeholder="0.00">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="parkingCharge">Parking</label>
+                                    <input type="number" id="parkingCharge" step="0.01" placeholder="0.00">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="petFeeCharge">Pet Fee</label>
+                                    <input type="number" id="petFeeCharge" step="0.01" placeholder="0.00">
+                                </div>
+                                
+                                <div class="form-group" id="camChargesGroup" style="display: none;">
+                                    <label for="camCharges">CAM Charges (Commercial)</label>
+                                    <input type="number" id="camCharges" step="0.01" placeholder="0.00">
+                                </div>
+                            </div>
+                            
+                            <!-- Commercial Leasing Features (Commercial Only) -->
+                            <div id="commercialLeasingFeatures" style="display: none;">
+                                <h3 style="margin: 30px 0 15px 0; color: #667eea; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px;">Commercial Leasing Features</h3>
+                                
+                                <!-- Rent Escalation -->
+                                <h4 style="margin: 20px 0 10px 0; color: #666;">Rent Escalation</h4>
+                                
+                                <div class="form-group">
+                                    <label for="escalationType">Escalation Type</label>
+                                    <select id="escalationType">
+                                        <option value="None">None</option>
+                                        <option value="Fixed Amount">Fixed Amount</option>
+                                        <option value="Percentage">Percentage</option>
+                                        <option value="CPI">CPI (Consumer Price Index)</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group" id="escalationAmountGroup" style="display: none;">
+                                    <label for="escalationAmount">Escalation Amount ($)</label>
+                                    <input type="number" id="escalationAmount" step="0.01" placeholder="0.00">
+                                    <small style="color: #666;">Fixed dollar amount increase per escalation period</small>
+                                </div>
+                                
+                                <div class="form-group" id="escalationPercentageGroup" style="display: none;">
+                                    <label for="escalationPercentage">Escalation Percentage (%)</label>
+                                    <input type="number" id="escalationPercentage" step="0.01" placeholder="0.00" min="0" max="100">
+                                    <small style="color: #666;">Percentage increase per escalation period</small>
+                                </div>
+                                
+                                <div class="form-group" id="escalationFrequencyGroup" style="display: none;">
+                                    <label for="escalationFrequency">Escalation Frequency</label>
+                                    <select id="escalationFrequency">
+                                        <option value="">Select frequency...</option>
+                                        <option value="Monthly">Monthly</option>
+                                        <option value="Quarterly">Quarterly</option>
+                                        <option value="Annually">Annually</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group" id="firstEscalationDateGroup" style="display: none;">
+                                    <label for="firstEscalationDate">First Escalation Date</label>
+                                    <input type="date" id="firstEscalationDate">
+                                    <small style="color: #666;">Date when first escalation takes effect</small>
+                                </div>
+                                
+                                <!-- Extension/Options -->
+                                <div class="form-group" style="margin: 30px 0 10px 0;">
+                                    <label style="display: flex; align-items: center; gap: 12px; cursor: pointer;">
+                                        <span style="font-weight: 600; color: #555;">Extension Options</span>
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" id="hasExtensionOptions">
+                                            <span class="toggle-slider"></span>
+                                        </label>
+                                    </label>
+                                    <small style="color: #666; display: block; margin-top: 5px;">Lease has extension/renewal options</small>
+                                </div>
+                                
+                                <div id="extensionOptionsGroup" style="display: none;">
+                                    <div class="form-group">
+                                        <label for="numberOfExtensions">Number of Extension Options</label>
+                                        <input type="number" id="numberOfExtensions" min="0" placeholder="0">
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="extensionTermLength">Extension Term Length (months)</label>
+                                        <input type="number" id="extensionTermLength" min="1" placeholder="12">
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="extensionNoticePeriod">Extension Notice Period (days)</label>
+                                        <input type="number" id="extensionNoticePeriod" min="0" placeholder="90">
+                                        <small style="color: #666;">Days before lease end that tenant must provide notice</small>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="extensionRentType">Extension Rent Type</label>
+                                        <select id="extensionRentType">
+                                            <option value="">Select type...</option>
+                                            <option value="Fair Market Value">Fair Market Value</option>
+                                            <option value="Fixed Amount">Fixed Amount</option>
+                                            <option value="Percentage Increase">Percentage Increase</option>
+                                            <option value="Same as Current">Same as Current</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="form-group" id="extensionRentAmountGroup" style="display: none;">
+                                        <label for="extensionRentAmount">Extension Rent Amount ($)</label>
+                                        <input type="number" id="extensionRentAmount" step="0.01" placeholder="0.00">
+                                    </div>
+                                    
+                                    <div class="form-group" id="extensionRentPercentageGroup" style="display: none;">
+                                        <label for="extensionRentPercentage">Extension Rent Increase (%)</label>
+                                        <input type="number" id="extensionRentPercentage" step="0.01" placeholder="0.00" min="0">
+                                    </div>
+                                </div>
+                                
+                                <!-- Additional Commercial Features -->
+                                <div class="form-group" style="margin: 30px 0 10px 0;">
+                                    <label style="display: flex; align-items: center; gap: 12px; cursor: pointer;">
+                                        <span style="font-weight: 600; color: #555;">Additional Commercial Terms</span>
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" id="showCommercialTerms">
+                                            <span class="toggle-slider"></span>
+                                        </label>
+                                    </label>
+                                </div>
+                                
+                                <div id="commercialTermsGroup" style="display: none;">
+                                    <div class="form-group">
+                                        <label for="baseYear">Base Year for CAM/Operating Expenses</label>
+                                        <input type="number" id="baseYear" placeholder="2024" min="2000" max="2100">
+                                        <small style="color: #666;">Base year used for calculating CAM and operating expense increases</small>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="operatingExpenseCap">Operating Expense Cap (%)</label>
+                                        <input type="number" id="operatingExpenseCap" step="0.01" placeholder="0.00" min="0" max="100">
+                                        <small style="color: #666;">Maximum annual increase in operating expenses (as percentage)</small>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="rentAbatementMonths">Rent Abatement Period (months)</label>
+                                        <input type="number" id="rentAbatementMonths" min="0" placeholder="0">
+                                        <small style="color: #666;">Number of months of free/reduced rent at lease start</small>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="rentAbatementAmount">Rent Abatement Amount ($)</label>
+                                        <input type="number" id="rentAbatementAmount" step="0.01" placeholder="0.00">
+                                        <small style="color: #666;">Total amount of rent abatement/concession</small>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="tenantImprovementAllowance">Tenant Improvement Allowance ($)</label>
+                                        <input type="number" id="tenantImprovementAllowance" step="0.01" placeholder="0.00">
+                                        <small style="color: #666;">Total TI allowance provided to tenant</small>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label>
+                                            <input type="checkbox" id="rightOfFirstRefusal" style="margin-right: 8px;">
+                                            Right of First Refusal
+                                        </label>
+                                        <small style="color: #666; display: block; margin-top: 5px;">Tenant has right of first refusal on adjacent/expanding space</small>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label>
+                                            <input type="checkbox" id="exclusiveUse" style="margin-right: 8px;">
+                                            Exclusive Use Clause
+                                        </label>
+                                        <small style="color: #666; display: block; margin-top: 5px;">Tenant has exclusive use rights for specific business type</small>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="exclusiveUseDescription">Exclusive Use Description</label>
+                                        <textarea id="exclusiveUseDescription" rows="2" placeholder="Describe the exclusive use rights..."></textarea>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="percentageRent">Percentage Rent Threshold ($)</label>
+                                        <input type="number" id="percentageRent" step="0.01" placeholder="0.00">
+                                        <small style="color: #666;">Sales threshold above which percentage rent applies (for retail)</small>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="percentageRentRate">Percentage Rent Rate (%)</label>
+                                        <input type="number" id="percentageRentRate" step="0.01" placeholder="0.00" min="0" max="100">
+                                        <small style="color: #666;">Percentage of sales above threshold paid as rent</small>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Special Terms & Notes -->
+                            <h3 style="margin: 30px 0 15px 0; color: #667eea; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px;">Additional Information</h3>
+                            
+                            <div class="form-group">
+                                <label for="specialTerms">Special Terms</label>
+                                <textarea id="specialTerms" rows="4" placeholder="Any special terms or conditions..."></textarea>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="leaseNotes">Notes</label>
+                                <textarea id="leaseNotes" rows="4" placeholder="Internal notes..."></textarea>
+                            </div>
+                            
+                            <!-- Document Upload -->
+                            <div class="form-group">
+                                <label for="leaseDocument">Lease Document (PDF)</label>
+                                <div id="leaseDocumentDropZone" style="border: 2px dashed #ccc; border-radius: 8px; padding: 30px; text-align: center; background-color: #f9f9f9; cursor: pointer; transition: all 0.3s ease; margin-top: 10px;">
+                                    <div id="leaseDocumentDropZoneContent">
+                                        <p style="margin: 0 0 10px 0; color: #666; font-size: 14px;">
+                                            <strong>Drag and drop a PDF file here</strong>
+                                        </p>
+                                        <p style="margin: 0; color: #999; font-size: 12px;">or</p>
+                                        <label for="leaseDocument" style="display: inline-block; margin-top: 10px; padding: 8px 16px; background-color: #667eea; color: white; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                                            Browse Files
+                                        </label>
+                                        <input type="file" id="leaseDocument" accept=".pdf" style="display: none;">
+                                    </div>
+                                    <div id="leaseDocumentFileName" style="display: none; margin-top: 10px; padding: 8px; background-color: #e8f4f8; border-radius: 4px;">
+                                        <span id="leaseDocumentFileNameText" style="color: #667eea; font-weight: 500;"></span>
+                                        <button type="button" id="leaseDocumentRemoveBtn" style="margin-left: 10px; padding: 4px 8px; background-color: #dc2626; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Remove</button>
+                                    </div>
+                                </div>
+                                <small style="color: #666; display: block; margin-top: 8px;">Upload the signed lease document (PDF only)</small>
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button type="button" class="btn-secondary" id="cancelLeaseBtn">Cancel</button>
+                                <button type="button" class="btn-secondary" id="editLeaseBtn" style="display: none;">Edit</button>
+                                <button type="submit" class="btn-primary">Save Lease</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     <!-- Floating Action Buttons -->
     <div class="fab-container">
         <button id="fabAddTenant" class="fab" title="Add Tenant" style="display: none;">
@@ -1005,6 +1508,10 @@
         <button id="fabAddUnit" class="fab" title="Add Unit" style="display: none;">
             <span class="fab-icon">+</span>
             <span class="fab-label">Add Unit</span>
+        </button>
+        <button id="fabAddLease" class="fab" title="Add Lease" style="display: none;">
+            <span class="fab-icon">+</span>
+            <span class="fab-label">Add Lease</span>
         </button>
     </div>
 
