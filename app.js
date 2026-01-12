@@ -10,6 +10,11 @@ let beforePhotoUrl = null;
 let afterPhotoUrl = null;
 let completionAfterPhotoFile = null;
 
+// Authentication state
+let currentUser = null;
+let currentUserProfile = null;
+let auth = null; // Firebase Auth instance
+
 // Tenant Management - moved to top for early initialization
 let editingTenantId = null;
 let currentTenantView = 'table'; // 'cards' or 'table' - table is now default
@@ -119,30 +124,324 @@ function startApp() {
 function initLandingPage() {
     const launchAppBtn = document.getElementById('launchAppBtn');
     const landingPage = document.getElementById('landingPage');
-    const appContainer = document.getElementById('appContainer');
+    const authPages = document.getElementById('authPages');
     
-    if (launchAppBtn && landingPage && appContainer) {
+    if (launchAppBtn && landingPage) {
         launchAppBtn.addEventListener('click', function() {
             console.log('Launch Application button clicked');
             landingPage.style.display = 'none';
-            appContainer.style.display = 'block';
-            // Initialize the app after showing it
-            if (typeof startApp === 'function') {
-                startApp();
+            // Check if user is authenticated
+            if (currentUser) {
+                showApplication();
             } else {
-                console.error('startApp function not found');
+                showAuthPages();
             }
         });
         console.log('Landing page initialized - Launch button ready');
-    } else {
-        console.log('Landing page elements not found, initializing app directly');
-        // If landing page elements don't exist, just initialize the app
-        if (appContainer) {
-            appContainer.style.display = 'block';
-        }
-        startApp();
+    }
+    
+    // Initialize auth pages navigation
+    initAuthPages();
+    
+    // Start app initialization
+    startApp();
+}
+
+// Initialize authentication pages
+function initAuthPages() {
+    // Login form
+    const loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+        loginForm.addEventListener('submit', handleLogin);
+    }
+    
+    // Signup form
+    const signupForm = document.getElementById('signupForm');
+    if (signupForm) {
+        signupForm.addEventListener('submit', handleSignup);
+    }
+    
+    // Password reset form
+    const passwordResetForm = document.getElementById('passwordResetForm');
+    if (passwordResetForm) {
+        passwordResetForm.addEventListener('submit', handlePasswordReset);
+    }
+    
+    // Navigation links
+    const showSignupLink = document.getElementById('showSignupLink');
+    if (showSignupLink) {
+        showSignupLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            showSignupPage();
+        });
+    }
+    
+    const showLoginLink = document.getElementById('showLoginLink');
+    if (showLoginLink) {
+        showLoginLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            showLoginPage();
+        });
+    }
+    
+    const forgotPasswordLink = document.getElementById('forgotPasswordLink');
+    if (forgotPasswordLink) {
+        forgotPasswordLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            showPasswordResetPage();
+        });
+    }
+    
+    const backToLoginLink = document.getElementById('backToLoginLink');
+    if (backToLoginLink) {
+        backToLoginLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            showLoginPage();
+        });
     }
 }
+
+// Handle login
+async function handleLogin(e) {
+    e.preventDefault();
+    
+    const email = document.getElementById('loginEmail').value;
+    const password = document.getElementById('loginPassword').value;
+    const rememberMe = document.getElementById('rememberMe').checked;
+    const errorDiv = document.getElementById('loginError');
+    
+    // Clear previous errors
+    if (errorDiv) {
+        errorDiv.style.display = 'none';
+        errorDiv.textContent = '';
+    }
+    
+    try {
+        if (!auth) {
+            throw new Error('Authentication not initialized');
+        }
+        
+        // Set persistence
+        const persistence = rememberMe 
+            ? firebase.auth.Auth.Persistence.LOCAL 
+            : firebase.auth.Auth.Persistence.SESSION;
+        await auth.setPersistence(persistence);
+        
+        // Sign in
+        const userCredential = await auth.signInWithEmailAndPassword(email, password);
+        console.log('✅ Login successful');
+        
+        // Update last login
+        if (userCredential.user && db) {
+            await db.collection('users').doc(userCredential.user.uid).update({
+                lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
+        
+        // Auth state change will handle showing the app
+    } catch (error) {
+        console.error('Login error:', error);
+        let errorMessage = 'An error occurred during login.';
+        
+        switch (error.code) {
+            case 'auth/user-not-found':
+                errorMessage = 'No account found with this email address.';
+                break;
+            case 'auth/wrong-password':
+                errorMessage = 'Incorrect password.';
+                break;
+            case 'auth/invalid-email':
+                errorMessage = 'Invalid email address.';
+                break;
+            case 'auth/user-disabled':
+                errorMessage = 'This account has been disabled.';
+                break;
+            case 'auth/too-many-requests':
+                errorMessage = 'Too many failed login attempts. Please try again later.';
+                break;
+            default:
+                errorMessage = error.message || 'Failed to sign in. Please try again.';
+        }
+        
+        if (errorDiv) {
+            errorDiv.textContent = errorMessage;
+            errorDiv.style.display = 'block';
+        }
+    }
+}
+
+// Handle signup
+async function handleSignup(e) {
+    e.preventDefault();
+    
+    const email = document.getElementById('signupEmail').value;
+    const password = document.getElementById('signupPassword').value;
+    const passwordConfirm = document.getElementById('signupPasswordConfirm').value;
+    const fullName = document.getElementById('signupFullName').value;
+    const phone = document.getElementById('signupPhone').value;
+    const errorDiv = document.getElementById('signupError');
+    const successDiv = document.getElementById('signupSuccess');
+    
+    // Clear previous messages
+    if (errorDiv) {
+        errorDiv.style.display = 'none';
+        errorDiv.textContent = '';
+    }
+    if (successDiv) {
+        successDiv.style.display = 'none';
+    }
+    
+    // Validate password match
+    if (password !== passwordConfirm) {
+        if (errorDiv) {
+            errorDiv.textContent = 'Passwords do not match.';
+            errorDiv.style.display = 'block';
+        }
+        return;
+    }
+    
+    // Validate password strength
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/;
+    if (!passwordRegex.test(password)) {
+        if (errorDiv) {
+            errorDiv.textContent = 'Password must be at least 8 characters with uppercase, lowercase, number, and special character.';
+            errorDiv.style.display = 'block';
+        }
+        return;
+    }
+    
+    try {
+        if (!auth) {
+            throw new Error('Authentication not initialized');
+        }
+        
+        // Create user account
+        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        console.log('✅ Account created successfully');
+        
+        // Update user display name
+        await userCredential.user.updateProfile({
+            displayName: fullName
+        });
+        
+        // Create user profile in Firestore
+        if (db) {
+            await createUserProfile(userCredential.user.uid, {
+                email: email,
+                displayName: fullName,
+                role: 'viewer',
+                isActive: false, // Requires admin approval
+                profile: {
+                    phone: phone || null
+                },
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
+        
+        // Sign out (user needs admin approval)
+        await auth.signOut();
+        
+        // Show success message
+        if (successDiv) {
+            successDiv.style.display = 'block';
+        }
+        
+        // Reset form
+        document.getElementById('signupForm').reset();
+        
+    } catch (error) {
+        console.error('Signup error:', error);
+        let errorMessage = 'An error occurred during signup.';
+        
+        switch (error.code) {
+            case 'auth/email-already-in-use':
+                errorMessage = 'An account with this email already exists.';
+                break;
+            case 'auth/invalid-email':
+                errorMessage = 'Invalid email address.';
+                break;
+            case 'auth/weak-password':
+                errorMessage = 'Password is too weak. Please use a stronger password.';
+                break;
+            default:
+                errorMessage = error.message || 'Failed to create account. Please try again.';
+        }
+        
+        if (errorDiv) {
+            errorDiv.textContent = errorMessage;
+            errorDiv.style.display = 'block';
+        }
+    }
+}
+
+// Handle password reset
+async function handlePasswordReset(e) {
+    e.preventDefault();
+    
+    const email = document.getElementById('resetEmail').value;
+    const errorDiv = document.getElementById('resetError');
+    const successDiv = document.getElementById('resetSuccess');
+    
+    // Clear previous messages
+    if (errorDiv) {
+        errorDiv.style.display = 'none';
+        errorDiv.textContent = '';
+    }
+    if (successDiv) {
+        successDiv.style.display = 'none';
+    }
+    
+    try {
+        if (!auth) {
+            throw new Error('Authentication not initialized');
+        }
+        
+        await auth.sendPasswordResetEmail(email);
+        console.log('✅ Password reset email sent');
+        
+        if (successDiv) {
+            successDiv.style.display = 'block';
+        }
+        
+        // Reset form
+        document.getElementById('passwordResetForm').reset();
+        
+    } catch (error) {
+        console.error('Password reset error:', error);
+        let errorMessage = 'An error occurred.';
+        
+        switch (error.code) {
+            case 'auth/user-not-found':
+                errorMessage = 'No account found with this email address.';
+                break;
+            case 'auth/invalid-email':
+                errorMessage = 'Invalid email address.';
+                break;
+            default:
+                errorMessage = error.message || 'Failed to send reset email. Please try again.';
+        }
+        
+        if (errorDiv) {
+            errorDiv.textContent = errorMessage;
+            errorDiv.style.display = 'block';
+        }
+    }
+}
+
+// Logout function
+window.logout = async function() {
+    try {
+        if (auth) {
+            await auth.signOut();
+            console.log('✅ Logged out successfully');
+            showAuthPages();
+        }
+    } catch (error) {
+        console.error('Logout error:', error);
+        alert('Error logging out: ' + error.message);
+    }
+};
 
 // Check if DOM is already loaded, if so run immediately, otherwise wait
 if (document.readyState === 'loading') {
