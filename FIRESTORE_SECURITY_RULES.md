@@ -45,12 +45,6 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && getUserRole() == 'super_admin';
     }
     
-    // Super admin bypass for all collections (full access)
-    // Note: Super admins can read/write everything regardless of other rules
-    function isSuperAdmin() {
-      return isAuthenticated() && getUserRole() == 'super_admin';
-    }
-    
     // User invitations collection
     match /userInvitations/{invitationId} {
       // Users can read invitations sent to their email
