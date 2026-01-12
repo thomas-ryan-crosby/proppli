@@ -3,7 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Maintenance Tracker</title>
+    <title>proppli — Property Operations Software</title>
+    <link rel="icon" type="image/png" href="assets/images/logos/LogoOnly.png">
+    <!-- Inter Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -12,65 +17,34 @@
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1>🔧 Maintenance Tracker</h1>
-            <div class="header-actions">
-                <div class="property-selector">
-                    <label for="propertySelect">Property:</label>
-                    <select id="propertySelect">
-                        <option value="">Select a property...</option>
-                    </select>
-                    <button id="managePropertiesBtn" class="btn-secondary">Manage Properties</button>
-                </div>
+        <!-- Navigation Bar -->
+        <nav class="main-nav">
+            <div class="nav-brand">
+                <img src="assets/images/logos/Logo+Word.png" alt="proppli" class="nav-logo" height="32">
             </div>
-        </header>
+            <div class="nav-links">
+                <button class="nav-link active" data-page="maintenance">Maintenance</button>
+                <button class="nav-link" data-page="properties">Properties</button>
+                <button class="nav-link" data-page="tenants">Tenants</button>
+                <button class="nav-link" data-page="leases">Leases</button>
+            </div>
+        </nav>
 
-        <main>
-            <!-- Property Management Modal -->
-            <div id="propertyModal" class="modal">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h2>Manage Properties</h2>
-                        <button class="close-btn" id="closePropertyModal">&times;</button>
-                    </div>
-                    <div class="modal-body">
-                        <div style="margin-bottom: 20px;">
-                            <button id="addPropertyBtn" class="btn-primary">+ Add Property</button>
-                        </div>
-                        <form id="propertyForm" style="display: none;">
-                            <input type="hidden" id="propertyId">
-                            <div class="form-group">
-                                <label for="propertyName">Property Name *</label>
-                                <input type="text" id="propertyName" required placeholder="e.g., Oakwood Apartments">
-                            </div>
-                            <div class="form-group">
-                                <label for="propertyAddress">Address</label>
-                                <input type="text" id="propertyAddress" placeholder="e.g., 123 Main St, City, State">
-                            </div>
-                            <div class="form-group">
-                                <label for="propertyType">Property Type *</label>
-                                <select id="propertyType" required>
-                                    <option value="">Select property type...</option>
-                                    <option value="commercial">Commercial Property Management</option>
-                                    <option value="hoa">HOA Property Management</option>
-                                    <option value="residential">Residential Property Management</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="propertyDescription">Description</label>
-                                <textarea id="propertyDescription" rows="3" placeholder="Optional description or notes"></textarea>
-                            </div>
-                            <div class="form-actions">
-                                <button type="submit" class="btn-primary">Save Property</button>
-                                <button type="button" class="btn-secondary" id="cancelPropertyForm">Cancel</button>
-                            </div>
-                        </form>
-                        <hr>
-                        <h3>Existing Properties</h3>
-                        <div id="propertiesList"></div>
+        <!-- Maintenance Tracker Page -->
+        <div id="maintenancePage" class="page active">
+            <header>
+                <h2>Maintenance</h2>
+                <div class="header-actions">
+                    <div class="property-selector">
+                        <label for="propertySelect">Property:</label>
+                        <select id="propertySelect">
+                            <option value="">Select a property...</option>
+                        </select>
                     </div>
                 </div>
-            </div>
+            </header>
+
+            <main>
 
             <!-- Ticket Creation Modal -->
             <div id="ticketModal" class="modal">
@@ -144,15 +118,10 @@
                             <div class="form-group">
                                 <label for="ticketStatus">Status</label>
                                 <select id="ticketStatus">
-                                    <option value="New (Unassigned)">New (Unassigned)</option>
                                     <option value="Not Started">Not Started</option>
                                     <option value="In Progress">In Progress</option>
                                     <option value="Completed">Completed</option>
                                 </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="assignedTo">Assigned To</label>
-                                <input type="text" id="assignedTo" placeholder="Enter name of person assigned to this ticket">
                             </div>
                             <div class="form-group" id="retroactiveDatesGroup" style="display: none;">
                                 <label style="font-weight: 600; color: #667eea;">Retroactive Ticket Dates (Optional)</label>
@@ -259,11 +228,6 @@
                     <div class="modal-body">
                         <form id="completionForm">
                             <div class="form-group">
-                                <label for="completionTimeAllocated">Time Allocated (hours) *</label>
-                                <input type="number" id="completionTimeAllocated" step="0.25" min="0" required placeholder="e.g., 2.5">
-                                <small style="color: #666; font-size: 12px;">Enter the time allocated for this ticket</small>
-                            </div>
-                            <div class="form-group">
                                 <label for="completionCompletedBy">Completed By *</label>
                                 <input type="text" id="completionCompletedBy" required>
                             </div>
@@ -346,65 +310,12 @@
                 </div>
 
                 <div id="activeTicketsView" class="tickets-view">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
-                        <h2 style="margin: 0;">Active Tickets</h2>
-                        <div class="ticket-controls" style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
-                            <div class="control-group">
-                                <label for="activeSortBy" style="font-size: 12px; color: #666; margin-right: 5px;">Sort by:</label>
-                                <select id="activeSortBy" class="control-select">
-                                    <option value="dateCreated-desc">Date Created (Newest)</option>
-                                    <option value="dateCreated-asc">Date Created (Oldest)</option>
-                                    <option value="status-asc">Status (A-Z)</option>
-                                    <option value="status-desc">Status (Z-A)</option>
-                                    <option value="assignedTo-asc">Assigned To (A-Z)</option>
-                                    <option value="assignedTo-desc">Assigned To (Z-A)</option>
-                                    <option value="timeAllocated-desc">Time Allocated (High-Low)</option>
-                                    <option value="timeAllocated-asc">Time Allocated (Low-High)</option>
-                                </select>
-                            </div>
-                            <div class="control-group">
-                                <label for="activeFilterStatus" style="font-size: 12px; color: #666; margin-right: 5px;">Status:</label>
-                                <select id="activeFilterStatus" class="control-select">
-                                    <option value="">All Statuses</option>
-                                    <option value="New (Unassigned)">New (Unassigned)</option>
-                                    <option value="Not Started">Not Started</option>
-                                    <option value="In Progress">In Progress</option>
-                                </select>
-                            </div>
-                            <div class="control-group">
-                                <label for="activeFilterAssigned" style="font-size: 12px; color: #666; margin-right: 5px;">Assigned To:</label>
-                                <select id="activeFilterAssigned" class="control-select">
-                                    <option value="">All Assignees</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
+                    <h2>Active Tickets</h2>
                     <div id="activeTicketsList" class="tickets-list"></div>
                 </div>
 
                 <div id="completedTicketsView" class="tickets-view" style="display: none;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
-                        <h2 style="margin: 0;">Completed Tickets</h2>
-                        <div class="ticket-controls" style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
-                            <div class="control-group">
-                                <label for="completedSortBy" style="font-size: 12px; color: #666; margin-right: 5px;">Sort by:</label>
-                                <select id="completedSortBy" class="control-select">
-                                    <option value="dateCompleted-desc">Date Completed (Newest)</option>
-                                    <option value="dateCompleted-asc">Date Completed (Oldest)</option>
-                                    <option value="completedBy-asc">Completed By (A-Z)</option>
-                                    <option value="completedBy-desc">Completed By (Z-A)</option>
-                                    <option value="timeAllocated-desc">Time Allocated (High-Low)</option>
-                                    <option value="timeAllocated-asc">Time Allocated (Low-High)</option>
-                                </select>
-                            </div>
-                            <div class="control-group">
-                                <label for="completedFilterAssigned" style="font-size: 12px; color: #666; margin-right: 5px;">Completed By:</label>
-                                <select id="completedFilterAssigned" class="control-select">
-                                    <option value="">All</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
+                    <h2>Completed Tickets</h2>
                     <div id="completedTicketsList" class="tickets-list"></div>
                 </div>
                 <div id="deletedTicketsView" class="tickets-view" style="display: none;">
@@ -413,31 +324,1314 @@
                     <div id="deletedTicketsList" class="tickets-list"></div>
                 </div>
             </div>
-        </main>
-    </div>
+            </main>
+        </div>
 
-    <!-- Firebase Config - Create firebase-config.js from firebase-config.example.js -->
-    <script src="firebase-config.js"></script>
-    <script src="app.js?v=2.0"></script>
-    <script>
-        // Fallback if firebase-config.js is missing
-        if (typeof firebase === 'undefined' || typeof db === 'undefined') {
-            document.body.innerHTML = `
-                <div style="padding: 40px; text-align: center; font-family: sans-serif;">
-                    <h1 style="color: #e74c3c;">⚠️ Configuration Missing</h1>
-                    <p style="font-size: 18px; margin: 20px 0;">The <code>firebase-config.js</code> file is missing.</p>
-                    <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; max-width: 600px; margin: 20px auto; text-align: left;">
-                        <h3>To fix this:</h3>
-                        <ol style="line-height: 1.8;">
-                            <li>Copy <code>firebase-config.example.js</code> to <code>firebase-config.js</code></li>
-                            <li>Fill in your Firebase configuration values</li>
-                            <li>Refresh this page</li>
-                        </ol>
-                        <p style="margin-top: 20px;"><strong>Note:</strong> This file is excluded from Git for security reasons.</p>
+        <!-- Properties Page -->
+        <div id="propertiesPage" class="page" style="display: none;">
+            <header>
+                <h2>Properties</h2>
+                <div class="header-actions">
+                    <button id="addPropertyBtn" class="btn-primary">+ Add Property</button>
+                </div>
+            </header>
+
+            <main>
+                <div class="properties-page-content">
+                    <!-- Property List -->
+                    <div class="section">
+                        <h3>Properties</h3>
+                        <div id="propertiesList" class="properties-grid"></div>
+                    </div>
+
+                    <!-- Property Form (Modal) -->
+                    <div id="propertyModal" class="modal">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h2>Manage Property</h2>
+                                <button class="close-btn" id="closePropertyModal">&times;</button>
+                            </div>
+                            <div class="modal-body">
+                                <form id="propertyForm" style="display: none;">
+                                    <input type="hidden" id="propertyId">
+                                    <div class="form-group">
+                                        <label for="propertyName">Property Name *</label>
+                                        <input type="text" id="propertyName" required placeholder="e.g., Oakwood Apartments">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="propertyAddress">Address</label>
+                                        <input type="text" id="propertyAddress" placeholder="e.g., 123 Main St, City, State">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="propertyType">Property Type *</label>
+                                        <select id="propertyType" required>
+                                            <option value="">Select property type...</option>
+                                            <option value="commercial">Commercial</option>
+                                            <option value="hoa">HOA</option>
+                                            <option value="residential">Residential</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="propertyStatus">Property Status *</label>
+                                        <select id="propertyStatus" required>
+                                            <option value="Active">Active</option>
+                                            <option value="Inactive">Inactive</option>
+                                            <option value="Under Development">Under Development</option>
+                                        </select>
+                                    </div>
+                            <div class="form-group" id="propertySquareFootageGroup">
+                                <label for="propertySquareFootage">Square Footage <span id="squareFootageRequired">*</span></label>
+                                <input type="number" id="propertySquareFootage" min="0" step="1" placeholder="e.g., 5000">
+                            </div>
+                            <div class="form-group" id="propertyYearBuiltGroup">
+                                <label for="propertyYearBuilt">Year Built <span id="yearBuiltRequired">*</span></label>
+                                <input type="number" id="propertyYearBuilt" min="1800" max="2100" step="1" placeholder="e.g., 2020">
+                            </div>
+                            <div class="form-group">
+                                <label for="propertyNumberOfUnits">Number of Units/Spaces *</label>
+                                <input type="number" id="propertyNumberOfUnits" min="0" step="1" required placeholder="e.g., 10">
+                            </div>
+                                    <div class="form-group">
+                                        <label for="propertyLotSize">Lot Size</label>
+                                        <input type="number" id="propertyLotSize" min="0" step="0.01" placeholder="e.g., 0.5 (acres)">
+                                        <small style="color: #666; font-size: 12px;">Optional: Enter in acres or square feet</small>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="propertyNumberOfFloors">Number of Floors/Stories</label>
+                                        <input type="number" id="propertyNumberOfFloors" min="1" step="1" placeholder="e.g., 3">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="propertyParkingSpaces">Parking Spaces</label>
+                                        <input type="number" id="propertyParkingSpaces" min="0" step="1" placeholder="e.g., 20">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="propertyTaxId">Property Tax ID / Assessor Parcel Number</label>
+                                        <input type="text" id="propertyTaxId" placeholder="e.g., 123-456-789">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="propertyOwnerName">Property Owner Name</label>
+                                        <input type="text" id="propertyOwnerName" placeholder="e.g., ABC Properties LLC">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="propertyOwnerContact">Property Owner Contact</label>
+                                        <input type="text" id="propertyOwnerContact" placeholder="e.g., owner@example.com or phone number">
+                                    </div>
+                                    <!-- Commercial Specific Fields -->
+                                    <div id="commercialPropertyFields" style="display: none;">
+                                        <div class="form-group">
+                                            <label for="propertyBuildingNumber">Building Number</label>
+                                            <input type="text" id="propertyBuildingNumber" placeholder="e.g., Building A">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="propertyNumberOfBuildings">Number of Buildings</label>
+                                            <input type="number" id="propertyNumberOfBuildings" min="1" step="1" placeholder="e.g., 3">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="propertyTotalLeasableSqFt">Total Leasable Square Footage</label>
+                                            <input type="number" id="propertyTotalLeasableSqFt" min="0" step="1" placeholder="e.g., 45000">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="propertyCommonAreaSqFt">Common Area Square Footage</label>
+                                            <input type="number" id="propertyCommonAreaSqFt" min="0" step="1" placeholder="e.g., 5000">
+                                        </div>
+                                    </div>
+                                    <!-- Residential Specific Fields -->
+                                    <div id="residentialPropertyFields" style="display: none;">
+                                        <div class="form-group">
+                                            <label for="propertyNumberOfBedrooms">Number of Bedrooms</label>
+                                            <input type="number" id="propertyNumberOfBedrooms" min="0" step="1" placeholder="e.g., 3">
+                                            <small style="color: #666; font-size: 12px;">For single-family properties</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="propertyNumberOfBathrooms">Number of Bathrooms</label>
+                                            <input type="number" id="propertyNumberOfBathrooms" min="0" step="0.5" placeholder="e.g., 2.5">
+                                            <small style="color: #666; font-size: 12px;">For single-family properties</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="propertySubtype">Property Subtype</label>
+                                            <select id="propertySubtype">
+                                                <option value="">Select subtype...</option>
+                                                <option value="Single-Family">Single-Family</option>
+                                                <option value="Multi-Family">Multi-Family</option>
+                                                <option value="Apartment Complex">Apartment Complex</option>
+                                                <option value="Condo">Condo</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="propertyDescription">Description</label>
+                                        <textarea id="propertyDescription" rows="3" placeholder="Optional description or notes"></textarea>
+                                    </div>
+                                    <div class="form-actions">
+                                        <button type="submit" class="btn-primary">Save Property</button>
+                                        <button type="button" class="btn-secondary" id="cancelPropertyForm">Cancel</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Property Detail View (for buildings and units) -->
+                    <div id="propertyDetailView" style="display: none;">
+                        <div class="property-detail-header">
+                            <button id="backToPropertiesBtn" class="btn-secondary">← Back to Properties</button>
+                            <h3 id="propertyDetailName"></h3>
+                        </div>
+                        <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                            <h4>Buildings & Units</h4>
+                            <div style="display: flex; gap: 10px; display: none;">
+                                <button id="addBuildingBtn" class="btn-primary btn-small">+ Add Building</button>
+                                <button id="addUnitBtn" class="btn-primary btn-small">+ Add Unit</button>
+                            </div>
+                        </div>
+                        <div id="buildingsUnitsTable" class="buildings-units-table-container" style="overflow-x: auto;"></div>
+                        
+                        <!-- Building Modal -->
+                        <div id="buildingModal" class="modal">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h2 id="buildingModalTitle">Add Building</h2>
+                                    <button class="close-btn" id="closeBuildingModal">&times;</button>
+                                </div>
+                                <div class="modal-body">
+                                    <form id="buildingForm">
+                                        <input type="hidden" id="buildingId">
+                                        <input type="hidden" id="buildingPropertyId">
+                                        <div class="form-group">
+                                            <label for="buildingName">Building Name/Number *</label>
+                                            <input type="text" id="buildingName" required placeholder="e.g., Building A, Building 1">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="buildingAddress">Building Address</label>
+                                            <input type="text" id="buildingAddress" placeholder="e.g., 123 Main St, City, State (optional - defaults to property address)">
+                                            <small style="color: #666; font-size: 12px;">Leave blank to use property address</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="buildingNumberOfFloors">Number of Floors</label>
+                                            <input type="number" id="buildingNumberOfFloors" min="1" step="1" placeholder="e.g., 5">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="buildingNumberOfUnits">Number of Units</label>
+                                            <input type="number" id="buildingNumberOfUnits" min="0" step="1" placeholder="e.g., 20">
+                                        </div>
+                                        <div class="form-actions">
+                                            <button type="submit" class="btn-primary">Save Building</button>
+                                            <button type="button" class="btn-secondary" id="cancelBuildingForm">Cancel</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Unit Modal -->
+                        <div id="unitModal" class="modal">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h2 id="unitModalTitle">Add Unit/Space</h2>
+                                    <button class="close-btn" id="closeUnitModal">&times;</button>
+                                </div>
+                                <div class="modal-body">
+                                    <form id="unitForm">
+                                        <input type="hidden" id="unitId">
+                                        <input type="hidden" id="unitPropertyId">
+                                        <div class="form-group">
+                                            <label for="unitNumber">Unit Number/Identifier *</label>
+                                            <input type="text" id="unitNumber" required placeholder="e.g., 101, Suite A, Unit 1A">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="unitType">Unit Type *</label>
+                                            <select id="unitType" required>
+                                                <option value="">Select unit type...</option>
+                                                <option value="Apartment">Apartment</option>
+                                                <option value="Office">Office</option>
+                                                <option value="Retail">Retail</option>
+                                                <option value="Storage">Storage</option>
+                                                <option value="Parking">Parking</option>
+                                                <option value="Other">Other</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="unitBuildingId">Building (Optional)</label>
+                                            <select id="unitBuildingId">
+                                                <option value="">No Building (Property Level)</option>
+                                            </select>
+                                            <small style="color: #666; font-size: 12px;">Select a building if this unit belongs to a specific building</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="unitSquareFootage">Square Footage</label>
+                                            <input type="number" id="unitSquareFootage" min="0" step="1" placeholder="e.g., 800">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="unitFloorNumber">Floor Number</label>
+                                            <input type="number" id="unitFloorNumber" min="0" step="1" placeholder="e.g., 2">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="unitNumberOfBedrooms">Number of Bedrooms</label>
+                                            <input type="number" id="unitNumberOfBedrooms" min="0" step="1" placeholder="e.g., 2">
+                                            <small style="color: #666; font-size: 12px;">For residential units</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="unitNumberOfBathrooms">Number of Bathrooms</label>
+                                            <input type="number" id="unitNumberOfBathrooms" min="0" step="0.5" placeholder="e.g., 1.5">
+                                            <small style="color: #666; font-size: 12px;">For residential units</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="unitStatus">Unit Status *</label>
+                                            <select id="unitStatus" required>
+                                                <option value="Vacant">Vacant</option>
+                                                <option value="Occupied">Occupied</option>
+                                                <option value="Maintenance">Maintenance</option>
+                                                <option value="Reserved">Reserved</option>
+                                                <option value="Not Available">Not Available</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="unitMonthlyRent">Monthly Rent/Base Rate</label>
+                                            <input type="number" id="unitMonthlyRent" min="0" step="0.01" placeholder="e.g., 1500.00">
+                                            <small style="color: #666; font-size: 12px;">For quick reference</small>
+                                        </div>
+                                        <div class="form-actions">
+                                            <button type="submit" class="btn-primary">Save Unit</button>
+                                            <button type="button" class="btn-secondary" id="cancelUnitForm">Cancel</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            `;
-        }
+            </main>
+        </div>
+
+        <!-- Tenants Page -->
+        <div id="tenantsPage" class="page" style="display: none;">
+            <header>
+                <h2>Tenant Management</h2>
+                <div class="header-actions" style="display: none;">
+                    <button id="addTenantBtn" class="btn-primary">+ Add Tenant</button>
+                </div>
+            </header>
+
+            <main>
+                <div class="tenants-page-content">
+                    <div class="section">
+                        <div class="section-header-controls">
+                            <div class="filter-controls">
+                                <label for="tenantPropertyFilter">Filter by Property:</label>
+                                <select id="tenantPropertyFilter">
+                                    <option value="">All Properties</option>
+                                </select>
+                            </div>
+                            <div class="table-view-options" id="tableViewOptions" style="display: flex;">
+                                <!-- All contacts are shown by default, no filter needed -->
+                            </div>
+                        </div>
+                        <div id="tenantsList" class="tenants-grid" style="display: none;"></div>
+                        <div id="tenantsTable" class="tenants-table-container"></div>
+                    </div>
+                </div>
+            </main>
+            
+            <!-- Tenant Modal -->
+            <div id="tenantModal" class="modal">
+                <div class="modal-content" style="max-width: 800px;">
+                    <div class="modal-header">
+                        <h2 id="tenantModalTitle">Add Tenant</h2>
+                        <button class="close-btn" id="closeTenantModal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="tenantForm">
+                            <input type="hidden" id="tenantId">
+                            
+                            <!-- Basic Information -->
+                            <h3 style="margin: 20px 0 15px 0; color: #667eea; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px;">Basic Information</h3>
+                            
+                            <div class="form-group">
+                                <label for="tenantName">Tenant Name *</label>
+                                <input type="text" id="tenantName" required placeholder="e.g., John Smith, ABC Company">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="tenantType">Tenant Type *</label>
+                                <select id="tenantType" required>
+                                    <option value="">Select tenant type...</option>
+                                    <option value="Commercial">Commercial</option>
+                                    <option value="Residential">Residential</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="tenantStatus">Status *</label>
+                                <select id="tenantStatus" required>
+                                    <option value="Active">Active</option>
+                                    <option value="Past">Past</option>
+                                    <option value="Moved Out">Moved Out</option>
+                                    <option value="Prospect">Prospect</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="tenantPropertyId">Associated Property (Optional)</label>
+                                <select id="tenantPropertyId">
+                                    <option value="">No Property (Orphan Tenant)</option>
+                                </select>
+                                <small style="color: #666; font-size: 12px;">Associate tenant with a property to filter them by property. Leave blank for orphan tenants.</small>
+                            </div>
+                            
+                            <!-- Unit Assignment Section (shown only when editing) -->
+                            <div id="tenantUnitAssignmentSection" style="display: none;">
+                                <h3 style="margin: 20px 0 15px 0; color: #2563EB; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px;">Unit Assignment</h3>
+                                
+                                <div class="form-group">
+                                    <label for="tenantEditPropertyId">Property</label>
+                                    <select id="tenantEditPropertyId">
+                                        <option value="">Select property...</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="tenantEditUnitId">Unit/Space (Optional)</label>
+                                    <select id="tenantEditUnitId">
+                                        <option value="">No Unit (Property Level)</option>
+                                    </select>
+                                    <small style="color: #666; font-size: 12px;">Select a unit to assign this tenant to</small>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="tenantEditMoveInDate">Move-In Date</label>
+                                    <input type="date" id="tenantEditMoveInDate">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="tenantEditMoveOutDate">Move-Out Date</label>
+                                    <input type="date" id="tenantEditMoveOutDate">
+                                    <small style="color: #666; font-size: 12px;">Leave blank if currently occupied</small>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="tenantEditOccupancyStatus">Occupancy Status</label>
+                                    <select id="tenantEditOccupancyStatus">
+                                        <option value="Active">Active</option>
+                                        <option value="Past">Past</option>
+                                        <option value="Pending">Pending</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="tenantEditOccupancyNotes">Occupancy Notes</label>
+                                    <textarea id="tenantEditOccupancyNotes" rows="2" placeholder="Additional notes about this occupancy..."></textarea>
+                                </div>
+                                
+                                <div class="form-actions" style="margin-top: 10px;">
+                                    <button type="button" id="saveTenantOccupancyBtn" class="btn-primary btn-small">Save Unit Assignment</button>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="tenantMailingAddress">Mailing Address</label>
+                                <input type="text" id="tenantMailingAddress" placeholder="e.g., 123 Main St, City, State ZIP">
+                            </div>
+                            
+                            <!-- Commercial Specific Fields -->
+                            <div id="commercialTenantFields" style="display: none;">
+                                <h3 style="margin: 20px 0 15px 0; color: #667eea; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px;">Commercial Information</h3>
+                                
+                                <div class="form-group">
+                                    <label for="tenantTaxId">Tax ID / EIN</label>
+                                    <input type="text" id="tenantTaxId" placeholder="e.g., 12-3456789">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="tenantBusinessType">Business Type</label>
+                                    <input type="text" id="tenantBusinessType" placeholder="e.g., Retail, Office, Restaurant">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="tenantNumberOfEmployees">Number of Employees</label>
+                                    <input type="number" id="tenantNumberOfEmployees" min="0" step="1" placeholder="e.g., 25">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="tenantWebsite">Website</label>
+                                    <input type="url" id="tenantWebsite" placeholder="e.g., https://example.com">
+                                </div>
+                            </div>
+                            
+                            <!-- Residential Specific Fields -->
+                            <div id="residentialTenantFields" style="display: none;">
+                                <h3 style="margin: 20px 0 15px 0; color: #667eea; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px;">Residential Information</h3>
+                                
+                                <div class="form-group">
+                                    <label for="tenantDateOfBirth">Date of Birth</label>
+                                    <input type="date" id="tenantDateOfBirth">
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="tenantNotes">Notes</label>
+                                <textarea id="tenantNotes" rows="3" placeholder="Additional notes about the tenant..."></textarea>
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button type="submit" class="btn-primary">Save Tenant</button>
+                                <button type="button" class="btn-secondary" id="cancelTenantForm">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tenant Detail Modal -->
+            <div id="tenantDetailModal" class="modal">
+                <div class="modal-content" style="max-width: 900px; max-height: 90vh; overflow-y: auto;">
+                    <div class="modal-header">
+                        <h2 id="tenantDetailName">Tenant Details</h2>
+                        <button class="close-btn" id="closeTenantDetailModal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="property-detail-tabs" style="margin-bottom: 20px; border-bottom: 2px solid #e2e8f0;">
+                            <button class="tab-btn active" data-tab="contacts">Contacts</button>
+                            <button class="tab-btn" data-tab="occupancies">Occupancies</button>
+                        </div>
+                        <div id="contactsTab" class="tab-content active">
+                            <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <h4 style="margin: 0;">Contacts</h4>
+                                <button id="addContactBtn" class="btn-primary btn-small" style="display: none;">+ Add Contact</button>
+                            </div>
+                            <div id="contactsList" class="contacts-list"></div>
+                        </div>
+                        <div id="occupanciesTab" class="tab-content" style="display: none;">
+                            <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <h4 style="margin: 0;">Occupancies</h4>
+                                <button id="addOccupancyBtn" class="btn-primary btn-small">+ Add Occupancy</button>
+                            </div>
+                            <div id="occupanciesList" class="occupancies-list"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Send Email Modal -->
+            <div id="sendEmailModal" class="modal">
+                <div class="modal-content" style="max-width: 700px;">
+                    <div class="modal-header">
+                        <h2>Send Email</h2>
+                        <button class="close-btn" id="closeSendEmailModal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label>Select Recipients:</label>
+                            <div style="display: flex; flex-direction: column; gap: 15px; margin-top: 10px;">
+                                <div>
+                                    <label style="font-weight: 600; margin-bottom: 8px; display: block;">Buildings:</label>
+                                    <div id="buildingCheckboxes" style="max-height: 150px; overflow-y: auto; border: 1px solid #e0e0e0; padding: 10px; border-radius: 4px;">
+                                        <p style="color: #999; font-style: italic;">Loading buildings...</p>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label style="font-weight: 600; margin-bottom: 8px; display: block;">Tenants:</label>
+                                    <div id="tenantCheckboxes" style="max-height: 200px; overflow-y: auto; border: 1px solid #e0e0e0; padding: 10px; border-radius: 4px;">
+                                        <p style="color: #999; font-style: italic;">Loading tenants...</p>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label style="font-weight: 600; margin-bottom: 8px; display: block;">Individual Contacts:</label>
+                                    <div id="contactCheckboxes" style="max-height: 200px; overflow-y: auto; border: 1px solid #e0e0e0; padding: 10px; border-radius: 4px;">
+                                        <p style="color: #999; font-style: italic;">Loading contacts...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #e0e0e0;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <strong>Selected Recipients:</strong> <span id="selectedRecipientsCount">0</span>
+                                </div>
+                                <button type="button" class="btn-primary" id="openEmailClientBtn">Open Email Client</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Contact Modal -->
+            <div id="contactModal" class="modal">
+                <div class="modal-content" style="max-width: 600px;">
+                    <div class="modal-header">
+                        <h2 id="contactModalTitle">Add Contact</h2>
+                        <button class="close-btn" id="closeContactModal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="contactForm">
+                            <input type="hidden" id="contactId">
+                            
+                            <div class="form-group">
+                                <label for="contactTenantIdSelect">Tenant (Optional)</label>
+                                <select id="contactTenantIdSelect">
+                                    <option value="">No Tenant (Orphan Contact)</option>
+                                </select>
+                                <small style="color: #666; font-size: 12px;">Leave blank to create an orphan contact</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="contactPropertyId">Associated Property (Optional)</label>
+                                <select id="contactPropertyId">
+                                    <option value="">No Property (Orphan Contact)</option>
+                                </select>
+                                <small style="color: #666; font-size: 12px;">Associate contact with a property to filter them by property. Leave blank for orphan contacts.</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="contactName">Contact Name *</label>
+                                <input type="text" id="contactName" required placeholder="e.g., John Doe">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="contactEmail">Email</label>
+                                <input type="email" id="contactEmail" placeholder="e.g., john@example.com">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="contactPhone">Phone</label>
+                                <input type="tel" id="contactPhone" placeholder="e.g., (555) 123-4567">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="contactTitle">Title/Position</label>
+                                <input type="text" id="contactTitle" placeholder="e.g., Property Manager, CEO">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Contact Classifications *</label>
+                                <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
+                                    <label style="display: flex; align-items: center; gap: 8px; font-weight: normal;">
+                                        <input type="checkbox" id="contactPrimary" value="Primary">
+                                        <span>Primary Contact</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 8px; font-weight: normal;">
+                                        <input type="checkbox" id="contactSecondary" value="Secondary">
+                                        <span>Secondary Contact</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 8px; font-weight: normal;">
+                                        <input type="checkbox" id="contactLeasing" value="Leasing">
+                                        <span>Leasing Contact</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 8px; font-weight: normal;">
+                                        <input type="checkbox" id="contactBilling" value="Billing">
+                                        <span>Billing Contact</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 8px; font-weight: normal;">
+                                        <input type="checkbox" id="contactTenantRepresentative" value="Tenant Representative">
+                                        <span>Tenant Representative</span>
+                                    </label>
+                                </div>
+                                <small style="color: #666; font-size: 12px;">Select one or more classifications</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="contactNotes">Notes</label>
+                                <textarea id="contactNotes" rows="2" placeholder="Additional notes about this contact..."></textarea>
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button type="submit" class="btn-primary">Save Contact</button>
+                                <button type="button" class="btn-secondary" id="cancelContactForm">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Occupancy Modal -->
+            <div id="occupancyModal" class="modal">
+                <div class="modal-content" style="max-width: 600px;">
+                    <div class="modal-header">
+                        <h2 id="occupancyModalTitle">Add Occupancy</h2>
+                        <button class="close-btn" id="closeOccupancyModal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="occupancyForm">
+                            <input type="hidden" id="occupancyId">
+                            <input type="hidden" id="occupancyTenantId">
+                            
+                            <div class="form-group">
+                                <label for="occupancyPropertyId">Property *</label>
+                                <select id="occupancyPropertyId" required>
+                                    <option value="">Select property...</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="occupancyUnitId">Unit/Space (Optional)</label>
+                                <select id="occupancyUnitId">
+                                    <option value="">No Unit (Property Level)</option>
+                                </select>
+                                <small style="color: #666; font-size: 12px;">Select a unit if this occupancy is for a specific unit</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="occupancyMoveInDate">Move-In Date *</label>
+                                <input type="date" id="occupancyMoveInDate" required>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="occupancyMoveOutDate">Move-Out Date</label>
+                                <input type="date" id="occupancyMoveOutDate">
+                                <small style="color: #666; font-size: 12px;">Leave blank if currently occupied</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="occupancyStatus">Status *</label>
+                                <select id="occupancyStatus" required>
+                                    <option value="Active">Active</option>
+                                    <option value="Past">Past</option>
+                                    <option value="Pending">Pending</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="occupancyNotes">Notes</label>
+                                <textarea id="occupancyNotes" rows="2" placeholder="Additional notes about this occupancy..."></textarea>
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button type="submit" class="btn-primary">Save Occupancy</button>
+                                <button type="button" class="btn-secondary" id="cancelOccupancyForm">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+        <!-- Leases Page -->
+        <div id="leasesPage" class="page" style="display: none;">
+            <header>
+                <h2>Lease Management</h2>
+            </header>
+
+            <main>
+                <div class="leases-page-content">
+                    <div class="section">
+                        <div class="section-header-controls">
+                            <div class="filter-controls" style="display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 20px;">
+                                <div>
+                                    <label for="leasePropertyFilter">Filter by Property:</label>
+                                    <select id="leasePropertyFilter">
+                                        <option value="">All Properties</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="leasesList" style="display: none;"></div>
+                        <div id="leasesTable" class="leases-table-container"></div>
+                    </div>
+                </div>
+            </main>
+            
+            <!-- Unit Lease Detail Modal -->
+            <div id="unitLeaseDetailModal" class="modal">
+                <div class="modal-content" style="max-width: 900px; max-height: 90vh; overflow-y: auto;">
+                    <div class="modal-header">
+                        <h2 id="unitLeaseDetailTitle">Unit Leases</h2>
+                        <button class="close-btn" id="closeUnitLeaseDetailModal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="property-detail-tabs" style="margin-bottom: 20px; border-bottom: 2px solid #e2e8f0;">
+                            <button class="tab-btn active" data-tab="activeLeases">Active Leases</button>
+                            <button class="tab-btn" data-tab="legacyLeases">Legacy Leases</button>
+                            <button class="tab-btn" data-tab="deletedLeases">Deleted Leases</button>
+                        </div>
+                        <div id="activeLeasesTab" class="tab-content active">
+                            <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <h4 style="margin: 0;">Active Leases</h4>
+                                <button id="addLeaseFromUnitBtn" class="btn-primary btn-small">+ Add Lease</button>
+                            </div>
+                            <div id="activeLeasesList" class="leases-list"></div>
+                        </div>
+                        <div id="legacyLeasesTab" class="tab-content" style="display: none;">
+                            <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <h4 style="margin: 0;">Legacy Leases</h4>
+                            </div>
+                            <div id="legacyLeasesList" class="leases-list"></div>
+                        </div>
+                        <div id="deletedLeasesTab" class="tab-content" style="display: none;">
+                            <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <h4 style="margin: 0;">Deleted Leases</h4>
+                                <small style="color: #666;">Leases will be permanently removed after 30 days</small>
+                            </div>
+                            <div id="deletedLeasesList" class="leases-list"></div>
+                        </div>
+                    </div>
+            </div>
+        </div>
+        
+        <!-- Deprecated Lease Modal -->
+        <div id="deprecatedLeaseModal" class="modal">
+            <div class="modal-content" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h2>Mark Lease as Deprecated/Legacy</h2>
+                    <button class="modal-close" onclick="closeDeprecatedModal()">&times;</button>
+                </div>
+                <form id="deprecatedLeaseForm" style="padding: 0 30px 30px 30px;">
+                    <input type="hidden" id="deprecatedLeaseId">
+                    <div class="form-group">
+                        <label for="deprecatedLeaseDate">Deprecated/Legacy Date *</label>
+                        <input type="date" id="deprecatedLeaseDate" required>
+                        <small style="color: #666; display: block; margin-top: 5px;">Date when this lease was marked as deprecated/legacy</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="deprecatedReason">Deprecation Reason</label>
+                        <textarea id="deprecatedReason" rows="4" placeholder="Enter reason for marking this lease as deprecated/legacy (optional)"></textarea>
+                        <small style="color: #666; display: block; margin-top: 5px;">Optional: Provide context for why this lease is being marked as deprecated</small>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn-secondary" onclick="closeDeprecatedModal()">Cancel</button>
+                        <button type="submit" class="btn-danger">Mark as Deprecated</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Lease Modal -->
+        <div id="leaseModal" class="modal">
+                <div class="modal-content" style="max-width: 900px;">
+                    <div class="modal-header">
+                        <h2 id="leaseModalTitle">Add Lease</h2>
+                        <button class="close-btn" id="closeLeaseModal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="leaseForm">
+                            <input type="hidden" id="leaseId">
+                            
+                            <!-- Basic Information -->
+                            <h3 style="margin: 20px 0 15px 0; color: #667eea; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px;">Basic Information</h3>
+                            
+                            <div class="form-group">
+                                <label for="leaseNumber">Lease Number</label>
+                                <input type="text" id="leaseNumber" placeholder="Auto-generated or manual">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="leaseTenantId">Tenant *</label>
+                                <select id="leaseTenantId" required>
+                                    <option value="">Select tenant...</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="leasePropertyId">Property *</label>
+                                <select id="leasePropertyId" required>
+                                    <option value="">Select property...</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="leaseUnitId">Unit/Space (Optional)</label>
+                                <select id="leaseUnitId">
+                                    <option value="">No Unit (Property Level)</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="leaseType">Lease Type *</label>
+                                <select id="leaseType" required>
+                                    <option value="">Select type...</option>
+                                    <option value="Commercial">Commercial</option>
+                                    <option value="Residential">Residential</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="leaseStatus">Status *</label>
+                                <select id="leaseStatus" required>
+                                    <option value="Active">Active</option>
+                                    <option value="Expiring Soon">Expiring Soon</option>
+                                    <option value="Expired">Expired</option>
+                                    <option value="Terminated">Terminated</option>
+                                    <option value="Renewed">Renewed</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label style="display: flex; align-items: center; gap: 12px; cursor: pointer;">
+                                    <span style="font-weight: 600; color: #555;">Mark as Deprecated/Legacy</span>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="isDeprecated">
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </label>
+                                <small style="color: #666; display: block; margin-top: 5px;">Mark this lease as deprecated or legacy for archival purposes</small>
+                            </div>
+                            
+                            <div class="form-group" id="deprecatedDateGroup" style="display: none;">
+                                <label for="deprecatedDate">Deprecated/Legacy Date</label>
+                                <input type="date" id="deprecatedDate">
+                                <small style="color: #666; display: block; margin-top: 5px;">Date when this lease was marked as deprecated/legacy</small>
+                            </div>
+                            
+                            <div class="form-group" id="deprecatedReasonGroup" style="display: none;">
+                                <label for="deprecatedReasonInForm">Deprecation Reason</label>
+                                <textarea id="deprecatedReasonInForm" rows="3" placeholder="Enter reason for marking this lease as deprecated/legacy (optional)"></textarea>
+                                <small style="color: #666; display: block; margin-top: 5px;">Optional: Provide context for why this lease is being marked as deprecated</small>
+                            </div>
+                            
+                            <!-- Lease Dates -->
+                            <h3 style="margin: 30px 0 15px 0; color: #667eea; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px;">Lease Dates</h3>
+                            
+                            <div class="form-group">
+                                <label for="leaseStartDate">Lease Start Date *</label>
+                                <input type="date" id="leaseStartDate" required>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Lease Duration</label>
+                                <div style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
+                                    <div style="flex: 1; min-width: 200px;">
+                                        <label for="leaseEndDate" style="display: block; margin-bottom: 5px;">Lease End Date</label>
+                                        <input type="date" id="leaseEndDate">
+                                    </div>
+                                    <div style="text-align: center; padding: 0 10px; color: #999;">OR</div>
+                                    <div style="flex: 1; min-width: 200px;">
+                                        <label for="leaseTermInput" style="display: block; margin-bottom: 5px;">Lease Term</label>
+                                        <div style="display: flex; gap: 5px;">
+                                            <input type="number" id="leaseTermInput" min="0" step="0.5" placeholder="0" style="flex: 1;">
+                                            <select id="leaseTermUnit" style="width: 100px;">
+                                                <option value="months">Months</option>
+                                                <option value="years">Years</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <small style="color: #666; display: block; margin-top: 5px;">Enter either end date or term - the other will be calculated automatically</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="leaseTerm">Calculated Term (months)</label>
+                                <input type="number" id="leaseTerm" readonly placeholder="Auto-calculated">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>
+                                    <input type="checkbox" id="autoRenewal" style="margin-right: 8px;">
+                                    Auto Renewal
+                                </label>
+                                <small style="color: #666; display: block; margin-top: 5px;">Lease will automatically renew at expiration</small>
+                            </div>
+                            
+                            <div id="autoRenewalTermGroup" style="display: none;">
+                                <div class="form-group">
+                                    <label for="autoRenewalTerm">Auto Renewal Term</label>
+                                    <div style="display: flex; gap: 5px;">
+                                        <input type="number" id="autoRenewalTerm" min="1" step="0.5" placeholder="12" style="flex: 1;">
+                                        <select id="autoRenewalTermUnit" style="width: 100px;">
+                                            <option value="months">Months</option>
+                                            <option value="years">Years</option>
+                                        </select>
+                                    </div>
+                                    <small style="color: #666;">Term length for each auto renewal</small>
+                                </div>
+                            </div>
+                            
+                            <!-- Financial Information -->
+                            <h3 style="margin: 30px 0 15px 0; color: #667eea; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px;">Financial Information</h3>
+                            
+                            <div class="form-group">
+                                <label for="monthlyRent">Monthly Rent *</label>
+                                <input type="number" id="monthlyRent" step="0.01" required>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="securityDeposit">Security Deposit *</label>
+                                <input type="number" id="securityDeposit" step="0.01" required>
+                            </div>
+                            
+                            <!-- Additional Monthly Charges -->
+                            <div class="form-group" style="margin: 20px 0 10px 0;">
+                                <label style="display: flex; align-items: center; gap: 12px; cursor: pointer;">
+                                    <span style="font-weight: 600; color: #555;">Additional Monthly Charges</span>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="showAdditionalCharges">
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </label>
+                            </div>
+                            
+                            <div id="additionalChargesGroup" style="display: none;">
+                                <div class="form-group">
+                                    <label for="utilitiesCharge">Utilities</label>
+                                    <input type="number" id="utilitiesCharge" step="0.01" placeholder="0.00">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="parkingCharge">Parking</label>
+                                    <input type="number" id="parkingCharge" step="0.01" placeholder="0.00">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="petFeeCharge">Pet Fee</label>
+                                    <input type="number" id="petFeeCharge" step="0.01" placeholder="0.00">
+                                </div>
+                                
+                                <div class="form-group" id="camChargesGroup" style="display: none;">
+                                    <label for="camCharges">CAM Charges (Commercial)</label>
+                                    <input type="number" id="camCharges" step="0.01" placeholder="0.00">
+                                </div>
+                            </div>
+                            
+                            <!-- Commercial Leasing Features (Commercial Only) -->
+                            <div id="commercialLeasingFeatures" style="display: none;">
+                                <h3 style="margin: 30px 0 15px 0; color: #667eea; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px;">Commercial Leasing Features</h3>
+                                
+                                <!-- Rent Escalation -->
+                                <h4 style="margin: 20px 0 10px 0; color: #666;">Rent Escalation</h4>
+                                
+                                <div class="form-group">
+                                    <label for="escalationType">Escalation Type</label>
+                                    <select id="escalationType">
+                                        <option value="None">None</option>
+                                        <option value="Fixed Amount">Fixed Amount</option>
+                                        <option value="Percentage">Percentage</option>
+                                        <option value="CPI">CPI (Consumer Price Index)</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group" id="escalationAmountGroup" style="display: none;">
+                                    <label for="escalationAmount">Escalation Amount ($)</label>
+                                    <input type="number" id="escalationAmount" step="0.01" placeholder="0.00">
+                                    <small style="color: #666;">Fixed dollar amount increase per escalation period</small>
+                                </div>
+                                
+                                <div class="form-group" id="escalationPercentageGroup" style="display: none;">
+                                    <label for="escalationPercentage">Escalation Percentage (%)</label>
+                                    <input type="number" id="escalationPercentage" step="0.01" placeholder="0.00" min="0" max="100">
+                                    <small style="color: #666;">Percentage increase per escalation period</small>
+                                </div>
+                                
+                                <div class="form-group" id="escalationFrequencyGroup" style="display: none;">
+                                    <label for="escalationFrequency">Escalation Frequency</label>
+                                    <select id="escalationFrequency">
+                                        <option value="">Select frequency...</option>
+                                        <option value="Monthly">Monthly</option>
+                                        <option value="Quarterly">Quarterly</option>
+                                        <option value="Annually">Annually</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group" id="firstEscalationDateGroup" style="display: none;">
+                                    <label for="firstEscalationDate">First Escalation Date</label>
+                                    <input type="date" id="firstEscalationDate">
+                                    <small style="color: #666;">Date when first escalation takes effect</small>
+                                </div>
+                                
+                                <!-- Extension/Options -->
+                                <div class="form-group" style="margin: 30px 0 10px 0;">
+                                    <label style="display: flex; align-items: center; gap: 12px; cursor: pointer;">
+                                        <span style="font-weight: 600; color: #555;">Extension Options</span>
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" id="hasExtensionOptions">
+                                            <span class="toggle-slider"></span>
+                                        </label>
+                                    </label>
+                                    <small style="color: #666; display: block; margin-top: 5px;">Lease has extension/renewal options</small>
+                                </div>
+                                
+                                <div id="extensionOptionsGroup" style="display: none;">
+                                    <div class="form-group">
+                                        <label for="numberOfExtensions">Number of Extension Options</label>
+                                        <input type="number" id="numberOfExtensions" min="0" placeholder="0">
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="extensionTermLength">Extension Term Length (months)</label>
+                                        <input type="number" id="extensionTermLength" min="1" placeholder="12">
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="extensionNoticePeriod">Extension Notice Period (days)</label>
+                                        <input type="number" id="extensionNoticePeriod" min="0" placeholder="90">
+                                        <small style="color: #666;">Days before lease end that tenant must provide notice</small>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="extensionRentType">Extension Rent Type</label>
+                                        <select id="extensionRentType">
+                                            <option value="">Select type...</option>
+                                            <option value="Fair Market Value">Fair Market Value</option>
+                                            <option value="Fixed Amount">Fixed Amount</option>
+                                            <option value="Percentage Increase">Percentage Increase</option>
+                                            <option value="Same as Current">Same as Current</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="form-group" id="extensionRentAmountGroup" style="display: none;">
+                                        <label for="extensionRentAmount">Extension Rent Amount ($)</label>
+                                        <input type="number" id="extensionRentAmount" step="0.01" placeholder="0.00">
+                                    </div>
+                                    
+                                    <div class="form-group" id="extensionRentPercentageGroup" style="display: none;">
+                                        <label for="extensionRentPercentage">Extension Rent Increase (%)</label>
+                                        <input type="number" id="extensionRentPercentage" step="0.01" placeholder="0.00" min="0">
+                                    </div>
+                                </div>
+                                
+                                <!-- Additional Commercial Features -->
+                                <div class="form-group" style="margin: 30px 0 10px 0;">
+                                    <label style="display: flex; align-items: center; gap: 12px; cursor: pointer;">
+                                        <span style="font-weight: 600; color: #555;">Additional Commercial Terms</span>
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" id="showCommercialTerms">
+                                            <span class="toggle-slider"></span>
+                                        </label>
+                                    </label>
+                                </div>
+                                
+                                <div id="commercialTermsGroup" style="display: none;">
+                                    <div class="form-group">
+                                        <label for="baseYear">Base Year for CAM/Operating Expenses</label>
+                                        <input type="number" id="baseYear" placeholder="2024" min="2000" max="2100">
+                                        <small style="color: #666;">Base year used for calculating CAM and operating expense increases</small>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="operatingExpenseCap">Operating Expense Cap (%)</label>
+                                        <input type="number" id="operatingExpenseCap" step="0.01" placeholder="0.00" min="0" max="100">
+                                        <small style="color: #666;">Maximum annual increase in operating expenses (as percentage)</small>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="rentAbatementMonths">Rent Abatement Period (months)</label>
+                                        <input type="number" id="rentAbatementMonths" min="0" placeholder="0">
+                                        <small style="color: #666;">Number of months of free/reduced rent at lease start</small>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="rentAbatementAmount">Rent Abatement Amount ($)</label>
+                                        <input type="number" id="rentAbatementAmount" step="0.01" placeholder="0.00">
+                                        <small style="color: #666;">Total amount of rent abatement/concession</small>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="tenantImprovementAllowance">Tenant Improvement Allowance ($)</label>
+                                        <input type="number" id="tenantImprovementAllowance" step="0.01" placeholder="0.00">
+                                        <small style="color: #666;">Total TI allowance provided to tenant</small>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label>
+                                            <input type="checkbox" id="rightOfFirstRefusal" style="margin-right: 8px;">
+                                            Right of First Refusal
+                                        </label>
+                                        <small style="color: #666; display: block; margin-top: 5px;">Tenant has right of first refusal on adjacent/expanding space</small>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label>
+                                            <input type="checkbox" id="exclusiveUse" style="margin-right: 8px;">
+                                            Exclusive Use Clause
+                                        </label>
+                                        <small style="color: #666; display: block; margin-top: 5px;">Tenant has exclusive use rights for specific business type</small>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="exclusiveUseDescription">Exclusive Use Description</label>
+                                        <textarea id="exclusiveUseDescription" rows="2" placeholder="Describe the exclusive use rights..."></textarea>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="percentageRent">Percentage Rent Threshold ($)</label>
+                                        <input type="number" id="percentageRent" step="0.01" placeholder="0.00">
+                                        <small style="color: #666;">Sales threshold above which percentage rent applies (for retail)</small>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label for="percentageRentRate">Percentage Rent Rate (%)</label>
+                                        <input type="number" id="percentageRentRate" step="0.01" placeholder="0.00" min="0" max="100">
+                                        <small style="color: #666;">Percentage of sales above threshold paid as rent</small>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Special Terms & Notes -->
+                            <h3 style="margin: 30px 0 15px 0; color: #667eea; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px;">Additional Information</h3>
+                            
+                            <div class="form-group">
+                                <label for="specialTerms">Special Terms</label>
+                                <textarea id="specialTerms" rows="4" placeholder="Any special terms or conditions..."></textarea>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="leaseNotes">Notes</label>
+                                <textarea id="leaseNotes" rows="4" placeholder="Internal notes..."></textarea>
+                            </div>
+                            
+                            <!-- Document Upload -->
+                            <div class="form-group">
+                                <label for="leaseDocument">Lease Document (PDF)</label>
+                                <div id="leaseDocumentDropZone" style="border: 2px dashed #ccc; border-radius: 8px; padding: 30px; text-align: center; background-color: #f9f9f9; cursor: pointer; transition: all 0.3s ease; margin-top: 10px;">
+                                    <div id="leaseDocumentDropZoneContent">
+                                        <p style="margin: 0 0 10px 0; color: #666; font-size: 14px;">
+                                            <strong>Drag and drop a PDF file here</strong>
+                                        </p>
+                                        <p style="margin: 0; color: #999; font-size: 12px;">or</p>
+                                        <label for="leaseDocument" style="display: inline-block; margin-top: 10px; padding: 8px 16px; background-color: #667eea; color: white; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                                            Browse Files
+                                        </label>
+                                        <input type="file" id="leaseDocument" accept=".pdf" style="display: none;">
+                                    </div>
+                                    <div id="leaseDocumentFileName" style="display: none; margin-top: 10px; padding: 8px; background-color: #e8f4f8; border-radius: 4px;">
+                                        <span id="leaseDocumentFileNameText" style="color: #667eea; font-weight: 500;"></span>
+                                        <button type="button" id="leaseDocumentRemoveBtn" style="margin-left: 10px; padding: 4px 8px; background-color: #dc2626; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Remove</button>
+                                    </div>
+                                </div>
+                                <small style="color: #666; display: block; margin-top: 8px;">Upload the signed lease document (PDF only)</small>
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button type="button" class="btn-secondary" id="cancelLeaseBtn">Cancel</button>
+                                <button type="button" class="btn-secondary" id="editLeaseBtn" style="display: none;">Edit</button>
+                                <button type="submit" class="btn-primary">Save Lease</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    <!-- Floating Action Buttons -->
+    <div class="fab-container">
+        <button id="fabAddTenant" class="fab" title="Add Tenant" style="display: none;">
+            <span class="fab-icon">+</span>
+            <span class="fab-label">Add Tenant</span>
+        </button>
+        <button id="fabAddContact" class="fab" title="Add Contact" style="display: none;">
+            <span class="fab-icon">+</span>
+            <span class="fab-label">Add Contact</span>
+        </button>
+        <button id="fabAddBuilding" class="fab" title="Add Building" style="display: none;">
+            <span class="fab-icon">+</span>
+            <span class="fab-label">Add Building</span>
+        </button>
+        <button id="fabAddUnit" class="fab" title="Add Unit" style="display: none;">
+            <span class="fab-icon">+</span>
+            <span class="fab-label">Add Unit</span>
+        </button>
+        <button id="fabAddLease" class="fab" title="Add Lease" style="display: none;">
+            <span class="fab-icon">+</span>
+            <span class="fab-label">Add Lease</span>
+        </button>
+    </div>
+
+    <!-- Firebase Config - Automatically selects config based on environment -->
+    <script>
+        // Auto-detect environment and load appropriate Firebase config
+        (function() {
+            const hostname = window.location.hostname;
+            const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
+            const isProduction = hostname === 'www.proppli.com' || hostname === 'proppli.com';
+            const isStaging = hostname === 'staging.proppli.com';
+            
+            const urlParams = new URLSearchParams(window.location.search);
+            const forceProd = urlParams.get('prod') === 'true';
+            const forceStaging = urlParams.get('staging') === 'true';
+            const forceDev = urlParams.get('dev') === 'true';
+            
+            // Determine which config to use
+            let configFile;
+            let environment;
+            
+            if (forceProd) {
+                configFile = 'firebase-config.production.js';
+                environment = 'PRODUCTION (forced)';
+                console.log('🔵 Using PRODUCTION database (forced via ?prod=true)');
+            } else if (forceStaging) {
+                configFile = 'firebase-config.staging.js';
+                environment = 'STAGING (forced)';
+                console.log('🟡 Using STAGING database (forced via ?staging=true)');
+            } else if (forceDev) {
+                configFile = 'firebase-config.development.js';
+                environment = 'DEVELOPMENT (forced)';
+                console.log('🟢 Using DEVELOPMENT database (forced via ?dev=true)');
+            } else if (isProduction) {
+                configFile = 'firebase-config.production.js';
+                environment = 'PRODUCTION';
+                console.log('🔵 Using PRODUCTION database (www.proppli.com detected)');
+            } else if (isStaging) {
+                configFile = 'firebase-config.staging.js';
+                environment = 'STAGING';
+                console.log('🟡 Using STAGING database (staging.proppli.com detected)');
+            } else if (isLocal) {
+                configFile = 'firebase-config.development.js';
+                environment = 'DEVELOPMENT';
+                console.log('🟢 Using DEVELOPMENT database (localhost detected)');
+            } else {
+                // Fallback: default to development for unknown domains
+                configFile = 'firebase-config.development.js';
+                environment = 'DEVELOPMENT (fallback)';
+                console.log('🟢 Using DEVELOPMENT database (unknown domain, defaulting to dev)');
+            }
+            const script = document.createElement('script');
+            script.src = configFile;
+            
+            // Wait for config to load before loading app.js
+            script.onload = function() {
+                console.log(`✅ Config script loaded: ${configFile} (${environment})`);
+                
+                // Give it a moment for Firebase to initialize
+                setTimeout(function() {
+                    // Verify db is defined
+                    if (typeof db === 'undefined') {
+                        console.error('❌ Firebase db is not defined after loading config');
+                        console.error('Firebase object:', typeof firebase !== 'undefined' ? 'exists' : 'missing');
+                        console.error('Config file attempted:', configFile);
+                        alert(`Error: Firebase configuration did not initialize properly.\n\nEnvironment: ${environment}\nConfig file: ${configFile}\n\nPlease check that the config file exists and contains valid Firebase credentials.`);
+                        return;
+                    }
+                    
+                    console.log('✅ Firebase db is ready, loading app.js...');
+                    
+                    // Now load app.js after config is ready
+                    const appScript = document.createElement('script');
+                    appScript.src = 'app.js?v=7.0';
+                    appScript.onload = function() {
+                        console.log('✅ app.js loaded successfully');
+                    };
+                    appScript.onerror = function() {
+                        console.error('❌ Failed to load app.js');
+                        alert('Error: Failed to load app.js. Please check the file exists.');
+                    };
+                    document.head.appendChild(appScript);
+                }, 100);
+            };
+            
+            script.onerror = function() {
+                console.error('❌ Firebase config file not found:', configFile);
+                console.error('Environment:', environment);
+                console.error('Hostname:', hostname);
+                
+                // Try fallback to development config
+                console.warn('⚠️ Attempting fallback to development config');
+                const fallback = document.createElement('script');
+                fallback.src = 'firebase-config.development.js';
+                fallback.onload = function() {
+                    if (typeof db === 'undefined') {
+                        console.error('❌ Firebase db is not defined after loading fallback config');
+                        alert(`Error: Firebase configuration file is missing or invalid.\n\nAttempted: ${configFile}\nFallback: firebase-config.development.js\n\nPlease ensure the config files exist and contain valid Firebase credentials.`);
+                        return;
+                    }
+                    console.log('✅ Fallback config loaded successfully');
+                    const appScript = document.createElement('script');
+                    appScript.src = 'app.js?v=7.0';
+                    document.head.appendChild(appScript);
+                };
+                fallback.onerror = function() {
+                    alert(`Error: Firebase configuration files are missing.\n\nPlease ensure the following files exist:\n- firebase-config.production.js\n- firebase-config.staging.js\n- firebase-config.development.js\n\nAnd that they contain valid Firebase credentials.`);
+                };
+                document.head.appendChild(fallback);
+            };
+            document.head.appendChild(script);
+        })();
     </script>
 </body>
 </html>
