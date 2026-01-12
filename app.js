@@ -10431,16 +10431,18 @@ function calculateRentForMonth(lease, year, month) {
     const targetYear = year;
     const targetMonth = month - 1; // Convert to 0-based (0 = January, 11 = December)
     
-    // Debug logging (remove after testing)
-    if (lease.tenantId && month === 1 && year === 2026) {
-        console.log('Escalation Debug - January 2026:', {
-            tenantId: lease.tenantId,
+    // Debug logging for Carver Darden lease (remove after fixing)
+    const tenantName = lease.tenantId ? (tenants && tenants[lease.tenantId] ? tenants[lease.tenantId].tenantName : '') : '';
+    if (tenantName && tenantName.toLowerCase().includes('carver')) {
+        console.log(`Escalation Debug - ${tenantName} - ${month}/${year}:`, {
             firstEscDate: firstEscDate.toISOString(),
+            firstEscDateLocal: `${firstEscDate.getFullYear()}-${String(firstEscDate.getMonth() + 1).padStart(2, '0')}-${String(firstEscDate.getDate()).padStart(2, '0')}`,
             firstEscYear,
-            firstEscMonth,
+            firstEscMonth: firstEscMonth + 1, // Show as 1-12
             targetYear,
-            targetMonth,
-            beforeCheck: targetYear < firstEscYear || (targetYear === firstEscYear && targetMonth < firstEscMonth)
+            targetMonth: targetMonth + 1, // Show as 1-12
+            beforeCheck: targetYear < firstEscYear || (targetYear === firstEscYear && targetMonth < firstEscMonth),
+            periods: 'will calculate below'
         });
     }
     
