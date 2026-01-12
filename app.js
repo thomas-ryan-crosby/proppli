@@ -140,6 +140,9 @@ function initAuth() {
                 // Only show application if user profile loaded successfully and is active
                 if (currentUserProfile && currentUserProfile.isActive) {
                     showApplication();
+                    // Load data now that user is authenticated
+                    loadProperties();
+                    loadTickets();
                 }
             } else {
                 console.log('👤 No user authenticated');
@@ -719,8 +722,13 @@ function initializeApp() {
     setupLeaseEventListeners();
     setupNavigation();
     setupUserMenu();
-    loadProperties();
-    loadTickets();
+    
+    // Only load data if user is authenticated
+    if (currentUser && auth && auth.currentUser) {
+        loadProperties();
+        loadTickets();
+    }
+    
     showPage(currentPage);
     updateFABsVisibility();
     
@@ -1257,6 +1265,11 @@ function setupEventListeners() {
 
 // Property Management
 function loadProperties() {
+    // Don't load if user is not authenticated
+    if (!currentUser || !auth || !auth.currentUser) {
+        return;
+    }
+    
     db.collection('properties').onSnapshot((snapshot) => {
         const properties = {};
         snapshot.docs.forEach(doc => {
@@ -8111,6 +8124,11 @@ function shouldPermanentlyRemoveLease(lease) {
 
 // Load leases from Firestore
 async function loadLeases() {
+    // Don't load if user is not authenticated
+    if (!currentUser || !auth || !auth.currentUser) {
+        return;
+    }
+    
     try {
         const leasesSnapshot = await db.collection('leases').orderBy('leaseStartDate', 'desc').get();
         const leases = {};
@@ -10875,6 +10893,11 @@ async function populateRentRollFilters() {
     
     if (!propertyFilter) return;
     
+    // Don't load if user is not authenticated
+    if (!currentUser || !auth || !auth.currentUser) {
+        return;
+    }
+    
     try {
         // Populate property filter
         const propertiesSnapshot = await db.collection('properties').orderBy('name').get();
@@ -11141,6 +11164,11 @@ function calculateRentForMonth(lease, year, month) {
 async function loadRentRoll() {
     const rentRollTable = document.getElementById('rentRollTable');
     if (!rentRollTable) return;
+    
+    // Don't load if user is not authenticated
+    if (!currentUser || !auth || !auth.currentUser) {
+        return;
+    }
     
     try {
         // Get filters
