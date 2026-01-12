@@ -17,6 +17,7 @@ let selectedPropertyForTenants = null;
 
 // Lease Management
 let editingLeaseId = null;
+let currentPropertyIdForLeaseDetail = null;
 let currentLeaseView = 'current'; // 'current' or 'previous'
 let leaseDocumentFile = null;
 
@@ -9371,6 +9372,7 @@ let currentUnitIdForDetail = null;
 
 window.viewUnitLeasesDetail = async function(unitId) {
     currentUnitIdForDetail = unitId;
+    currentPropertyIdForLeaseDetail = null;
     const modal = document.getElementById('unitLeaseDetailModal');
     if (!modal) return;
     
@@ -9412,6 +9414,9 @@ window.viewUnitLeasesDetail = async function(unitId) {
 window.viewPropertyLeasesDetail = async function(propertyId) {
     const modal = document.getElementById('unitLeaseDetailModal');
     if (!modal) return;
+    
+    currentPropertyIdForLeaseDetail = propertyId;
+    currentUnitIdForDetail = null;
     
     modal.setAttribute('data-property-id', propertyId);
     modal.removeAttribute('data-unit-id');
@@ -9455,6 +9460,7 @@ window.backToLeases = function() {
         modal.classList.remove('show');
     }
     currentUnitIdForDetail = null;
+    currentPropertyIdForLeaseDetail = null;
 };
 
 // Load active leases for a unit
