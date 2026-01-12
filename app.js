@@ -10431,6 +10431,19 @@ function calculateRentForMonth(lease, year, month) {
     const targetYear = year;
     const targetMonth = month - 1; // Convert to 0-based (0 = January, 11 = December)
     
+    // Debug logging (remove after testing)
+    if (lease.tenantId && month === 1 && year === 2026) {
+        console.log('Escalation Debug - January 2026:', {
+            tenantId: lease.tenantId,
+            firstEscDate: firstEscDate.toISOString(),
+            firstEscYear,
+            firstEscMonth,
+            targetYear,
+            targetMonth,
+            beforeCheck: targetYear < firstEscYear || (targetYear === firstEscYear && targetMonth < firstEscMonth)
+        });
+    }
+    
     // If we haven't reached the first escalation month, return initial rent
     // We use strict less-than: target must be at or after the escalation month
     if (targetYear < firstEscYear) {
