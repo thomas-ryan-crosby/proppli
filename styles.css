@@ -2393,3 +2393,54 @@ hr {
     }
 }
 
+ 
+ / *   R e n t   R o l l   T a b l e   S t y l e s   * /  
+ /* Rent Roll Table Styles */
+.rent-roll-container {
+    margin-top: 20px;
+}
+
+.rent-roll-table {
+    font-size: 0.875rem;
+}
+
+.rent-roll-table tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+.rent-roll-table th {
+    white-space: nowrap;
+}
+
+.rent-roll-table td {
+    white-space: nowrap;
+}
+
+/* Finance Tabs */
+.finance-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.finance-tabs .tab-btn {
+    padding: 10px 20px;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px 8px 0 0;
+    cursor: pointer;
+    font-weight: 500;
+    color: #64748b;
+    transition: all 0.2s;
+}
+
+.finance-tabs .tab-btn:hover {
+    background: #f8f9fa;
+    color: #1e293b;
+}
+
+.finance-tabs .tab-btn.active {
+    background: #667eea;
+    color: white;
+    border-color: #667eea;
+}
