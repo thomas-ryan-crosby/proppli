@@ -10901,6 +10901,9 @@ async function populateRentRollFilters() {
         }
     } catch (error) {
         console.error('Error loading filters for rent roll:', error);
+        if (error.code === 'permission-denied') {
+            handlePermissionError('rent roll filters');
+        }
     }
 }
 
