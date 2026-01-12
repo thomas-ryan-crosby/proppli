@@ -229,6 +229,12 @@ function updateUserMenu() {
 let permissionErrorShown = false;
 
 function handlePermissionError(context = '') {
+    // Only show modal if user is actually logged in
+    if (!currentUser || !auth || !auth.currentUser) {
+        // No user logged in, just log the error silently
+        return;
+    }
+    
     // Only show modal once per session
     if (permissionErrorShown) {
         return;
@@ -2923,6 +2929,11 @@ function handlePropertySelect(e) {
 
 // Ticket Management
 function loadTickets() {
+    // Don't load if user is not authenticated
+    if (!currentUser || !auth || !auth.currentUser) {
+        return;
+    }
+    
     db.collection('tickets').onSnapshot((snapshot) => {
         const tickets = {};
         snapshot.docs.forEach(doc => {
@@ -4149,6 +4160,11 @@ window.openPhotoModal = function(photoUrl) {
 // Tenant Management - variables moved to top
 
 function loadTenants() {
+    // Don't load if user is not authenticated
+    if (!currentUser || !auth || !auth.currentUser) {
+        return;
+    }
+    
     db.collection('tenants').onSnapshot((snapshot) => {
         const tenants = {};
         snapshot.forEach((doc) => {
