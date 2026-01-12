@@ -7772,6 +7772,40 @@ window.openLeaseModal = async function(leaseId = null, editMode = false, unitId 
                 leaseNumberInput.value = `LEASE-${timestamp}`;
             }
             
+            // Ensure toggles are off and groups are hidden for new lease
+            const showAdditionalChargesToggle = document.getElementById('showAdditionalCharges');
+            const additionalChargesGroup = document.getElementById('additionalChargesGroup');
+            if (showAdditionalChargesToggle) {
+                showAdditionalChargesToggle.checked = false;
+                if (additionalChargesGroup) {
+                    additionalChargesGroup.style.display = 'none';
+                }
+            }
+            
+            const hasExtensionOptionsCheckbox = document.getElementById('hasExtensionOptions');
+            const extensionOptionsGroup = document.getElementById('extensionOptionsGroup');
+            if (hasExtensionOptionsCheckbox) {
+                hasExtensionOptionsCheckbox.checked = false;
+                if (extensionOptionsGroup) {
+                    extensionOptionsGroup.style.display = 'none';
+                }
+            }
+            
+            const showCommercialTermsToggle = document.getElementById('showCommercialTerms');
+            const commercialTermsGroup = document.getElementById('commercialTermsGroup');
+            if (showCommercialTermsToggle) {
+                showCommercialTermsToggle.checked = false;
+                if (commercialTermsGroup) {
+                    commercialTermsGroup.style.display = 'none';
+                }
+            }
+            
+            // Reset lease term field
+            const termInput = document.getElementById('leaseTerm');
+            if (termInput) {
+                termInput.value = '';
+            }
+            
             // Pre-populate unit if provided
             if (unitId) {
                 const unitDoc = await db.collection('units').doc(unitId).get();
@@ -8052,33 +8086,60 @@ async function populateLeaseFormDropdowns() {
     if (startDateInput && endDateInput && termInput && termInputField && termUnitSelect) {
         const calculateTermFromDates = () => {
             if (startDateInput.value && endDateInput.value) {
-                const start = new Date(startDateInput.value);
-                const end = new Date(endDateInput.value);
+                // Parse dates as local dates (not UTC) to avoid timezone issues
+                const startParts = startDateInput.value.split('-');
+                const endParts = endDateInput.value.split('-');
+                
+                if (startParts.length !== 3 || endParts.length !== 3) {
+                    termInput.value = '';
+                    return;
+                }
+                
+                const start = new Date(parseInt(startParts[0]), parseInt(startParts[1]) - 1, parseInt(startParts[2]));
+                const end = new Date(parseInt(endParts[0]), parseInt(endParts[1]) - 1, parseInt(endParts[2]));
                 
                 // Validate dates
                 if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-                    termInput.value = 0;
+                    termInput.value = '';
                     return;
                 }
                 
-                // Ensure end date is after start date
+                // Ensure end date is after or equal to start date
                 if (end < start) {
-                    termInput.value = 0;
+                    termInput.value = '';
                     return;
                 }
                 
-                const months = Math.round((end - start) / (1000 * 60 * 60 * 24 * 30.44));
-                termInput.value = months > 0 ? months : 0;
+                // Calculate difference in months more accurately
+                const yearDiff = end.getFullYear() - start.getFullYear();
+                const monthDiff = end.getMonth() - start.getMonth();
+                const dayDiff = end.getDate() - start.getDate();
                 
-                // Update term input field if it's empty
-                if (!termInputField.value) {
-                    const unit = termUnitSelect.value;
-                    if (unit === 'years') {
-                        termInputField.value = (months / 12).toFixed(1);
-                    } else {
-                        termInputField.value = months;
-                    }
+                let months = yearDiff * 12 + monthDiff;
+                // If end date is earlier in the month, don't count that month
+                if (dayDiff < 0) {
+                    months -= 1;
                 }
+                
+                // Only set if positive
+                if (months > 0) {
+                    termInput.value = months;
+                    
+                    // Update term input field if it's empty
+                    if (!termInputField.value) {
+                        const unit = termUnitSelect.value;
+                        if (unit === 'years') {
+                            termInputField.value = (months / 12).toFixed(1);
+                        } else {
+                            termInputField.value = months;
+                        }
+                    }
+                } else {
+                    termInput.value = '';
+                }
+            } else {
+                // Clear term if dates are not both set
+                termInput.value = '';
             }
         };
         
@@ -8621,20 +8682,38 @@ async function handleLeaseSubmit(e) {
                 const termUnit = document.getElementById('leaseTermUnit');
                 
                 if (endDateInput && endDateInput.value && startDateInput && startDateInput.value) {
-                    const start = new Date(startDateInput.value);
-                    const end = new Date(endDateInput.value);
+                    // Parse dates as local dates (not UTC) to avoid timezone issues
+                    const startParts = startDateInput.value.split('-');
+                    const endParts = endDateInput.value.split('-');
+                    
+                    if (startParts.length !== 3 || endParts.length !== 3) {
+                        return 0;
+                    }
+                    
+                    const start = new Date(parseInt(startParts[0]), parseInt(startParts[1]) - 1, parseInt(startParts[2]));
+                    const end = new Date(parseInt(endParts[0]), parseInt(endParts[1]) - 1, parseInt(endParts[2]));
                     
                     // Validate dates
                     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
                         return 0;
                     }
                     
-                    // Ensure end date is after start date
+                    // Ensure end date is after or equal to start date
                     if (end < start) {
                         return 0;
                     }
                     
-                    const months = Math.round((end - start) / (1000 * 60 * 60 * 24 * 30.44));
+                    // Calculate difference in months more accurately
+                    const yearDiff = end.getFullYear() - start.getFullYear();
+                    const monthDiff = end.getMonth() - start.getMonth();
+                    const dayDiff = end.getDate() - start.getDate();
+                    
+                    let months = yearDiff * 12 + monthDiff;
+                    // If end date is earlier in the month, don't count that month
+                    if (dayDiff < 0) {
+                        months -= 1;
+                    }
+                    
                     return months > 0 ? months : 0;
                 } else if (termInput && termInput.value) {
                     const termValue = parseFloat(termInput.value) || 0;
