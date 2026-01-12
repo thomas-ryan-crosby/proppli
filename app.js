@@ -10469,6 +10469,10 @@ async function loadRentRoll() {
         const tenantFilter = document.getElementById('rentRollTenantFilter')?.value || '';
         const yearFilter = parseInt(document.getElementById('rentRollYearFilter')?.value || new Date().getFullYear());
         
+        // Get view options
+        const orientation = document.querySelector('input[name="rentRollOrientation"]:checked')?.value || 'vertical';
+        const breakoutByBuilding = document.getElementById('rentRollBreakoutByBuilding')?.checked || false;
+        
         // Load all necessary data
         const [leasesSnapshot, propertiesSnapshot, tenantsSnapshot, unitsSnapshot, buildingsSnapshot] = await Promise.all([
             db.collection('leases').get(),
@@ -10539,7 +10543,7 @@ async function loadRentRoll() {
         });
         
         // Render rent roll
-        renderRentRoll(leasesByProperty, properties, tenants, units, buildings, yearFilter);
+        renderRentRoll(leasesByProperty, properties, tenants, units, buildings, yearFilter, orientation, breakoutByBuilding);
         
     } catch (error) {
         console.error('Error loading rent roll:', error);
@@ -10547,8 +10551,8 @@ async function loadRentRoll() {
     }
 }
 
-// Render rent roll table (transposed: months as rows, tenants as columns)
-function renderRentRoll(leasesByProperty, properties, tenants, units, buildings, year) {
+// Render rent roll table
+function renderRentRoll(leasesByProperty, properties, tenants, units, buildings, year, orientation = 'vertical', breakoutByBuilding = false) {
     const rentRollTable = document.getElementById('rentRollTable');
     if (!rentRollTable) return;
     
@@ -10557,146 +10561,326 @@ function renderRentRoll(leasesByProperty, properties, tenants, units, buildings,
         return;
     }
     
+    if (orientation === 'vertical') {
+        renderRentRollVertical(leasesByProperty, properties, tenants, units, buildings, year, breakoutByBuilding);
+    } else {
+        renderRentRollHorizontal(leasesByProperty, properties, tenants, units, buildings, year, breakoutByBuilding);
+    }
+}
+
+// Render rent roll in vertical orientation (tenants as columns, months as rows)
+function renderRentRollVertical(leasesByProperty, properties, tenants, units, buildings, year, breakoutByBuilding) {
+    const rentRollTable = document.getElementById('rentRollTable');
     let html = '';
     
-    // Month abbreviations
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const monthLabels = months.map((m, i) => `${m}/${String(year).slice(-2)}`);
     
-    // Process each property
     Object.keys(leasesByProperty).forEach(propertyId => {
         const property = properties[propertyId] || { name: 'Unknown Property' };
         const propertyLeases = leasesByProperty[propertyId];
         
-        // Sort leases by tenant name
-        propertyLeases.sort((a, b) => {
-            const tenantA = tenants[a.tenantId]?.tenantName || '';
-            const tenantB = tenants[b.tenantId]?.tenantName || '';
-            return tenantA.localeCompare(tenantB);
-        });
-        
-        // Property header
         html += `<div style="margin-bottom: 40px;">`;
         html += `<h3 style="margin-bottom: 20px; color: #1e293b; font-size: 1.5rem;">${escapeHtml(property.name)} Rent Roll</h3>`;
         html += `<div style="font-size: 0.9em; color: #64748b; margin-bottom: 15px;">As of ${new Date().toLocaleDateString()}</div>`;
         
-        // Rent roll table
-        html += `<div style="overflow-x: auto; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">`;
-        html += `<table class="rent-roll-table" style="width: 100%; min-width: 800px; border-collapse: collapse;">`;
-        
-        // Header row: Month column + Tenant columns
-        html += `<thead>`;
-        html += `<tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">`;
-        html += `<th style="padding: 12px; text-align: left; font-weight: 600; border: 1px solid rgba(255,255,255,0.2); position: sticky; left: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); z-index: 10; min-width: 120px;">Month</th>`;
-        
-        // Tenant columns (with suite # and area)
-        propertyLeases.forEach(lease => {
-            const tenant = tenants[lease.tenantId];
-            const tenantName = tenant?.tenantName || 'Unknown Tenant';
-            const unit = lease.unitId ? units[lease.unitId] : null;
-            const suiteNumber = unit?.unitNumber || 'N/A';
-            const squareFootage = unit?.squareFootage || null;
-            const building = unit?.buildingId ? buildings[unit.buildingId] : null;
-            const buildingName = building?.name || '';
-            
-            html += `<th style="padding: 12px; text-align: center; font-weight: 600; border: 1px solid rgba(255,255,255,0.2); min-width: 140px; vertical-align: top;">`;
-            html += `<div style="font-weight: 600; margin-bottom: 4px;">${escapeHtml(tenantName)}</div>`;
-            html += `<div style="font-size: 0.85em; font-weight: 400; opacity: 0.9; margin-bottom: 2px;">${escapeHtml(suiteNumber)}</div>`;
-            if (squareFootage) {
-                html += `<div style="font-size: 0.8em; font-weight: 400; opacity: 0.8;">${squareFootage.toLocaleString()} SF</div>`;
-            }
-            html += `</th>`;
-        });
-        
-        html += `<th style="padding: 12px; text-align: right; font-weight: 600; border: 1px solid rgba(255,255,255,0.2); position: sticky; right: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); z-index: 10; min-width: 120px;">Total</th>`;
-        html += `</tr>`;
-        html += `</thead>`;
-        html += `<tbody>`;
-        
-        // Data rows: One row per month
-        const monthlyTotals = [];
-        for (let month = 1; month <= 12; month++) {
-            html += `<tr style="border-bottom: 1px solid #e2e8f0;">`;
-            
-            // Month column (sticky)
-            html += `<td style="padding: 10px; font-weight: 600; position: sticky; left: 0; background: white; z-index: 5; border-right: 1px solid #e2e8f0;">${monthLabels[month - 1]}</td>`;
-            
-            let monthTotal = 0;
-            
-            // Tenant columns
+        if (breakoutByBuilding) {
+            // Group leases by building
+            const leasesByBuilding = {};
             propertyLeases.forEach(lease => {
-                const result = calculateRentForMonth(lease, year, month);
-                const rent = result.rent;
-                monthTotal += rent;
-                
-                // Check if this month has an escalation (rent changed from previous month)
-                let hasEscalation = false;
-                if (month > 1 && rent > 0) {
-                    const prevResult = calculateRentForMonth(lease, year, month - 1);
-                    const prevRent = prevResult.rent;
-                    if (prevRent > 0 && Math.abs(rent - prevRent) > 0.01) {
-                        hasEscalation = true;
-                    }
-                } else if (month === 1 && result.hasEscalation && rent > 0) {
-                    // First month escalation check
-                    hasEscalation = true;
+                const unit = lease.unitId ? units[lease.unitId] : null;
+                const buildingId = unit?.buildingId || 'no-building';
+                if (!leasesByBuilding[buildingId]) {
+                    leasesByBuilding[buildingId] = [];
                 }
-                
-                const rentDisplay = rent > 0 ? `$${rent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—';
-                const cellColor = rent > 0 ? '#1e293b' : '#cbd5e1';
-                
-                html += `<td style="padding: 10px; text-align: right; font-variant-numeric: tabular-nums; color: ${cellColor}; position: relative;">`;
-                
-                // Escalation indicator (up arrow in top right)
-                if (hasEscalation && rent > 0) {
-                    html += `<span style="position: absolute; top: 2px; right: 4px; color: #10b981; font-size: 0.75em; font-weight: bold;" title="Rent escalation applied">↑</span>`;
-                }
-                
-                html += `<span style="display: block; padding-right: ${hasEscalation ? '12px' : '0'};">${rentDisplay}</span>`;
-                html += `</td>`;
+                leasesByBuilding[buildingId].push(lease);
             });
             
-            monthlyTotals.push(monthTotal);
+            // Render each building separately
+            Object.keys(leasesByBuilding).forEach(buildingId => {
+                const buildingLeases = leasesByBuilding[buildingId];
+                const building = buildingId !== 'no-building' ? buildings[buildingId] : null;
+                const buildingName = building?.name || 'No Building Assigned';
+                
+                html += renderVerticalTable(buildingLeases, tenants, units, buildings, year, monthLabels, buildingName);
+            });
+        } else {
+            // Render all leases together
+            propertyLeases.sort((a, b) => {
+                const tenantA = tenants[a.tenantId]?.tenantName || '';
+                const tenantB = tenants[b.tenantId]?.tenantName || '';
+                return tenantA.localeCompare(tenantB);
+            });
             
-            // Total column (sticky)
-            html += `<td style="padding: 10px; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; color: #667eea; position: sticky; right: 0; background: white; z-index: 5; border-left: 1px solid #e2e8f0;">$${monthTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
-            
-            html += `</tr>`;
+            html += renderVerticalTable(propertyLeases, tenants, units, buildings, year, monthLabels);
         }
         
-        // Total row
-        let grandTotal = 0;
-        propertyLeases.forEach(lease => {
-            let annualRent = 0;
-            for (let month = 1; month <= 12; month++) {
-                const result = calculateRentForMonth(lease, year, month);
-                annualRent += result.rent;
-            }
-            grandTotal += annualRent;
-        });
-        
-        html += `<tr style="background: #f8f9fa; font-weight: 600; border-top: 2px solid #667eea;">`;
-        html += `<td style="padding: 12px; position: sticky; left: 0; background: #f8f9fa; z-index: 5; border-right: 1px solid #e2e8f0;">TOTAL</td>`;
-        
-        // Annual totals for each tenant
-        propertyLeases.forEach(lease => {
-            let annualRent = 0;
-            for (let month = 1; month <= 12; month++) {
-                const result = calculateRentForMonth(lease, year, month);
-                annualRent += result.rent;
-            }
-            
-            html += `<td style="padding: 12px; text-align: right; font-variant-numeric: tabular-nums; color: #667eea;">$${annualRent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
-        });
-        
-        html += `<td style="padding: 12px; text-align: right; font-variant-numeric: tabular-nums; color: #667eea; font-size: 1.1em; position: sticky; right: 0; background: #f8f9fa; z-index: 5; border-left: 1px solid #e2e8f0;">$${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
-        html += `</tr>`;
-        
-        html += `</tbody>`;
-        html += `</table>`;
-        html += `</div>`;
         html += `</div>`;
     });
     
     rentRollTable.innerHTML = html;
+}
+
+// Helper function to render vertical table
+function renderVerticalTable(leases, tenants, units, buildings, year, monthLabels, buildingName = null) {
+    let html = '';
+    
+    if (buildingName) {
+        html += `<h4 style="margin: 20px 0 10px 0; color: #475569; font-size: 1.2rem;">${escapeHtml(buildingName)}</h4>`;
+    }
+    
+    html += `<div style="overflow-x: auto; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px;">`;
+    html += `<table class="rent-roll-table" style="width: 100%; min-width: 800px; border-collapse: collapse;">`;
+    
+    // Header row
+    html += `<thead>`;
+    html += `<tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">`;
+    html += `<th style="padding: 12px; text-align: left; font-weight: 600; border: 1px solid rgba(255,255,255,0.2); position: sticky; left: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); z-index: 10; min-width: 120px;">Month</th>`;
+    
+    leases.forEach(lease => {
+        const tenant = tenants[lease.tenantId];
+        const tenantName = tenant?.tenantName || 'Unknown Tenant';
+        const unit = lease.unitId ? units[lease.unitId] : null;
+        const suiteNumber = unit?.unitNumber || 'N/A';
+        const squareFootage = unit?.squareFootage || null;
+        
+        html += `<th style="padding: 12px; text-align: center; font-weight: 600; border: 1px solid rgba(255,255,255,0.2); min-width: 140px; vertical-align: top;">`;
+        html += `<div style="font-weight: 600; margin-bottom: 4px;">${escapeHtml(tenantName)}</div>`;
+        html += `<div style="font-size: 0.85em; font-weight: 400; opacity: 0.9; margin-bottom: 2px;">${escapeHtml(suiteNumber)}</div>`;
+        if (squareFootage) {
+            html += `<div style="font-size: 0.8em; font-weight: 400; opacity: 0.8;">${squareFootage.toLocaleString()} SF</div>`;
+        }
+        html += `</th>`;
+    });
+    
+    html += `<th style="padding: 12px; text-align: right; font-weight: 600; border: 1px solid rgba(255,255,255,0.2); position: sticky; right: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); z-index: 10; min-width: 120px;">Total</th>`;
+    html += `</tr>`;
+    html += `</thead>`;
+    html += `<tbody>`;
+    
+    // Data rows: One row per month
+    const monthlyTotals = [];
+    for (let month = 1; month <= 12; month++) {
+        html += `<tr style="border-bottom: 1px solid #e2e8f0;">`;
+        html += `<td style="padding: 10px; font-weight: 600; position: sticky; left: 0; background: white; z-index: 5; border-right: 1px solid #e2e8f0;">${monthLabels[month - 1]}</td>`;
+        
+        let monthTotal = 0;
+        
+        leases.forEach(lease => {
+            const result = calculateRentForMonth(lease, year, month);
+            const rent = result.rent;
+            monthTotal += rent;
+            
+            let hasEscalation = false;
+            if (month > 1 && rent > 0) {
+                const prevResult = calculateRentForMonth(lease, year, month - 1);
+                const prevRent = prevResult.rent;
+                if (prevRent > 0 && Math.abs(rent - prevRent) > 0.01) {
+                    hasEscalation = true;
+                }
+            } else if (month === 1 && result.hasEscalation && rent > 0) {
+                hasEscalation = true;
+            }
+            
+            const rentDisplay = rent > 0 ? `$${rent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—';
+            const cellColor = rent > 0 ? '#1e293b' : '#cbd5e1';
+            
+            html += `<td style="padding: 10px; text-align: right; font-variant-numeric: tabular-nums; color: ${cellColor}; position: relative;">`;
+            if (hasEscalation && rent > 0) {
+                html += `<span style="position: absolute; top: 2px; right: 4px; color: #10b981; font-size: 0.75em; font-weight: bold;" title="Rent escalation applied">↑</span>`;
+            }
+            html += `<span style="display: block; padding-right: ${hasEscalation ? '12px' : '0'};">${rentDisplay}</span>`;
+            html += `</td>`;
+        });
+        
+        monthlyTotals.push(monthTotal);
+        html += `<td style="padding: 10px; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; color: #667eea; position: sticky; right: 0; background: white; z-index: 5; border-left: 1px solid #e2e8f0;">$${monthTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+        html += `</tr>`;
+    }
+    
+    // Total row
+    let grandTotal = 0;
+    const annualRents = [];
+    leases.forEach(lease => {
+        let annualRent = 0;
+        for (let month = 1; month <= 12; month++) {
+            const result = calculateRentForMonth(lease, year, month);
+            annualRent += result.rent;
+        }
+        annualRents.push(annualRent);
+        grandTotal += annualRent;
+    });
+    
+    html += `<tr style="background: #f8f9fa; font-weight: 600; border-top: 2px solid #667eea;">`;
+    html += `<td style="padding: 12px; position: sticky; left: 0; background: #f8f9fa; z-index: 5; border-right: 1px solid #e2e8f0;">TOTAL</td>`;
+    
+    annualRents.forEach(annualRent => {
+        html += `<td style="padding: 12px; text-align: right; font-variant-numeric: tabular-nums; color: #667eea;">$${annualRent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+    });
+    
+    html += `<td style="padding: 12px; text-align: right; font-variant-numeric: tabular-nums; color: #667eea; font-size: 1.1em; position: sticky; right: 0; background: #f8f9fa; z-index: 5; border-left: 1px solid #e2e8f0;">$${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+    html += `</tr>`;
+    
+    html += `</tbody>`;
+    html += `</table>`;
+    html += `</div>`;
+    
+    return html;
+}
+
+// Render rent roll in horizontal orientation (tenants as rows, months as columns)
+function renderRentRollHorizontal(leasesByProperty, properties, tenants, units, buildings, year, breakoutByBuilding) {
+    const rentRollTable = document.getElementById('rentRollTable');
+    let html = '';
+    
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthLabels = months.map((m, i) => `${m}/${String(year).slice(-2)}`);
+    
+    Object.keys(leasesByProperty).forEach(propertyId => {
+        const property = properties[propertyId] || { name: 'Unknown Property' };
+        const propertyLeases = leasesByProperty[propertyId];
+        
+        html += `<div style="margin-bottom: 40px;">`;
+        html += `<h3 style="margin-bottom: 20px; color: #1e293b; font-size: 1.5rem;">${escapeHtml(property.name)} Rent Roll</h3>`;
+        html += `<div style="font-size: 0.9em; color: #64748b; margin-bottom: 15px;">As of ${new Date().toLocaleDateString()}</div>`;
+        
+        if (breakoutByBuilding) {
+            // Group leases by building
+            const leasesByBuilding = {};
+            propertyLeases.forEach(lease => {
+                const unit = lease.unitId ? units[lease.unitId] : null;
+                const buildingId = unit?.buildingId || 'no-building';
+                if (!leasesByBuilding[buildingId]) {
+                    leasesByBuilding[buildingId] = [];
+                }
+                leasesByBuilding[buildingId].push(lease);
+            });
+            
+            // Render each building separately
+            Object.keys(leasesByBuilding).forEach(buildingId => {
+                const buildingLeases = leasesByBuilding[buildingId];
+                const building = buildingId !== 'no-building' ? buildings[buildingId] : null;
+                const buildingName = building?.name || 'No Building Assigned';
+                
+                html += renderHorizontalTable(buildingLeases, tenants, units, buildings, year, monthLabels, buildingName);
+            });
+        } else {
+            // Render all leases together
+            propertyLeases.sort((a, b) => {
+                const tenantA = tenants[a.tenantId]?.tenantName || '';
+                const tenantB = tenants[b.tenantId]?.tenantName || '';
+                return tenantA.localeCompare(tenantB);
+            });
+            
+            html += renderHorizontalTable(propertyLeases, tenants, units, buildings, year, monthLabels);
+        }
+        
+        html += `</div>`;
+    });
+    
+    rentRollTable.innerHTML = html;
+}
+
+// Helper function to render horizontal table
+function renderHorizontalTable(leases, tenants, units, buildings, year, monthLabels, buildingName = null) {
+    let html = '';
+    
+    if (buildingName) {
+        html += `<h4 style="margin: 20px 0 10px 0; color: #475569; font-size: 1.2rem;">${escapeHtml(buildingName)}</h4>`;
+    }
+    
+    html += `<div style="overflow-x: auto; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px;">`;
+    html += `<table class="rent-roll-table" style="width: 100%; min-width: 1200px; border-collapse: collapse;">`;
+    
+    // Header row
+    html += `<thead>`;
+    html += `<tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">`;
+    html += `<th style="padding: 12px; text-align: left; font-weight: 600; border: 1px solid rgba(255,255,255,0.2); position: sticky; left: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); z-index: 10;">Tenant</th>`;
+    html += `<th style="padding: 12px; text-align: center; font-weight: 600; border: 1px solid rgba(255,255,255,0.2);">Suite #</th>`;
+    html += `<th style="padding: 12px; text-align: right; font-weight: 600; border: 1px solid rgba(255,255,255,0.2);">Area (SF)</th>`;
+    
+    monthLabels.forEach(month => {
+        html += `<th style="padding: 12px; text-align: right; font-weight: 600; border: 1px solid rgba(255,255,255,0.2); min-width: 100px;">${month}</th>`;
+    });
+    
+    html += `<th style="padding: 12px; text-align: right; font-weight: 600; border: 1px solid rgba(255,255,255,0.2);">Total Annual</th>`;
+    html += `<th style="padding: 12px; text-align: right; font-weight: 600; border: 1px solid rgba(255,255,255,0.2);">$/SF</th>`;
+    html += `</tr>`;
+    html += `</thead>`;
+    html += `<tbody>`;
+    
+    let totalAnnualRent = 0;
+    const monthlyTotals = new Array(12).fill(0);
+    
+    leases.forEach(lease => {
+        const tenant = tenants[lease.tenantId];
+        const tenantName = tenant?.tenantName || 'Unknown Tenant';
+        const unit = lease.unitId ? units[lease.unitId] : null;
+        const suiteNumber = unit?.unitNumber || 'N/A';
+        const squareFootage = unit?.squareFootage || null;
+        
+        let annualRent = 0;
+        const monthlyRents = [];
+        
+        for (let month = 1; month <= 12; month++) {
+            const result = calculateRentForMonth(lease, year, month);
+            const rent = result.rent;
+            monthlyRents.push(rent);
+            annualRent += rent;
+            monthlyTotals[month - 1] += rent;
+        }
+        
+        totalAnnualRent += annualRent;
+        const rentPerSqFt = squareFootage && squareFootage > 0 ? (annualRent / 12 / squareFootage) : null;
+        
+        html += `<tr style="border-bottom: 1px solid #e2e8f0;">`;
+        html += `<td style="padding: 10px; font-weight: 600; position: sticky; left: 0; background: white; z-index: 5; border-right: 1px solid #e2e8f0;">${escapeHtml(tenantName)}</td>`;
+        html += `<td style="padding: 10px; text-align: center; color: #64748b;">${escapeHtml(suiteNumber)}</td>`;
+        html += `<td style="padding: 10px; text-align: right; color: #64748b; font-variant-numeric: tabular-nums;">${squareFootage ? squareFootage.toLocaleString() : '—'}</td>`;
+        
+        monthlyRents.forEach((rent, idx) => {
+            let hasEscalation = false;
+            if (idx > 0 && rent > 0) {
+                const prevRent = monthlyRents[idx - 1];
+                if (prevRent > 0 && Math.abs(rent - prevRent) > 0.01) {
+                    hasEscalation = true;
+                }
+            }
+            
+            const rentDisplay = rent > 0 ? `$${rent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—';
+            const cellColor = rent > 0 ? '#1e293b' : '#cbd5e1';
+            
+            html += `<td style="padding: 10px; text-align: right; font-variant-numeric: tabular-nums; color: ${cellColor}; position: relative;">`;
+            if (hasEscalation && rent > 0) {
+                html += `<span style="position: absolute; top: 2px; right: 4px; color: #10b981; font-size: 0.75em; font-weight: bold;" title="Rent escalation applied">↑</span>`;
+            }
+            html += `<span style="display: block; padding-right: ${hasEscalation ? '12px' : '0'};">${rentDisplay}</span>`;
+            html += `</td>`;
+        });
+        
+        html += `<td style="padding: 10px; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; color: #667eea;">$${annualRent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+        const ppfDisplay = rentPerSqFt ? `$${rentPerSqFt.toFixed(2)}` : '—';
+        html += `<td style="padding: 10px; text-align: right; font-variant-numeric: tabular-nums; color: #7c3aed;">${ppfDisplay}</td>`;
+        html += `</tr>`;
+    });
+    
+    // Total row
+    html += `<tr style="background: #f8f9fa; font-weight: 600; border-top: 2px solid #667eea;">`;
+    html += `<td style="padding: 12px; position: sticky; left: 0; background: #f8f9fa; z-index: 5; border-right: 1px solid #e2e8f0;">TOTAL</td>`;
+    html += `<td style="padding: 12px; text-align: center;"></td>`;
+    html += `<td style="padding: 12px; text-align: right;"></td>`;
+    
+    monthlyTotals.forEach(total => {
+        html += `<td style="padding: 12px; text-align: right; font-variant-numeric: tabular-nums; color: #667eea;">$${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+    });
+    
+    html += `<td style="padding: 12px; text-align: right; font-variant-numeric: tabular-nums; color: #667eea; font-size: 1.1em;">$${totalAnnualRent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+    html += `<td style="padding: 12px; text-align: right;"></td>`;
+    html += `</tr>`;
+    
+    html += `</tbody>`;
+    html += `</table>`;
+    html += `</div>`;
+    
+    return html;
 }
