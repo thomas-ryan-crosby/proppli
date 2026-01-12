@@ -10424,10 +10424,15 @@ function calculateRentForMonth(lease, year, month) {
     const firstEscDate = lease.rentEscalation.firstEscalationDate.toDate();
     
     // Normalize escalation date to first of month for comparison
-    const firstEscMonth = new Date(firstEscDate.getFullYear(), firstEscDate.getMonth(), 1);
+    const firstEscYear = firstEscDate.getFullYear();
+    const firstEscMonth = firstEscDate.getMonth(); // 0-based (0 = January, 11 = December)
+    
+    // Compare year and month directly (more reliable than date comparison)
+    const targetYear = year;
+    const targetMonth = month - 1; // Convert to 0-based
     
     // If we haven't reached the first escalation month, return initial rent
-    if (targetDate < firstEscMonth) {
+    if (targetYear < firstEscYear || (targetYear === firstEscYear && targetMonth < firstEscMonth)) {
         return { rent: initialRent, hasEscalation: false };
     }
     
@@ -10440,27 +10445,26 @@ function calculateRentForMonth(lease, year, month) {
     const frequency = esc.escalationFrequency;
     
     if (frequency === 'Monthly') {
-        const monthsDiff = (year - firstEscDate.getFullYear()) * 12 + (month - 1 - firstEscDate.getMonth());
-        periods = Math.max(0, Math.floor(monthsDiff));
+        const monthsDiff = (targetYear - firstEscYear) * 12 + (targetMonth - firstEscMonth);
+        periods = Math.max(0, monthsDiff);
     } else if (frequency === 'Quarterly') {
-        const monthsDiff = (year - firstEscDate.getFullYear()) * 12 + (month - 1 - firstEscDate.getMonth());
+        const monthsDiff = (targetYear - firstEscYear) * 12 + (targetMonth - firstEscMonth);
         periods = Math.max(0, Math.floor(monthsDiff / 3));
     } else if (frequency === 'Annually') {
-        const yearsDiff = year - firstEscDate.getFullYear();
-        const monthDiff = (month - 1) - firstEscDate.getMonth();
+        const yearsDiff = targetYear - firstEscYear;
         
         if (yearsDiff === 0) {
             // Same year - only count if we're at or past the escalation month
-            if (monthDiff >= 0) {
+            if (targetMonth >= firstEscMonth) {
                 periods = 1; // First escalation period
             } else {
                 periods = 0;
             }
         } else if (yearsDiff > 0) {
             // Future year
-            if (monthDiff > 0) {
+            if (targetMonth > firstEscMonth) {
                 periods = yearsDiff + 1;
-            } else if (monthDiff === 0) {
+            } else if (targetMonth === firstEscMonth) {
                 periods = yearsDiff + 1;
             } else {
                 periods = yearsDiff;
