@@ -659,6 +659,8 @@ window.logout = async function() {
         if (auth) {
             await auth.signOut();
             console.log('✅ Logged out successfully');
+            currentUser = null;
+            currentUserProfile = null;
             showAuthPages();
         }
     } catch (error) {
@@ -666,6 +668,35 @@ window.logout = async function() {
         alert('Error logging out: ' + error.message);
     }
 };
+
+// Setup user menu dropdown
+function setupUserMenu() {
+    const userMenuBtn = document.getElementById('userMenuBtn');
+    const userMenuDropdown = document.querySelector('.user-menu-dropdown');
+    const logoutBtn = document.getElementById('logoutBtn');
+    
+    if (userMenuBtn && userMenuDropdown) {
+        // Toggle dropdown on button click
+        userMenuBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            userMenuDropdown.classList.toggle('active');
+        });
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!userMenuDropdown.contains(e.target)) {
+                userMenuDropdown.classList.remove('active');
+            }
+        });
+    }
+    
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            window.logout();
+        });
+    }
+}
 
 // Check if DOM is already loaded, if so run immediately, otherwise wait
 if (document.readyState === 'loading') {
@@ -681,10 +712,16 @@ function initializeApp() {
     setupEventListeners();
     setupLeaseEventListeners();
     setupNavigation();
+    setupUserMenu();
     loadProperties();
     loadTickets();
     showPage(currentPage);
     updateFABsVisibility();
+    
+    // Update user menu when app initializes
+    if (currentUserProfile || currentUser) {
+        updateUserMenu();
+    }
 }
 
 // Navigation
