@@ -38,10 +38,17 @@ service cloud.firestore {
                     (request.auth.uid == userId || isAdmin());
       
       // Only admins can create/update users
+      // Super admins have full access
       allow create, update: if isAuthenticated() && isAdmin();
       
       // Only super admins can delete users
       allow delete: if isAuthenticated() && getUserRole() == 'super_admin';
+    }
+    
+    // Super admin bypass for all collections (full access)
+    // Note: Super admins can read/write everything regardless of other rules
+    function isSuperAdmin() {
+      return isAuthenticated() && getUserRole() == 'super_admin';
     }
     
     // User invitations collection
@@ -145,6 +152,12 @@ service cloud.firestore {
       // Only admins and property managers can write
       allow write: if isAuthenticated() && isUserActive() && 
                      (isAdmin() || getUserRole() == 'property_manager');
+    }
+    
+    // Super admin full access override (must be last)
+    // Super admins can access any document
+    match /{document=**} {
+      allow read, write: if isSuperAdmin();
     }
     
     // Default: deny all other access
