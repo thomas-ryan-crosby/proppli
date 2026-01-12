@@ -8054,6 +8054,19 @@ async function populateLeaseFormDropdowns() {
             if (startDateInput.value && endDateInput.value) {
                 const start = new Date(startDateInput.value);
                 const end = new Date(endDateInput.value);
+                
+                // Validate dates
+                if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+                    termInput.value = 0;
+                    return;
+                }
+                
+                // Ensure end date is after start date
+                if (end < start) {
+                    termInput.value = 0;
+                    return;
+                }
+                
                 const months = Math.round((end - start) / (1000 * 60 * 60 * 24 * 30.44));
                 termInput.value = months > 0 ? months : 0;
                 
@@ -8610,7 +8623,19 @@ async function handleLeaseSubmit(e) {
                 if (endDateInput && endDateInput.value && startDateInput && startDateInput.value) {
                     const start = new Date(startDateInput.value);
                     const end = new Date(endDateInput.value);
-                    return Math.round((end - start) / (1000 * 60 * 60 * 24 * 30.44));
+                    
+                    // Validate dates
+                    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+                        return 0;
+                    }
+                    
+                    // Ensure end date is after start date
+                    if (end < start) {
+                        return 0;
+                    }
+                    
+                    const months = Math.round((end - start) / (1000 * 60 * 60 * 24 * 30.44));
+                    return months > 0 ? months : 0;
                 } else if (termInput && termInput.value) {
                     const termValue = parseFloat(termInput.value) || 0;
                     if (termUnit && termUnit.value === 'years') {
