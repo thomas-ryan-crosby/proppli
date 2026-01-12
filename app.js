@@ -9123,8 +9123,8 @@ async function renderLeasesTableView(leases, properties, tenants, units, buildin
             
             html += `<tr class="property-level-lease-row">
                 <td class="tenant-occupancies-cell" style="vertical-align: top; width: 180px; max-width: 180px; padding: 10px 12px; word-wrap: break-word; overflow-wrap: break-word;">${propertyLevelDisplay}</td>
-                <td style="padding: 10px; vertical-align: top;">${formatLeaseSummaries(activeLeases, tenants)}</td>
-                <td style="padding: 10px; vertical-align: top;">${formatLeaseSummaries(legacyLeases, tenants)}</td>
+                <td style="padding: 10px; vertical-align: top;">${formatLeaseSummaries(activeLeases, tenants, filteredUnits)}</td>
+                <td style="padding: 10px; vertical-align: top;">${formatLeaseSummaries(legacyLeases, tenants, filteredUnits)}</td>
                 <td style="padding: 10px; vertical-align: top;">
                     <button class="btn-sm btn-primary" onclick="viewPropertyLeasesDetail('${property.id}')">View</button>
                 </td>
@@ -9301,8 +9301,8 @@ function buildUnitLeaseRow(unit, activeLeases, legacyLeases, tenants, occupancie
     return `
         <tr class="unit-lease-row" data-unit-id="${unit.id}">
             <td class="tenant-occupancies-cell" style="vertical-align: top; width: 180px; max-width: 180px; padding: 10px 12px; word-wrap: break-word; overflow-wrap: break-word;">${unitDisplay}</td>
-            <td style="padding: 10px; vertical-align: top;">${formatLeaseSummaries(activeLeases, tenants)}</td>
-            <td style="padding: 10px; vertical-align: top;">${formatLeaseSummaries(legacyLeases || [], tenants)}</td>
+            <td style="padding: 10px; vertical-align: top;">${formatLeaseSummaries(activeLeases, tenants, filteredUnits)}</td>
+            <td style="padding: 10px; vertical-align: top;">${formatLeaseSummaries(legacyLeases || [], tenants, filteredUnits)}</td>
             <td style="padding: 10px; vertical-align: top;">
                 <button class="btn-sm btn-primary" onclick="viewUnitLeasesDetail('${unit.id}')">View</button>
             </td>
@@ -9372,7 +9372,7 @@ function calculateCurrentRent(lease) {
 }
 
 // Format lease summaries for display
-function formatLeaseSummaries(leases, tenants) {
+function formatLeaseSummaries(leases, tenants, units = {}) {
     if (leases.length === 0) {
         return '<span style="color: #999; font-style: italic;">None</span>';
     }
@@ -9400,6 +9400,32 @@ function formatLeaseSummaries(leases, tenants) {
         const initialAnnualFormatted = initialAnnualRent ? `$${initialAnnualRent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A';
         const currentAnnualFormatted = currentAnnualRent ? `$${currentAnnualRent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A';
         
+        // Calculate price per square foot (PPF)
+        const unit = lease.unitId ? units[lease.unitId] : null;
+        const squareFootage = unit?.squareFootage || null;
+        let ppfDisplay = '';
+        if (squareFootage && squareFootage > 0) {
+            const initialMonthlyPPF = initialRent / squareFootage;
+            const initialAnnualPPF = initialMonthlyPPF * 12;
+            const currentMonthlyPPF = currentRent ? (currentRent / squareFootage) : null;
+            const currentAnnualPPF = currentMonthlyPPF ? (currentMonthlyPPF * 12) : null;
+            
+            if (hasEscalation && currentRent && currentMonthlyPPF) {
+                ppfDisplay = `
+                    <div style="font-size: 0.8em; color: #7c3aed; margin-top: 4px;">
+                        <div><strong>Initial PPF:</strong> $${initialMonthlyPPF.toFixed(2)}/mo ($${initialAnnualPPF.toFixed(2)}/yr)</div>
+                        <div style="font-weight: 600;"><strong>Current PPF:</strong> $${currentMonthlyPPF.toFixed(2)}/mo ($${currentAnnualPPF.toFixed(2)}/yr)</div>
+                    </div>
+                `;
+            } else {
+                ppfDisplay = `
+                    <div style="font-size: 0.8em; color: #7c3aed; margin-top: 4px;">
+                        <div><strong>PPF:</strong> $${initialMonthlyPPF.toFixed(2)}/mo ($${initialAnnualPPF.toFixed(2)}/yr)</div>
+                    </div>
+                `;
+            }
+        }
+        
         // Show rent display - always show initial and current if escalations exist
         let rentDisplay = '';
         if (hasEscalation && currentRent) {
@@ -9410,12 +9436,14 @@ function formatLeaseSummaries(leases, tenants) {
                         <div><strong>Initial:</strong> ${initialRentFormatted}/mo (${initialAnnualFormatted}/yr)</div>
                         <div style="font-weight: 600; color: #1e293b;"><strong>Current:</strong> ${currentRentFormatted}/mo (${currentAnnualFormatted}/yr)</div>
                     </div>
+                    ${ppfDisplay}
                 </div>
             `;
         } else {
             rentDisplay = `
                 <div style="font-size: 0.85em; color: #666; margin-top: 2px;">
                     <div>${initialRentFormatted}/mo (${initialAnnualFormatted}/yr)</div>
+                    ${ppfDisplay}
                 </div>
             `;
         }
@@ -9566,11 +9594,18 @@ async function loadUnitActiveLeases(unitId) {
         
         const leases = [];
         const tenants = {};
+        const units = {};
         
         // Load tenants
         const tenantsSnapshot = await db.collection('tenants').get();
         tenantsSnapshot.forEach(doc => {
             tenants[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        
+        // Load units
+        const unitsSnapshot = await db.collection('units').get();
+        unitsSnapshot.forEach(doc => {
+            units[doc.id] = { id: doc.id, ...doc.data() };
         });
         
         leasesSnapshot.forEach(doc => {
@@ -9580,7 +9615,7 @@ async function loadUnitActiveLeases(unitId) {
             }
         });
         
-        renderLeaseDetailList(leases, tenants, activeLeasesList);
+        renderLeaseDetailList(leases, tenants, activeLeasesList, units);
     } catch (error) {
         console.error('Error loading active leases:', error);
         activeLeasesList.innerHTML = '<p style="color: #e74c3c; padding: 20px;">Error loading leases.</p>';
@@ -9599,11 +9634,18 @@ async function loadUnitLegacyLeases(unitId) {
         
         const leases = [];
         const tenants = {};
+        const units = {};
         
         // Load tenants
         const tenantsSnapshot = await db.collection('tenants').get();
         tenantsSnapshot.forEach(doc => {
             tenants[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        
+        // Load units
+        const unitsSnapshot = await db.collection('units').get();
+        unitsSnapshot.forEach(doc => {
+            units[doc.id] = { id: doc.id, ...doc.data() };
         });
         
         leasesSnapshot.forEach(doc => {
@@ -9613,7 +9655,7 @@ async function loadUnitLegacyLeases(unitId) {
             }
         });
         
-        renderLeaseDetailList(leases, tenants, legacyLeasesList);
+        renderLeaseDetailList(leases, tenants, legacyLeasesList, units);
     } catch (error) {
         console.error('Error loading legacy leases:', error);
         legacyLeasesList.innerHTML = '<p style="color: #999; text-align: center; padding: 40px;">Error loading legacy leases.</p>';
@@ -9632,11 +9674,18 @@ async function loadUnitDeletedLeases(unitId) {
         
         const leases = [];
         const tenants = {};
+        const units = {};
         
         // Load tenants
         const tenantsSnapshot = await db.collection('tenants').get();
         tenantsSnapshot.forEach(doc => {
             tenants[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        
+        // Load units
+        const unitsSnapshot = await db.collection('units').get();
+        unitsSnapshot.forEach(doc => {
+            units[doc.id] = { id: doc.id, ...doc.data() };
         });
         
         leasesSnapshot.forEach(doc => {
@@ -9646,7 +9695,7 @@ async function loadUnitDeletedLeases(unitId) {
             }
         });
         
-        renderLeaseDetailList(leases, tenants, deletedLeasesList);
+        renderLeaseDetailList(leases, tenants, deletedLeasesList, units);
     } catch (error) {
         console.error('Error loading deleted leases:', error);
         deletedLeasesList.innerHTML = '<p style="color: #999; text-align: center; padding: 40px;">Error loading deleted leases.</p>';
@@ -9665,11 +9714,18 @@ async function loadPropertyActiveLeases(propertyId) {
         
         const leases = [];
         const tenants = {};
+        const units = {};
         
         // Load tenants
         const tenantsSnapshot = await db.collection('tenants').get();
         tenantsSnapshot.forEach(doc => {
             tenants[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        
+        // Load units
+        const unitsSnapshot = await db.collection('units').get();
+        unitsSnapshot.forEach(doc => {
+            units[doc.id] = { id: doc.id, ...doc.data() };
         });
         
         leasesSnapshot.forEach(doc => {
@@ -9679,7 +9735,7 @@ async function loadPropertyActiveLeases(propertyId) {
             }
         });
         
-        renderLeaseDetailList(leases, tenants, activeLeasesList);
+        renderLeaseDetailList(leases, tenants, activeLeasesList, units);
     } catch (error) {
         console.error('Error loading active leases:', error);
         activeLeasesList.innerHTML = '<p style="color: #e74c3c; padding: 20px;">Error loading leases.</p>';
@@ -9698,11 +9754,18 @@ async function loadPropertyLegacyLeases(propertyId) {
         
         const leases = [];
         const tenants = {};
+        const units = {};
         
         // Load tenants
         const tenantsSnapshot = await db.collection('tenants').get();
         tenantsSnapshot.forEach(doc => {
             tenants[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        
+        // Load units
+        const unitsSnapshot = await db.collection('units').get();
+        unitsSnapshot.forEach(doc => {
+            units[doc.id] = { id: doc.id, ...doc.data() };
         });
         
         leasesSnapshot.forEach(doc => {
@@ -9712,7 +9775,7 @@ async function loadPropertyLegacyLeases(propertyId) {
             }
         });
         
-        renderLeaseDetailList(leases, tenants, legacyLeasesList);
+        renderLeaseDetailList(leases, tenants, legacyLeasesList, units);
     } catch (error) {
         console.error('Error loading property legacy leases:', error);
         legacyLeasesList.innerHTML = '<p style="color: #999; text-align: center; padding: 40px;">Error loading legacy leases.</p>';
@@ -9731,11 +9794,18 @@ async function loadPropertyDeletedLeases(propertyId) {
         
         const leases = [];
         const tenants = {};
+        const units = {};
         
         // Load tenants
         const tenantsSnapshot = await db.collection('tenants').get();
         tenantsSnapshot.forEach(doc => {
             tenants[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        
+        // Load units
+        const unitsSnapshot = await db.collection('units').get();
+        unitsSnapshot.forEach(doc => {
+            units[doc.id] = { id: doc.id, ...doc.data() };
         });
         
         leasesSnapshot.forEach(doc => {
@@ -9745,7 +9815,7 @@ async function loadPropertyDeletedLeases(propertyId) {
             }
         });
         
-        renderLeaseDetailList(leases, tenants, deletedLeasesList);
+        renderLeaseDetailList(leases, tenants, deletedLeasesList, units);
     } catch (error) {
         console.error('Error loading property deleted leases:', error);
         deletedLeasesList.innerHTML = '<p style="color: #999; text-align: center; padding: 40px;">Error loading deleted leases.</p>';
@@ -9753,7 +9823,7 @@ async function loadPropertyDeletedLeases(propertyId) {
 }
 
 // Render lease detail list (full details)
-function renderLeaseDetailList(leases, tenants, container) {
+function renderLeaseDetailList(leases, tenants, container, units = {}) {
     if (leases.length === 0) {
         container.innerHTML = '<p style="color: #999; text-align: center; padding: 40px;">No leases found.</p>';
         return;
@@ -9782,6 +9852,40 @@ function renderLeaseDetailList(leases, tenants, container) {
         const initialAnnualFormatted = initialAnnualRent ? `$${initialAnnualRent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A';
         const currentAnnualFormatted = currentAnnualRent ? `$${currentAnnualRent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A';
         
+        // Calculate price per square foot (PPF)
+        const unit = lease.unitId ? units[lease.unitId] : null;
+        const squareFootage = unit?.squareFootage || null;
+        let ppfDisplay = '';
+        if (squareFootage && squareFootage > 0) {
+            const initialMonthlyPPF = initialRent / squareFootage;
+            const initialAnnualPPF = initialMonthlyPPF * 12;
+            const currentMonthlyPPF = currentRent ? (currentRent / squareFootage) : null;
+            const currentAnnualPPF = currentMonthlyPPF ? (currentMonthlyPPF * 12) : null;
+            
+            if (hasEscalation && currentRent && currentMonthlyPPF) {
+                ppfDisplay = `
+                    <div>
+                        <div style="color: #64748b; font-size: 0.85em; margin-bottom: 4px;">Initial PPF</div>
+                        <div style="font-weight: 600; color: #7c3aed;">$${initialMonthlyPPF.toFixed(2)}/mo</div>
+                        <div style="font-size: 0.8em; color: #a78bfa;">$${initialAnnualPPF.toFixed(2)}/yr</div>
+                    </div>
+                    <div>
+                        <div style="color: #64748b; font-size: 0.85em; margin-bottom: 4px;">Current PPF</div>
+                        <div style="font-weight: 600; color: #7c3aed;">$${currentMonthlyPPF.toFixed(2)}/mo</div>
+                        <div style="font-size: 0.8em; color: #a78bfa;">$${currentAnnualPPF.toFixed(2)}/yr</div>
+                    </div>
+                `;
+            } else {
+                ppfDisplay = `
+                    <div>
+                        <div style="color: #64748b; font-size: 0.85em; margin-bottom: 4px;">Price Per Square Foot</div>
+                        <div style="font-weight: 600; color: #7c3aed;">$${initialMonthlyPPF.toFixed(2)}/mo</div>
+                        <div style="font-size: 0.8em; color: #a78bfa;">$${initialAnnualPPF.toFixed(2)}/yr</div>
+                    </div>
+                `;
+            }
+        }
+        
         // Rent display based on escalations - always show both if escalations exist
         let rentDisplay = '';
         if (hasEscalation && currentRent) {
@@ -9797,6 +9901,7 @@ function renderLeaseDetailList(leases, tenants, container) {
                     <div style="font-weight: 600; color: #667eea;">${currentRentFormatted}/mo</div>
                     <div style="font-size: 0.8em; color: #999;">${currentAnnualFormatted}/yr</div>
                 </div>
+                ${ppfDisplay}
             `;
         } else {
             rentDisplay = `
@@ -9805,6 +9910,7 @@ function renderLeaseDetailList(leases, tenants, container) {
                     <div style="font-weight: 600;">${initialRentFormatted}/mo</div>
                     <div style="font-size: 0.8em; color: #999;">${initialAnnualFormatted}/yr</div>
                 </div>
+                ${ppfDisplay}
             `;
         }
         
