@@ -10429,10 +10429,14 @@ function calculateRentForMonth(lease, year, month) {
     
     // Compare year and month directly (more reliable than date comparison)
     const targetYear = year;
-    const targetMonth = month - 1; // Convert to 0-based
+    const targetMonth = month - 1; // Convert to 0-based (0 = January, 11 = December)
     
     // If we haven't reached the first escalation month, return initial rent
-    if (targetYear < firstEscYear || (targetYear === firstEscYear && targetMonth < firstEscMonth)) {
+    // We use strict less-than: target must be at or after the escalation month
+    if (targetYear < firstEscYear) {
+        return { rent: initialRent, hasEscalation: false };
+    }
+    if (targetYear === firstEscYear && targetMonth < firstEscMonth) {
         return { rent: initialRent, hasEscalation: false };
     }
     
@@ -10492,10 +10496,21 @@ function calculateRentForMonth(lease, year, month) {
         }
     }
     
-    // Check if this is the exact month when escalation first occurs (periods = 0 but we're at the escalation date)
-    if (periods === 0 && targetDate.getMonth() === firstEscDate.getMonth() && targetDate.getFullYear() === firstEscDate.getFullYear()) {
-        // This is the first month of escalation - rent hasn't changed yet, but mark it as escalation month
-        hasEscalation = true;
+    // Note: periods calculation above should handle the first escalation month correctly
+    // For annual: if targetMonth >= firstEscMonth in same year, periods = 1
+    // For monthly/quarterly: monthsDiff will be 0 for the first month, so periods = 0, but we need to apply the first escalation
+    if (frequency === 'Monthly' || frequency === 'Quarterly') {
+        if (periods === 0 && targetYear === firstEscYear && targetMonth === firstEscMonth) {
+            // This is the exact first escalation month for monthly/quarterly
+            periods = 1;
+            hasEscalation = true;
+            if (esc.escalationType === 'Fixed Amount' && esc.escalationAmount) {
+                rent = initialRent + esc.escalationAmount;
+            } else if ((esc.escalationType === 'Percentage' || esc.escalationType === 'CPI') && esc.escalationPercentage) {
+                const rate = esc.escalationPercentage / 100;
+                rent = initialRent * (1 + rate);
+            }
+        }
     }
     
     return { rent: Math.round(rent * 100) / 100, hasEscalation }; // Round to 2 decimal places
