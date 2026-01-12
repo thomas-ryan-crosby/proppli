@@ -10451,26 +10451,31 @@ function calculateRentForMonth(lease, year, month) {
         const monthsDiff = (targetYear - firstEscYear) * 12 + (targetMonth - firstEscMonth);
         periods = Math.max(0, Math.floor(monthsDiff / 3));
     } else if (frequency === 'Annually') {
+        // For annual escalations, count how many full years have passed since the first escalation
+        // The first escalation month itself counts as period 1
         const yearsDiff = targetYear - firstEscYear;
         
-        if (yearsDiff === 0) {
+        if (yearsDiff < 0) {
+            periods = 0;
+        } else if (yearsDiff === 0) {
             // Same year - only count if we're at or past the escalation month
             if (targetMonth >= firstEscMonth) {
-                periods = 1; // First escalation period
+                periods = 1; // First escalation period (the escalation month itself)
             } else {
                 periods = 0;
             }
-        } else if (yearsDiff > 0) {
-            // Future year
+        } else {
+            // Future year - calculate based on month position
             if (targetMonth > firstEscMonth) {
+                // We're past the escalation month in a future year
                 periods = yearsDiff + 1;
             } else if (targetMonth === firstEscMonth) {
+                // We're exactly at the escalation month in a future year
                 periods = yearsDiff + 1;
             } else {
+                // We're before the escalation month in a future year
                 periods = yearsDiff;
             }
-        } else {
-            periods = 0;
         }
     }
     
