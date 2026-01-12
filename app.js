@@ -189,6 +189,8 @@ function showPage(page) {
         loadTickets();
     } else if (page === 'leases') {
         loadLeases();
+    } else if (page === 'finance') {
+        loadFinance();
     }
     
     // Update FAB visibility
@@ -10123,3 +10125,362 @@ window.handleDeprecatedLeaseSubmit = async function(e) {
 };
 
 // openLeaseModal is already globally accessible (defined above as window.openLeaseModal)
+
+// ============================================
+// FINANCE PAGE FUNCTIONS
+// ============================================
+
+// Load Finance page
+async function loadFinance() {
+    // Populate property filter
+    await populateRentRollFilters();
+    
+    // Load rent roll
+    await loadRentRoll();
+    
+    // Setup finance tab switching
+    setupFinanceTabs();
+}
+
+// Populate rent roll filters
+async function populateRentRollFilters() {
+    const propertyFilter = document.getElementById('rentRollPropertyFilter');
+    if (!propertyFilter) return;
+    
+    try {
+        const propertiesSnapshot = await db.collection('properties').orderBy('name').get();
+        propertyFilter.innerHTML = '<option value="">All Properties</option>';
+        
+        propertiesSnapshot.forEach(doc => {
+            const property = doc.data();
+            const option = document.createElement('option');
+            option.value = doc.id;
+            option.textContent = property.name || 'Unnamed Property';
+            propertyFilter.appendChild(option);
+        });
+        
+        // Add event listener for filter change
+        propertyFilter.addEventListener('change', () => {
+            loadRentRoll();
+        });
+        
+        // Add event listener for year filter
+        const yearFilter = document.getElementById('rentRollYearFilter');
+        if (yearFilter) {
+            yearFilter.addEventListener('change', () => {
+                loadRentRoll();
+            });
+        }
+    } catch (error) {
+        console.error('Error loading properties for rent roll filter:', error);
+    }
+}
+
+// Setup finance tab switching
+function setupFinanceTabs() {
+    const financeTabButtons = document.querySelectorAll('[data-finance-tab]');
+    financeTabButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const tabName = this.getAttribute('data-finance-tab');
+            
+            // Remove active class from all tabs and tab contents
+            document.querySelectorAll('[data-finance-tab]').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('#financePage .tab-content').forEach(c => {
+                c.classList.remove('active');
+                c.style.display = 'none';
+            });
+            
+            // Add active class to clicked tab
+            this.classList.add('active');
+            
+            // Show corresponding tab content
+            const tabContent = document.getElementById(tabName + 'Tab');
+            if (tabContent) {
+                tabContent.classList.add('active');
+                tabContent.style.display = 'block';
+            }
+            
+            // Load tab-specific data
+            if (tabName === 'rentRoll') {
+                loadRentRoll();
+            }
+        });
+    });
+}
+
+// Calculate rent for a specific month based on lease and escalation
+function calculateRentForMonth(lease, year, month) {
+    if (!lease.monthlyRent) return 0;
+    
+    const initialRent = lease.monthlyRent;
+    const targetDate = new Date(year, month - 1, 1); // First day of the month
+    
+    // If no escalations, return initial rent
+    if (!lease.rentEscalation || !lease.rentEscalation.escalationType || lease.rentEscalation.escalationType === 'None') {
+        return initialRent;
+    }
+    
+    // Check if lease has started
+    if (lease.leaseStartDate) {
+        const startDate = lease.leaseStartDate.toDate();
+        if (targetDate < startDate) {
+            return 0; // Lease hasn't started yet
+        }
+    }
+    
+    // Check if lease has ended (unless auto-renewal)
+    if (lease.leaseEndDate && !lease.autoRenewal) {
+        const endDate = lease.leaseEndDate.toDate();
+        const endOfMonth = new Date(year, month, 0); // Last day of the month
+        if (endOfMonth > endDate) {
+            return 0; // Lease has ended
+        }
+    }
+    
+    // Need first escalation date to calculate
+    if (!lease.rentEscalation.firstEscalationDate) {
+        return initialRent;
+    }
+    
+    const firstEscDate = lease.rentEscalation.firstEscalationDate.toDate();
+    
+    // If we haven't reached the first escalation date, return initial rent
+    if (targetDate < firstEscDate) {
+        return initialRent;
+    }
+    
+    const esc = lease.rentEscalation;
+    let rent = initialRent;
+    
+    // Calculate number of escalation periods from first escalation to target month
+    let periods = 0;
+    const frequency = esc.escalationFrequency;
+    
+    if (frequency === 'Monthly') {
+        const monthsDiff = (year - firstEscDate.getFullYear()) * 12 + (month - 1 - firstEscDate.getMonth());
+        periods = Math.max(0, Math.floor(monthsDiff));
+    } else if (frequency === 'Quarterly') {
+        const monthsDiff = (year - firstEscDate.getFullYear()) * 12 + (month - 1 - firstEscDate.getMonth());
+        periods = Math.max(0, Math.floor(monthsDiff / 3));
+    } else if (frequency === 'Annually') {
+        const yearsDiff = year - firstEscDate.getFullYear();
+        if (month - 1 > firstEscDate.getMonth() || (month - 1 === firstEscDate.getMonth())) {
+            periods = Math.max(0, yearsDiff);
+        } else {
+            periods = Math.max(0, yearsDiff - 1);
+        }
+    }
+    
+    // Apply escalations
+    if (periods > 0) {
+        if (esc.escalationType === 'Fixed Amount' && esc.escalationAmount) {
+            rent = initialRent + (esc.escalationAmount * periods);
+        } else if ((esc.escalationType === 'Percentage' || esc.escalationType === 'CPI') && esc.escalationPercentage) {
+            // Compound percentage increase
+            const rate = esc.escalationPercentage / 100;
+            rent = initialRent * Math.pow(1 + rate, periods);
+        }
+    }
+    
+    return Math.round(rent * 100) / 100; // Round to 2 decimal places
+}
+
+// Load and render rent roll
+async function loadRentRoll() {
+    const rentRollTable = document.getElementById('rentRollTable');
+    if (!rentRollTable) return;
+    
+    try {
+        // Get filters
+        const propertyFilter = document.getElementById('rentRollPropertyFilter')?.value || '';
+        const yearFilter = parseInt(document.getElementById('rentRollYearFilter')?.value || new Date().getFullYear());
+        
+        // Load all necessary data
+        const [leasesSnapshot, propertiesSnapshot, tenantsSnapshot, unitsSnapshot] = await Promise.all([
+            db.collection('leases').get(),
+            db.collection('properties').get(),
+            db.collection('tenants').get(),
+            db.collection('units').get()
+        ]);
+        
+        // Build data maps
+        const properties = {};
+        propertiesSnapshot.forEach(doc => {
+            properties[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        
+        const tenants = {};
+        tenantsSnapshot.forEach(doc => {
+            tenants[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        
+        const units = {};
+        unitsSnapshot.forEach(doc => {
+            units[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        
+        // Filter and process leases
+        const activeLeases = [];
+        leasesSnapshot.forEach(doc => {
+            const lease = { id: doc.id, ...doc.data() };
+            
+            // Only include active, non-deprecated, non-deleted leases
+            if (isLeaseActive(lease) && !isLeaseDeleted(lease)) {
+                // Filter by property if specified
+                if (!propertyFilter || lease.propertyId === propertyFilter) {
+                    activeLeases.push(lease);
+                }
+            }
+        });
+        
+        // Group leases by property
+        const leasesByProperty = {};
+        activeLeases.forEach(lease => {
+            const propId = lease.propertyId || 'no-property';
+            if (!leasesByProperty[propId]) {
+                leasesByProperty[propId] = [];
+            }
+            leasesByProperty[propId].push(lease);
+        });
+        
+        // Render rent roll
+        renderRentRoll(leasesByProperty, properties, tenants, units, yearFilter);
+        
+    } catch (error) {
+        console.error('Error loading rent roll:', error);
+        rentRollTable.innerHTML = '<p style="color: #e74c3c; padding: 20px;">Error loading rent roll data.</p>';
+    }
+}
+
+// Render rent roll table
+function renderRentRoll(leasesByProperty, properties, tenants, units, year) {
+    const rentRollTable = document.getElementById('rentRollTable');
+    if (!rentRollTable) return;
+    
+    if (Object.keys(leasesByProperty).length === 0) {
+        rentRollTable.innerHTML = '<p style="color: #999; text-align: center; padding: 40px;">No active leases found.</p>';
+        return;
+    }
+    
+    let html = '';
+    
+    // Month abbreviations
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthLabels = months.map((m, i) => `${m}/${String(year).slice(-2)}`);
+    
+    // Process each property
+    Object.keys(leasesByProperty).forEach(propertyId => {
+        const property = properties[propertyId] || { name: 'Unknown Property' };
+        const propertyLeases = leasesByProperty[propertyId];
+        
+        // Sort leases by tenant name
+        propertyLeases.sort((a, b) => {
+            const tenantA = tenants[a.tenantId]?.tenantName || '';
+            const tenantB = tenants[b.tenantId]?.tenantName || '';
+            return tenantA.localeCompare(tenantB);
+        });
+        
+        // Property header
+        html += `<div style="margin-bottom: 40px;">`;
+        html += `<h3 style="margin-bottom: 20px; color: #1e293b; font-size: 1.5rem;">${escapeHtml(property.name)} Rent Roll</h3>`;
+        html += `<div style="font-size: 0.9em; color: #64748b; margin-bottom: 15px;">As of ${new Date().toLocaleDateString()}</div>`;
+        
+        // Rent roll table
+        html += `<div style="overflow-x: auto; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">`;
+        html += `<table class="rent-roll-table" style="width: 100%; min-width: 1200px; border-collapse: collapse;">`;
+        
+        // Header row 1: Column labels
+        html += `<thead>`;
+        html += `<tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">`;
+        html += `<th style="padding: 12px; text-align: left; font-weight: 600; border: 1px solid rgba(255,255,255,0.2); position: sticky; left: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); z-index: 10;">Tenant</th>`;
+        html += `<th style="padding: 12px; text-align: center; font-weight: 600; border: 1px solid rgba(255,255,255,0.2);">Suite #</th>`;
+        html += `<th style="padding: 12px; text-align: right; font-weight: 600; border: 1px solid rgba(255,255,255,0.2);">Area (SF)</th>`;
+        
+        // Month columns
+        monthLabels.forEach(month => {
+            html += `<th style="padding: 12px; text-align: right; font-weight: 600; border: 1px solid rgba(255,255,255,0.2); min-width: 100px;">${month}</th>`;
+        });
+        
+        html += `<th style="padding: 12px; text-align: right; font-weight: 600; border: 1px solid rgba(255,255,255,0.2);">Total Annual</th>`;
+        html += `<th style="padding: 12px; text-align: right; font-weight: 600; border: 1px solid rgba(255,255,255,0.2);">$/SF</th>`;
+        html += `</tr>`;
+        html += `</thead>`;
+        html += `<tbody>`;
+        
+        // Data rows
+        let totalAnnualRent = 0;
+        propertyLeases.forEach(lease => {
+            const tenant = tenants[lease.tenantId];
+            const tenantName = tenant?.tenantName || 'Unknown Tenant';
+            const unit = lease.unitId ? units[lease.unitId] : null;
+            const suiteNumber = unit?.unitNumber || 'N/A';
+            const squareFootage = unit?.squareFootage || null;
+            
+            // Calculate monthly rents for each month
+            const monthlyRents = [];
+            let annualRent = 0;
+            
+            for (let month = 1; month <= 12; month++) {
+                const rent = calculateRentForMonth(lease, year, month);
+                monthlyRents.push(rent);
+                annualRent += rent;
+            }
+            
+            totalAnnualRent += annualRent;
+            
+            // Calculate rent per square foot
+            const rentPerSqFt = squareFootage && squareFootage > 0 ? (annualRent / 12 / squareFootage) : null;
+            
+            html += `<tr style="border-bottom: 1px solid #e2e8f0;">`;
+            html += `<td style="padding: 10px; font-weight: 600; position: sticky; left: 0; background: white; z-index: 5; border-right: 1px solid #e2e8f0;">${escapeHtml(tenantName)}</td>`;
+            html += `<td style="padding: 10px; text-align: center; color: #64748b;">${escapeHtml(suiteNumber)}</td>`;
+            html += `<td style="padding: 10px; text-align: right; color: #64748b; font-variant-numeric: tabular-nums;">${squareFootage ? squareFootage.toLocaleString() : '—'}</td>`;
+            
+            // Monthly rent columns
+            monthlyRents.forEach(rent => {
+                const rentDisplay = rent > 0 ? `$${rent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—';
+                html += `<td style="padding: 10px; text-align: right; font-variant-numeric: tabular-nums; color: ${rent > 0 ? '#1e293b' : '#cbd5e1'};">${rentDisplay}</td>`;
+            });
+            
+            // Total annual rent
+            html += `<td style="padding: 10px; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; color: #667eea;">$${annualRent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+            
+            // Rent per square foot
+            const ppfDisplay = rentPerSqFt ? `$${rentPerSqFt.toFixed(2)}` : '—';
+            html += `<td style="padding: 10px; text-align: right; font-variant-numeric: tabular-nums; color: #7c3aed;">${ppfDisplay}</td>`;
+            
+            html += `</tr>`;
+        });
+        
+        // Total row
+        html += `<tr style="background: #f8f9fa; font-weight: 600; border-top: 2px solid #667eea;">`;
+        html += `<td style="padding: 12px; position: sticky; left: 0; background: #f8f9fa; z-index: 5; border-right: 1px solid #e2e8f0;">TOTAL</td>`;
+        html += `<td style="padding: 12px; text-align: center;"></td>`;
+        html += `<td style="padding: 12px; text-align: right;"></td>`;
+        
+        // Calculate totals for each month
+        const monthlyTotals = [];
+        for (let month = 1; month <= 12; month++) {
+            let monthTotal = 0;
+            propertyLeases.forEach(lease => {
+                monthTotal += calculateRentForMonth(lease, year, month);
+            });
+            monthlyTotals.push(monthTotal);
+        }
+        
+        monthlyTotals.forEach(total => {
+            html += `<td style="padding: 12px; text-align: right; font-variant-numeric: tabular-nums; color: #667eea;">$${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+        });
+        
+        html += `<td style="padding: 12px; text-align: right; font-variant-numeric: tabular-nums; color: #667eea; font-size: 1.1em;">$${totalAnnualRent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+        html += `<td style="padding: 12px; text-align: right;"></td>`;
+        html += `</tr>`;
+        
+        html += `</tbody>`;
+        html += `</table>`;
+        html += `</div>`;
+        html += `</div>`;
+    });
+    
+    rentRollTable.innerHTML = html;
+}

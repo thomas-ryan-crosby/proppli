@@ -27,6 +27,7 @@
                 <button class="nav-link" data-page="properties">Properties</button>
                 <button class="nav-link" data-page="tenants">Tenants</button>
                 <button class="nav-link" data-page="leases">Leases</button>
+                <button class="nav-link" data-page="finance">Finance</button>
             </div>
         </nav>
 
@@ -1497,6 +1498,48 @@
                     </div>
                 </div>
             </div>
+        </div>
+
+        <!-- Finance Page -->
+        <div id="financePage" class="page" style="display: none;">
+            <header>
+                <h2>Finance</h2>
+            </header>
+
+            <main>
+                <div class="finance-page-content">
+                    <!-- Finance Sub-tabs -->
+                    <div class="finance-tabs" style="margin-bottom: 20px; border-bottom: 2px solid #e2e8f0;">
+                        <button class="tab-btn active" data-finance-tab="rentRoll">Rent Roll</button>
+                        <!-- Future tabs can be added here -->
+                    </div>
+
+                    <!-- Rent Roll Tab -->
+                    <div id="rentRollTab" class="tab-content active">
+                        <div class="section">
+                            <div class="section-header-controls">
+                                <div class="filter-controls" style="display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 20px;">
+                                    <div>
+                                        <label for="rentRollPropertyFilter">Filter by Property:</label>
+                                        <select id="rentRollPropertyFilter">
+                                            <option value="">All Properties</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label for="rentRollYearFilter">Year:</label>
+                                        <select id="rentRollYearFilter">
+                                            <option value="2025">2025</option>
+                                            <option value="2026" selected>2026</option>
+                                            <option value="2027">2027</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="rentRollTable" class="rent-roll-container" style="overflow-x: auto;"></div>
+                        </div>
+                    </div>
+                </div>
+            </main>
         </div>
 
     <!-- Floating Action Buttons -->
