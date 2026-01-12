@@ -7473,6 +7473,22 @@ function handleOccupancySubmit(e) {
 // LEASE MANAGEMENT
 // ============================================
 
+// Helper function to check if a lease is deleted
+function isLeaseDeleted(lease) {
+    return lease.deletedAt !== null && lease.deletedAt !== undefined;
+}
+
+// Helper function to check if a deleted lease should be permanently removed (older than 30 days)
+function shouldPermanentlyRemoveLease(lease) {
+    if (!isLeaseDeleted(lease)) return false;
+    
+    const deletedDate = lease.deletedAt.toDate ? lease.deletedAt.toDate() : new Date(lease.deletedAt);
+    const today = new Date();
+    const daysSinceDeletion = Math.floor((today - deletedDate) / (1000 * 60 * 60 * 24));
+    
+    return daysSinceDeletion >= 30;
+}
+
 // Load leases from Firestore
 async function loadLeases() {
     try {
@@ -7483,6 +7499,15 @@ async function loadLeases() {
         
         leasesSnapshot.forEach((doc) => {
             const leaseData = { id: doc.id, ...doc.data() };
+            
+            // Check if deleted lease should be permanently removed (30+ days old)
+            if (shouldPermanentlyRemoveLease(leaseData)) {
+                db.collection('leases').doc(doc.id).delete()
+                    .then(() => console.log(`Permanently removed lease ${doc.id} (deleted >30 days ago)`))
+                    .catch(err => console.error(`Error removing lease ${doc.id}:`, err));
+                return; // Skip this lease, it will be deleted
+            }
+            
             // Calculate days until expiration
             if (leaseData.leaseEndDate) {
                 const endDate = leaseData.leaseEndDate.toDate();
@@ -9058,8 +9083,8 @@ async function renderLeasesTableView(leases, properties, tenants, units, buildin
                 return aNum.localeCompare(bNum, undefined, { numeric: true, sensitivity: 'base' });
             }).forEach(unit => {
                 const unitLeases = leasesByUnit[unit.id] || [];
-                const activeLeases = unitLeases.filter(l => isLeaseActive(l));
-                const legacyLeases = unitLeases.filter(l => isLeaseDeprecated(l));
+                const activeLeases = unitLeases.filter(l => isLeaseActive(l) && !isLeaseDeleted(l));
+                const legacyLeases = unitLeases.filter(l => isLeaseDeprecated(l) && !isLeaseDeleted(l));
                 
                 html += buildUnitLeaseRow(unit, activeLeases, legacyLeases, tenants, occupanciesByUnitId);
             });
@@ -9068,8 +9093,8 @@ async function renderLeasesTableView(leases, properties, tenants, units, buildin
         // Property-level leases (no unit)
         const propertyLeases = leasesByProperty[property.id] || [];
         if (propertyLeases.length > 0) {
-            const activeLeases = propertyLeases.filter(l => isLeaseActive(l));
-            const legacyLeases = propertyLeases.filter(l => isLeaseDeprecated(l));
+            const activeLeases = propertyLeases.filter(l => isLeaseActive(l) && !isLeaseDeleted(l));
+            const legacyLeases = propertyLeases.filter(l => isLeaseDeprecated(l) && !isLeaseDeleted(l));
             
             // Get tenant names for property-level leases
             const propertyActiveTenantNames = activeLeases.map(lease => {
@@ -9320,7 +9345,8 @@ function formatLeaseSummaries(leases, tenants) {
                     <div style="display: flex; gap: 4px; margin-left: 8px;">
                         <button class="btn-sm btn-primary" onclick="window.openLeaseModal('${lease.id}')" style="font-size: 0.75em; padding: 4px 8px;" title="View">View</button>
                         <button class="btn-sm btn-secondary" onclick="window.openLeaseModal('${lease.id}', true)" style="font-size: 0.75em; padding: 4px 8px;" title="Edit">Edit</button>
-                        ${!lease.isDeprecated ? `<button class="btn-sm btn-danger" onclick="window.openDeprecatedModal('${lease.id}')" style="font-size: 0.75em; padding: 4px 8px;" title="Mark as Deprecated/Legacy">Deprecated</button>` : ''}
+                        ${!lease.isDeprecated ? `<button class="btn-sm btn-warning" onclick="window.openDeprecatedModal('${lease.id}')" style="font-size: 0.75em; padding: 4px 8px;" title="Mark as Deprecated/Legacy">Deprecate</button>` : ''}
+                        ${!lease.deletedAt ? `<button class="btn-sm btn-danger" onclick="window.deleteLease('${lease.id}')" style="font-size: 0.75em; padding: 4px 8px; margin-left: 4px;" title="Delete Lease">Delete</button>` : ''}
                     </div>
                 </div>
             </div>
@@ -9403,6 +9429,7 @@ window.viewPropertyLeasesDetail = async function(propertyId) {
     // Load property-level leases
     loadPropertyActiveLeases(propertyId);
     loadPropertyLegacyLeases(propertyId);
+    loadPropertyDeletedLeases(propertyId);
     
     // Show modal
     modal.classList.add('show');
@@ -9484,7 +9511,7 @@ async function loadUnitLegacyLeases(unitId) {
         
         leasesSnapshot.forEach(doc => {
             const lease = { id: doc.id, ...doc.data() };
-            if (isLeaseDeprecated(lease)) {
+            if (isLeaseDeprecated(lease) && !isLeaseDeleted(lease)) {
                 leases.push(lease);
             }
         });
@@ -9493,6 +9520,39 @@ async function loadUnitLegacyLeases(unitId) {
     } catch (error) {
         console.error('Error loading legacy leases:', error);
         legacyLeasesList.innerHTML = '<p style="color: #999; text-align: center; padding: 40px;">Error loading legacy leases.</p>';
+    }
+}
+
+// Load deleted leases for a unit
+async function loadUnitDeletedLeases(unitId) {
+    const deletedLeasesList = document.getElementById('deletedLeasesList');
+    if (!deletedLeasesList) return;
+    
+    try {
+        const leasesSnapshot = await db.collection('leases')
+            .where('unitId', '==', unitId)
+            .get();
+        
+        const leases = [];
+        const tenants = {};
+        
+        // Load tenants
+        const tenantsSnapshot = await db.collection('tenants').get();
+        tenantsSnapshot.forEach(doc => {
+            tenants[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        
+        leasesSnapshot.forEach(doc => {
+            const lease = { id: doc.id, ...doc.data() };
+            if (isLeaseDeleted(lease) && !shouldPermanentlyRemoveLease(lease)) {
+                leases.push(lease);
+            }
+        });
+        
+        renderLeaseDetailList(leases, tenants, deletedLeasesList);
+    } catch (error) {
+        console.error('Error loading deleted leases:', error);
+        deletedLeasesList.innerHTML = '<p style="color: #999; text-align: center; padding: 40px;">Error loading deleted leases.</p>';
     }
 }
 
@@ -9517,7 +9577,7 @@ async function loadPropertyActiveLeases(propertyId) {
         
         leasesSnapshot.forEach(doc => {
             const lease = { id: doc.id, ...doc.data() };
-            if (!lease.unitId && isLeaseActive(lease)) {
+            if (!lease.unitId && isLeaseActive(lease) && !isLeaseDeleted(lease)) {
                 leases.push(lease);
             }
         });
@@ -9550,7 +9610,7 @@ async function loadPropertyLegacyLeases(propertyId) {
         
         leasesSnapshot.forEach(doc => {
             const lease = { id: doc.id, ...doc.data() };
-            if (isLeaseDeprecated(lease)) {
+            if (isLeaseDeprecated(lease) && !isLeaseDeleted(lease)) {
                 leases.push(lease);
             }
         });
@@ -9559,6 +9619,39 @@ async function loadPropertyLegacyLeases(propertyId) {
     } catch (error) {
         console.error('Error loading property legacy leases:', error);
         legacyLeasesList.innerHTML = '<p style="color: #999; text-align: center; padding: 40px;">Error loading legacy leases.</p>';
+    }
+}
+
+// Load deleted leases for a property (property-level)
+async function loadPropertyDeletedLeases(propertyId) {
+    const deletedLeasesList = document.getElementById('deletedLeasesList');
+    if (!deletedLeasesList) return;
+    
+    try {
+        const leasesSnapshot = await db.collection('leases')
+            .where('propertyId', '==', propertyId)
+            .get();
+        
+        const leases = [];
+        const tenants = {};
+        
+        // Load tenants
+        const tenantsSnapshot = await db.collection('tenants').get();
+        tenantsSnapshot.forEach(doc => {
+            tenants[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        
+        leasesSnapshot.forEach(doc => {
+            const lease = { id: doc.id, ...doc.data() };
+            if (isLeaseDeleted(lease) && !shouldPermanentlyRemoveLease(lease)) {
+                leases.push(lease);
+            }
+        });
+        
+        renderLeaseDetailList(leases, tenants, deletedLeasesList);
+    } catch (error) {
+        console.error('Error loading property deleted leases:', error);
+        deletedLeasesList.innerHTML = '<p style="color: #999; text-align: center; padding: 40px;">Error loading deleted leases.</p>';
     }
 }
 
@@ -9631,7 +9724,8 @@ function renderLeaseDetailList(leases, tenants, container) {
                     <div>
                         <button class="btn-sm btn-primary" onclick="window.openLeaseModal('${lease.id}')" style="margin-right: 8px;">View</button>
                         <button class="btn-sm btn-secondary" onclick="window.openLeaseModal('${lease.id}', true)" style="margin-right: 8px;">Edit</button>
-                        ${!lease.isDeprecated ? `<button class="btn-sm btn-danger" onclick="window.openDeprecatedModal('${lease.id}')">Mark as Deprecated</button>` : ''}
+                        ${!lease.isDeprecated ? `<button class="btn-sm btn-warning" onclick="window.openDeprecatedModal('${lease.id}')">Deprecate</button>` : ''}
+                        ${!lease.deletedAt ? `<button class="btn-sm btn-danger" onclick="window.deleteLease('${lease.id}')" style="margin-left: 8px;">Delete</button>` : ''}
                     </div>
                 </div>
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">
@@ -9708,6 +9802,50 @@ function closeDeprecatedModal() {
         form.reset();
     }
 }
+
+// Delete lease function
+window.deleteLease = async function(leaseId) {
+    if (!leaseId) {
+        alert('Lease ID is required');
+        return;
+    }
+    
+    if (!confirm('Are you sure you want to delete this lease? It will be moved to deleted leases and permanently removed after 30 days.')) {
+        return;
+    }
+    
+    try {
+        await db.collection('leases').doc(leaseId).update({
+            deletedAt: firebase.firestore.Timestamp.now(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        console.log('Lease marked as deleted successfully');
+        
+        // Refresh leases
+        loadLeases();
+        
+        // If viewing lease detail modal, refresh it
+        if (editingLeaseId === leaseId) {
+            await window.openLeaseModal(leaseId, false);
+        }
+        
+        // If viewing unit lease detail, refresh it
+        if (currentUnitIdForDetail) {
+            await window.viewUnitLeasesDetail(currentUnitIdForDetail);
+        }
+        
+        // If viewing property lease detail, refresh it
+        if (currentPropertyIdForLeaseDetail) {
+            await window.viewPropertyLeasesDetail(currentPropertyIdForLeaseDetail);
+        }
+        
+        alert('Lease has been deleted. It will be permanently removed after 30 days.');
+    } catch (error) {
+        console.error('Error deleting lease:', error);
+        alert('Error deleting lease: ' + error.message);
+    }
+};
 
 // Handle deprecated lease form submission
 window.handleDeprecatedLeaseSubmit = async function(e) {
