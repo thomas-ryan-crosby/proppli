@@ -1259,6 +1259,11 @@ function loadProperties() {
 
         renderPropertiesList(properties);
         loadTickets();
+    }, (error) => {
+        console.error('Error loading properties:', error);
+        if (error.code === 'permission-denied') {
+            handlePermissionError('properties');
+        }
     });
 }
 
