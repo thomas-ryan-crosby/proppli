@@ -2393,9 +2393,7 @@ hr {
     }
 }
 
- 
- / *   R e n t   R o l l   T a b l e   S t y l e s   * /  
- /* Rent Roll Table Styles */
+/* Rent Roll Table Styles */
 .rent-roll-container {
     margin-top: 20px;
 }
@@ -2408,12 +2406,27 @@ hr {
     background-color: #f8f9fa;
 }
 
+.rent-roll-table tbody tr:hover td {
+    background-color: #f8f9fa;
+}
+
 .rent-roll-table th {
     white-space: nowrap;
 }
 
 .rent-roll-table td {
     white-space: nowrap;
+}
+
+/* Escalation indicator */
+.rent-roll-table td[style*="position: relative"] {
+    position: relative;
+}
+
+/* Ensure sticky columns work properly */
+.rent-roll-table th[style*="position: sticky"],
+.rent-roll-table td[style*="position: sticky"] {
+    box-shadow: 2px 0 4px rgba(0,0,0,0.1);
 }
 
 /* Finance Tabs */
