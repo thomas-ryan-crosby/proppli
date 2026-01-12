@@ -115,30 +115,43 @@ function startApp() {
     checkFirebase();
 }
 
+// Initialize landing page and app
+function initLandingPage() {
+    const launchAppBtn = document.getElementById('launchAppBtn');
+    const landingPage = document.getElementById('landingPage');
+    const appContainer = document.getElementById('appContainer');
+    
+    if (launchAppBtn && landingPage && appContainer) {
+        launchAppBtn.addEventListener('click', function() {
+            console.log('Launch Application button clicked');
+            landingPage.style.display = 'none';
+            appContainer.style.display = 'block';
+            // Initialize the app after showing it
+            if (typeof startApp === 'function') {
+                startApp();
+            } else {
+                console.error('startApp function not found');
+            }
+        });
+        console.log('Landing page initialized - Launch button ready');
+    } else {
+        console.log('Landing page elements not found, initializing app directly');
+        // If landing page elements don't exist, just initialize the app
+        if (appContainer) {
+            appContainer.style.display = 'block';
+        }
+        startApp();
+    }
+}
+
 // Check if DOM is already loaded, if so run immediately, otherwise wait
 if (document.readyState === 'loading') {
-    // Initialize landing page
     document.addEventListener('DOMContentLoaded', function() {
-        // Setup launch application button
-        const launchAppBtn = document.getElementById('launchAppBtn');
-        const landingPage = document.getElementById('landingPage');
-        const appContainer = document.getElementById('appContainer');
-        
-        if (launchAppBtn && landingPage && appContainer) {
-            launchAppBtn.addEventListener('click', function() {
-                landingPage.style.display = 'none';
-                appContainer.style.display = 'block';
-                // Initialize the app after showing it
-                startApp();
-            });
-        } else {
-            // If landing page elements don't exist, just initialize the app
-            startApp();
-        }
+        initLandingPage();
     });
 } else {
     // DOM is already loaded, run immediately
-    startApp();
+    initLandingPage();
 }
 
 function initializeApp() {
