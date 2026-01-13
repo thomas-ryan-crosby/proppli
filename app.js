@@ -207,8 +207,26 @@ async function loadUserProfile(userId) {
                     profile: {}
                 });
                 console.log('✅ Created missing user profile for:', userEmail);
-                // Reload profile after creation
-                await loadUserProfile(userId);
+                
+                // Load the newly created profile
+                const newUserDoc = await db.collection('users').doc(userId).get();
+                if (newUserDoc.exists) {
+                    currentUserProfile = { id: newUserDoc.id, ...newUserDoc.data() };
+                    console.log('✅ User profile loaded:', currentUserProfile);
+                    updateUserMenu();
+                    
+                    // Check if user is active - if not, show approval message and sign out
+                    if (!currentUserProfile.isActive) {
+                        console.warn('⚠️ User account is not active - requires admin approval');
+                        showPermissionDeniedModal('Your account has been created but requires admin approval. Please contact a system administrator to activate your account.');
+                        await auth.signOut();
+                        return;
+                    }
+                } else {
+                    // Profile creation succeeded but document not found - this shouldn't happen
+                    console.error('Profile created but document not found on reload');
+                    throw new Error('Profile creation verification failed');
+                }
             } catch (createError) {
                 console.error('❌ Error creating user profile on login:', createError);
                 console.error('Error code:', createError.code);
