@@ -4465,11 +4465,222 @@ function formatDate(timestamp) {
     return 'Unknown';
 }
 
-// User detail modal functions (placeholder - to be implemented)
-window.openUserDetailModal = function(userId, editMode = false) {
-    console.log('Open user detail modal:', userId, editMode);
-    // TODO: Implement user detail modal
-    alert(`User detail modal for ${userId} (edit mode: ${editMode}) - Coming soon!`);
+// User detail modal functions
+let editingUserId = null;
+
+window.openUserDetailModal = async function(userId, editMode = false) {
+    editingUserId = userId;
+    
+    try {
+        // Load user data
+        const userDoc = await db.collection('users').doc(userId).get();
+        if (!userDoc.exists) {
+            alert('User not found.');
+            return;
+        }
+        
+        const user = { id: userDoc.id, ...userDoc.data() };
+        
+        // Populate form fields
+        document.getElementById('userDetailId').value = user.id;
+        document.getElementById('userDetailEmail').value = user.email || '';
+        document.getElementById('userDetailDisplayName').value = user.displayName || '';
+        document.getElementById('userDetailPhone').value = user.profile?.phone || '';
+        document.getElementById('userDetailRole').value = user.role || 'viewer';
+        document.getElementById('userDetailStatus').value = user.isActive ? 'true' : 'false';
+        document.getElementById('userDetailTitle').value = user.profile?.title || '';
+        document.getElementById('userDetailDepartment').value = user.profile?.department || '';
+        document.getElementById('userDetailNotes').value = user.profile?.notes || '';
+        
+        // Format dates
+        const createdDate = user.createdAt ? formatDate(user.createdAt) : 'Unknown';
+        const lastLoginDate = user.lastLogin ? formatDate(user.lastLogin) : 'Never';
+        document.getElementById('userDetailCreated').textContent = createdDate;
+        document.getElementById('userDetailLastLogin').textContent = lastLoginDate;
+        
+        // Update modal title
+        const modalTitle = document.getElementById('userDetailModalTitle');
+        if (modalTitle) {
+            modalTitle.textContent = editMode ? 'Edit User' : 'User Details';
+        }
+        
+        // Check if current user can edit this user's role
+        const roleSelect = document.getElementById('userDetailRole');
+        const roleNote = document.getElementById('userDetailRoleNote');
+        if (currentUserProfile) {
+            const isSuperAdmin = currentUserProfile.role === 'super_admin';
+            const isEditingSuperAdmin = user.role === 'super_admin';
+            
+            if (!isSuperAdmin && isEditingSuperAdmin) {
+                roleSelect.disabled = true;
+                if (roleNote) {
+                    roleNote.textContent = 'Only Super Admins can change Super Admin roles.';
+                    roleNote.style.color = '#e74c3c';
+                }
+            } else {
+                roleSelect.disabled = false;
+                if (roleNote) {
+                    roleNote.textContent = '';
+                }
+            }
+        }
+        
+        // Load assigned properties
+        await loadUserProperties(user);
+        
+        // Show modal
+        const modal = document.getElementById('userDetailModal');
+        if (modal) {
+            modal.classList.add('show');
+            document.body.style.overflow = 'hidden';
+            
+            // Reset to Details tab
+            switchUserDetailTab('details');
+        }
+        
+    } catch (error) {
+        console.error('Error opening user detail modal:', error);
+        alert('Error loading user details: ' + error.message);
+    }
+};
+
+// Switch user detail tabs
+function switchUserDetailTab(tabName) {
+    // Hide all tabs
+    document.querySelectorAll('.user-tab-content').forEach(tab => {
+        tab.classList.remove('active');
+        tab.style.display = 'none';
+    });
+    
+    // Remove active class from all tab buttons
+    document.querySelectorAll('[data-user-tab]').forEach(btn => {
+        btn.classList.remove('active');
+        btn.style.color = '#666';
+        btn.style.borderBottom = 'none';
+        btn.style.marginBottom = '0';
+    });
+    
+    // Show selected tab
+    const selectedTab = document.getElementById('user' + tabName.charAt(0).toUpperCase() + tabName.slice(1) + 'Tab');
+    if (selectedTab) {
+        selectedTab.classList.add('active');
+        selectedTab.style.display = 'block';
+    }
+    
+    // Activate tab button
+    const tabButton = document.querySelector(`[data-user-tab="${tabName}"]`);
+    if (tabButton) {
+        tabButton.classList.add('active');
+        tabButton.style.color = '#667eea';
+        tabButton.style.borderBottom = '2px solid #667eea';
+        tabButton.style.marginBottom = '-2px';
+    }
+}
+
+// Load user's assigned properties
+async function loadUserProperties(user) {
+    const propertiesList = document.getElementById('userPropertiesList');
+    const propertyCheckboxes = document.getElementById('userPropertyCheckboxes');
+    
+    if (!propertiesList || !propertyCheckboxes) return;
+    
+    try {
+        // Load all properties
+        const propertiesSnapshot = await db.collection('properties').get();
+        const allProperties = {};
+        propertiesSnapshot.forEach(doc => {
+            allProperties[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        
+        // Get user's assigned properties
+        const assignedPropertyIds = user.assignedProperties || [];
+        
+        // Display assigned properties
+        if (assignedPropertyIds.length === 0) {
+            propertiesList.innerHTML = '<p style="color: #999; font-style: italic;">No properties assigned.</p>';
+        } else {
+            let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
+            assignedPropertyIds.forEach(propId => {
+                const property = allProperties[propId];
+                if (property) {
+                    html += `
+                        <div style="background: white; padding: 12px; border-radius: 6px; border: 1px solid #e0e0e0; display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-weight: 600;">${escapeHtml(property.name || 'Unknown Property')}</span>
+                            <button type="button" class="btn-small btn-danger" onclick="removeUserProperty('${editingUserId}', '${propId}')">Remove</button>
+                        </div>
+                    `;
+                }
+            });
+            html += '</div>';
+            propertiesList.innerHTML = html;
+        }
+        
+        // Display property checkboxes
+        if (Object.keys(allProperties).length === 0) {
+            propertyCheckboxes.innerHTML = '<p style="color: #999; font-style: italic;">No properties available.</p>';
+        } else {
+            let html = '';
+            Object.values(allProperties).forEach(property => {
+                const isAssigned = assignedPropertyIds.includes(property.id);
+                html += `
+                    <label style="display: flex; align-items: center; gap: 10px; padding: 10px; cursor: pointer; border-radius: 4px; transition: background 0.2s;" 
+                           onmouseover="this.style.background='#e8f0fe'" 
+                           onmouseout="this.style.background='transparent'">
+                        <input type="checkbox" value="${property.id}" ${isAssigned ? 'checked' : ''} 
+                               onchange="updateUserPropertyCheckbox('${editingUserId}', '${property.id}', this.checked)">
+                        <span style="font-weight: 500;">${escapeHtml(property.name || 'Unknown Property')}</span>
+                    </label>
+                `;
+            });
+            propertyCheckboxes.innerHTML = html;
+        }
+        
+    } catch (error) {
+        console.error('Error loading user properties:', error);
+        propertiesList.innerHTML = '<p style="color: #e74c3c;">Error loading properties.</p>';
+        propertyCheckboxes.innerHTML = '<p style="color: #e74c3c;">Error loading properties.</p>';
+    }
+}
+
+// Update user property checkbox
+window.updateUserPropertyCheckbox = function(userId, propertyId, isChecked) {
+    // This will be handled by the save button
+    console.log('Property checkbox updated:', propertyId, isChecked);
+};
+
+// Remove user property
+window.removeUserProperty = async function(userId, propertyId) {
+    if (!confirm('Remove this property assignment?')) {
+        return;
+    }
+    
+    try {
+        const userDoc = await db.collection('users').doc(userId).get();
+        if (!userDoc.exists) {
+            alert('User not found.');
+            return;
+        }
+        
+        const user = userDoc.data();
+        const assignedProperties = user.assignedProperties || [];
+        const updatedProperties = assignedProperties.filter(id => id !== propertyId);
+        
+        await db.collection('users').doc(userId).update({
+            assignedProperties: updatedProperties
+        });
+        
+        console.log('✅ Property removed successfully');
+        
+        // Reload user properties
+        const updatedUser = { id: userId, ...user, assignedProperties: updatedProperties };
+        await loadUserProperties(updatedUser);
+        
+        // Reload users list
+        loadUsers();
+    } catch (error) {
+        console.error('Error removing property:', error);
+        alert('Error removing property: ' + error.message);
+    }
 };
 
 // Toggle user status
@@ -4492,6 +4703,56 @@ window.toggleUserStatus = async function(userId, isActive) {
         alert(`Error ${isActive ? 'activating' : 'deactivating'} user: ${error.message}`);
     }
 };
+
+// Save user details
+async function saveUserDetails(userId, userData) {
+    try {
+        const updateData = {
+            displayName: userData.displayName,
+            role: userData.role,
+            isActive: userData.isActive,
+            'profile.phone': userData.phone || null,
+            'profile.title': userData.title || null,
+            'profile.department': userData.department || null,
+            'profile.notes': userData.notes || null,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        
+        await db.collection('users').doc(userId).update(updateData);
+        
+        console.log('✅ User updated successfully');
+        return true;
+    } catch (error) {
+        console.error('Error saving user:', error);
+        throw error;
+    }
+}
+
+// Save user property assignments
+async function saveUserProperties(userId, propertyIds) {
+    try {
+        await db.collection('users').doc(userId).update({
+            assignedProperties: propertyIds,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        console.log('✅ User properties updated successfully');
+        return true;
+    } catch (error) {
+        console.error('Error saving user properties:', error);
+        throw error;
+    }
+}
+
+// Close user detail modal
+function closeUserDetailModal() {
+    const modal = document.getElementById('userDetailModal');
+    if (modal) {
+        modal.classList.remove('show');
+        document.body.style.overflow = '';
+    }
+    editingUserId = null;
+}
 
 function loadPropertiesForTenantFilter() {
     const propertyFilter = document.getElementById('tenantPropertyFilter');

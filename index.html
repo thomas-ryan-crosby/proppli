@@ -1809,6 +1809,129 @@
             </main>
         </div>
 
+        <!-- User Detail/Edit Modal -->
+        <div id="userDetailModal" class="modal">
+            <div class="modal-content" style="max-width: 900px;">
+                <div class="modal-header">
+                    <h2 id="userDetailModalTitle">User Details</h2>
+                    <button class="close-btn" id="closeUserDetailModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <!-- Tabs -->
+                    <div class="user-detail-tabs" style="display: flex; gap: 10px; border-bottom: 2px solid #e2e8f0; margin-bottom: 20px;">
+                        <button class="tab-btn active" data-user-tab="details" style="padding: 10px 20px; border: none; background: none; cursor: pointer; font-weight: 600; color: #667eea; border-bottom: 2px solid #667eea; margin-bottom: -2px;">Details</button>
+                        <button class="tab-btn" data-user-tab="properties" style="padding: 10px 20px; border: none; background: none; cursor: pointer; font-weight: 600; color: #666;">Properties</button>
+                        <button class="tab-btn" data-user-tab="activity" style="padding: 10px 20px; border: none; background: none; cursor: pointer; font-weight: 600; color: #666;">Activity</button>
+                    </div>
+
+                    <!-- Details Tab -->
+                    <div id="userDetailsTab" class="user-tab-content active">
+                        <form id="userDetailForm">
+                            <input type="hidden" id="userDetailId">
+                            
+                            <h3 style="margin: 20px 0 15px 0; color: #667eea; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px;">Basic Information</h3>
+                            
+                            <div class="form-group">
+                                <label for="userDetailEmail">Email</label>
+                                <input type="email" id="userDetailEmail" readonly style="background: #f5f5f5; cursor: not-allowed;">
+                                <small style="color: #666; font-size: 12px;">Email cannot be changed</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="userDetailDisplayName">Full Name *</label>
+                                <input type="text" id="userDetailDisplayName" required>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="userDetailPhone">Phone</label>
+                                <input type="tel" id="userDetailPhone">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="userDetailRole">Role *</label>
+                                <select id="userDetailRole" required>
+                                    <option value="">Select role...</option>
+                                    <option value="super_admin">Super Admin</option>
+                                    <option value="admin">Admin</option>
+                                    <option value="property_manager">Property Manager</option>
+                                    <option value="maintenance">Maintenance</option>
+                                    <option value="viewer">Viewer</option>
+                                </select>
+                                <small style="color: #666; font-size: 12px;" id="userDetailRoleNote"></small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="userDetailStatus">Status</label>
+                                <select id="userDetailStatus">
+                                    <option value="true">Active</option>
+                                    <option value="false">Inactive</option>
+                                </select>
+                            </div>
+                            
+                            <h3 style="margin: 30px 0 15px 0; color: #667eea; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px;">Additional Information</h3>
+                            
+                            <div class="form-group">
+                                <label for="userDetailTitle">Title</label>
+                                <input type="text" id="userDetailTitle" placeholder="e.g., Property Manager, Maintenance Lead">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="userDetailDepartment">Department</label>
+                                <input type="text" id="userDetailDepartment" placeholder="e.g., Operations, Maintenance">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="userDetailNotes">Notes</label>
+                                <textarea id="userDetailNotes" rows="3" placeholder="Additional notes about this user..."></textarea>
+                            </div>
+                            
+                            <div class="form-group" style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 20px;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                                    <span style="font-weight: 600; color: #333;">Created:</span>
+                                    <span id="userDetailCreated" style="color: #666;">—</span>
+                                </div>
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="font-weight: 600; color: #333;">Last Login:</span>
+                                    <span id="userDetailLastLogin" style="color: #666;">—</span>
+                                </div>
+                            </div>
+                            
+                            <div class="form-actions" style="margin-top: 25px;">
+                                <button type="submit" class="btn-primary" id="saveUserBtn">Save Changes</button>
+                                <button type="button" class="btn-secondary" id="cancelUserDetailForm">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Properties Tab -->
+                    <div id="userPropertiesTab" class="user-tab-content" style="display: none;">
+                        <h3 style="margin: 0 0 20px 0; color: #667eea;">Assigned Properties</h3>
+                        <div id="userPropertiesList" style="margin-bottom: 20px;">
+                            <p style="color: #999; font-style: italic;">Loading properties...</p>
+                        </div>
+                        <div class="form-group">
+                            <label for="userPropertySelector">Assign Properties</label>
+                            <div id="userPropertyCheckboxes" style="max-height: 300px; overflow-y: auto; border: 1px solid #e0e0e0; padding: 15px; border-radius: 6px; background: #f8f9fa;">
+                                <p style="color: #999; font-style: italic;">Loading properties...</p>
+                            </div>
+                            <small style="color: #666; font-size: 12px;">Select properties this user has access to. Super Admins and Admins have access to all properties.</small>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn-primary" id="saveUserPropertiesBtn">Save Property Assignments</button>
+                        </div>
+                    </div>
+
+                    <!-- Activity Tab -->
+                    <div id="userActivityTab" class="user-tab-content" style="display: none;">
+                        <h3 style="margin: 0 0 20px 0; color: #667eea;">Activity Log</h3>
+                        <div id="userActivityLog" style="min-height: 200px;">
+                            <p style="color: #999; font-style: italic; text-align: center; padding: 40px;">Activity logging coming soon...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     <!-- Floating Action Buttons -->
     <div class="fab-container">
         <button id="fabAddTenant" class="fab" title="Add Tenant" style="display: none;">
