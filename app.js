@@ -4860,6 +4860,242 @@ function closeUserDetailModal() {
     editingUserId = null;
 }
 
+// Invite User Modal Functions
+async function openInviteUserModal() {
+    const modal = document.getElementById('inviteUserModal');
+    if (!modal) return;
+    
+    // Reset form
+    const form = document.getElementById('inviteUserForm');
+    if (form) form.reset();
+    
+    // Clear error
+    const errorDiv = document.getElementById('inviteUserError');
+    if (errorDiv) {
+        errorDiv.style.display = 'none';
+        errorDiv.textContent = '';
+    }
+    
+    // Load properties for checkboxes
+    await loadInviteProperties();
+    
+    // Update properties note
+    updateInvitePropertiesNote();
+    
+    // Show modal
+    modal.classList.add('show');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeInviteUserModal() {
+    const modal = document.getElementById('inviteUserModal');
+    if (modal) {
+        modal.classList.remove('show');
+        document.body.style.overflow = '';
+    }
+}
+
+function updateInvitePropertiesNote() {
+    const roleSelect = document.getElementById('inviteRole');
+    const noteElement = document.getElementById('invitePropertiesNote');
+    if (!roleSelect || !noteElement) return;
+    
+    const role = roleSelect.value;
+    if (role === 'admin' || role === 'super_admin') {
+        noteElement.textContent = 'Admins have access to all properties. Property assignment is optional.';
+        noteElement.style.color = '#059669';
+    } else {
+        noteElement.textContent = 'Select at least one property for this user to access.';
+        noteElement.style.color = '#666';
+    }
+}
+
+async function loadInviteProperties() {
+    const checkboxesDiv = document.getElementById('invitePropertiesCheckboxes');
+    if (!checkboxesDiv) return;
+    
+    try {
+        const propertiesSnapshot = await db.collection('properties').get();
+        const properties = [];
+        propertiesSnapshot.forEach(doc => {
+            properties.push({ id: doc.id, ...doc.data() });
+        });
+        
+        if (properties.length === 0) {
+            checkboxesDiv.innerHTML = '<p style="color: #999; font-style: italic;">No properties available. Create properties first.</p>';
+            return;
+        }
+        
+        let html = '';
+        properties.forEach(property => {
+            html += `
+                <label style="display: flex; align-items: center; gap: 10px; padding: 10px; cursor: pointer; border-radius: 4px; transition: background 0.2s;" 
+                       onmouseover="this.style.background='#e8f0fe'" 
+                       onmouseout="this.style.background='transparent'">
+                    <input type="checkbox" value="${property.id}" name="inviteProperty">
+                    <span style="font-weight: 500;">${escapeHtml(property.name || 'Unknown Property')}</span>
+                </label>
+            `;
+        });
+        checkboxesDiv.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Error loading properties for invite:', error);
+        checkboxesDiv.innerHTML = '<p style="color: #e74c3c;">Error loading properties.</p>';
+    }
+}
+
+async function handleInviteUser(e) {
+    e.preventDefault();
+    
+    const email = document.getElementById('inviteEmail').value;
+    const fullName = document.getElementById('inviteFullName').value;
+    const phone = document.getElementById('invitePhone').value;
+    const role = document.getElementById('inviteRole').value;
+    const title = document.getElementById('inviteTitle').value;
+    const department = document.getElementById('inviteDepartment').value;
+    const sendEmail = document.getElementById('sendInviteEmail').checked;
+    const errorDiv = document.getElementById('inviteUserError');
+    
+    // Get selected properties
+    const propertyCheckboxes = document.querySelectorAll('#invitePropertiesCheckboxes input[type="checkbox"]:checked');
+    const propertyIds = Array.from(propertyCheckboxes).map(cb => cb.value);
+    
+    // Validate role
+    if (!role) {
+        if (errorDiv) {
+            errorDiv.textContent = 'Please select a role.';
+            errorDiv.style.display = 'block';
+        }
+        return;
+    }
+    
+    // Validate properties for non-admin roles
+    if (role !== 'admin' && role !== 'super_admin' && propertyIds.length === 0) {
+        if (errorDiv) {
+            errorDiv.textContent = 'Please select at least one property for non-admin roles.';
+            errorDiv.style.display = 'block';
+        }
+        return;
+    }
+    
+    // Clear previous errors
+    if (errorDiv) {
+        errorDiv.style.display = 'none';
+        errorDiv.textContent = '';
+    }
+    
+    try {
+        // Check if user already exists in Firebase Auth
+        // Note: We can't check this from client-side, so we'll try to create and handle errors
+        
+        // Create user in Firebase Auth (this will fail if email already exists)
+        if (!auth) {
+            throw new Error('Authentication not initialized');
+        }
+        
+        // Generate a temporary password (user will need to reset it)
+        const tempPassword = generateTempPassword();
+        
+        // Create Firebase Auth user
+        const userCredential = await auth.createUserWithEmailAndPassword(email, tempPassword);
+        console.log('✅ Firebase Auth user created');
+        
+        // Update display name
+        await userCredential.user.updateProfile({
+            displayName: fullName
+        });
+        
+        // Create Firestore user document
+        await db.collection('users').doc(userCredential.user.uid).set({
+            email: email,
+            displayName: fullName,
+            role: role,
+            isActive: true, // Admin-created users are active immediately
+            assignedProperties: propertyIds,
+            profile: {
+                phone: phone || null,
+                title: title || null,
+                department: department || null
+            },
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            lastLogin: null,
+            createdBy: currentUser.uid
+        });
+        
+        console.log('✅ User profile created in Firestore');
+        
+        // Send password reset email so user can set their own password
+        if (sendEmail) {
+            try {
+                await auth.sendPasswordResetEmail(email);
+                console.log('✅ Password reset email sent');
+            } catch (emailError) {
+                console.warn('Could not send password reset email:', emailError);
+                // Continue anyway - user can use "Forgot Password" later
+            }
+        }
+        
+        // Sign out the newly created user (we're logged in as admin)
+        await auth.signOut();
+        // Sign back in as the admin
+        if (currentUser && currentUser.email) {
+            // Note: This requires the admin to be logged in, which they should be
+            // We'll reload the page to restore the admin session
+            window.location.reload();
+        }
+        
+        alert(`User ${fullName} (${email}) has been created successfully!${sendEmail ? ' A password setup email has been sent.' : ' Please inform them to use "Forgot Password" to set up their account.'}`);
+        
+        // Close modal and reload users
+        closeInviteUserModal();
+        loadUsers();
+        
+    } catch (error) {
+        console.error('Error inviting user:', error);
+        let errorMessage = 'An error occurred while creating the user.';
+        
+        switch (error.code) {
+            case 'auth/email-already-in-use':
+                errorMessage = 'An account with this email already exists. Please use the User Management page to manage this user.';
+                break;
+            case 'auth/invalid-email':
+                errorMessage = 'Invalid email address.';
+                break;
+            case 'auth/weak-password':
+                errorMessage = 'Password is too weak.';
+                break;
+            case 'permission-denied':
+                errorMessage = 'You do not have permission to create users.';
+                break;
+            default:
+                errorMessage = error.message || 'Failed to create user. Please try again.';
+        }
+        
+        if (errorDiv) {
+            errorDiv.textContent = errorMessage;
+            errorDiv.style.display = 'block';
+        }
+    }
+}
+
+function generateTempPassword() {
+    // Generate a secure temporary password
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+    let password = '';
+    // Ensure at least one of each required type
+    password += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 26)];
+    password += 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)];
+    password += '0123456789'[Math.floor(Math.random() * 10)];
+    password += '!@#$%^&*'[Math.floor(Math.random() * 8)];
+    // Fill the rest
+    for (let i = 4; i < 16; i++) {
+        password += chars[Math.floor(Math.random() * chars.length)];
+    }
+    // Shuffle
+    return password.split('').sort(() => Math.random() - 0.5).join('');
+}
+
 function loadPropertiesForTenantFilter() {
     const propertyFilter = document.getElementById('tenantPropertyFilter');
     if (!propertyFilter) return;
