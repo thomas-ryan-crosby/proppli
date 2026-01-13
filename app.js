@@ -4247,7 +4247,7 @@ function loadTenants() {
 }
 
 // User Management
-function loadUsers() {
+async function loadUsers() {
     // Don't load if user is not authenticated or not admin
     if (!currentUser || !auth || !auth.currentUser) {
         return;
@@ -4262,26 +4262,58 @@ function loadUsers() {
         return;
     }
     
-    db.collection('users')
-        .orderBy('createdAt', 'desc')
-        .onSnapshot((snapshot) => {
-            allUsers = {};
-            snapshot.forEach((doc) => {
-                allUsers[doc.id] = { id: doc.id, ...doc.data() };
-            });
-            renderUsersList(allUsers);
-        }, (error) => {
-            console.error('Error loading users:', error);
-            const usersList = document.getElementById('usersList');
-            if (usersList) {
-                if (error.code === 'permission-denied') {
-                    usersList.innerHTML = '<p style="color: #e74c3c; text-align: center; padding: 20px;">You do not have permission to view users.</p>';
-                    handlePermissionError('user management');
-                } else {
-                    usersList.innerHTML = '<p style="color: #e74c3c; text-align: center; padding: 20px;">Error loading users. Please try again.</p>';
-                }
-            }
+    try {
+        // Load users from Firestore
+        const firestoreSnapshot = await db.collection('users').get();
+        const firestoreUsers = {};
+        firestoreSnapshot.forEach((doc) => {
+            firestoreUsers[doc.id] = { id: doc.id, ...doc.data(), source: 'firestore' };
         });
+        
+        // Also get all Firebase Auth users (requires Admin SDK, but we can try to get current user's auth info)
+        // Note: We can't list all Auth users from client-side, but we can check if Firestore users match Auth users
+        // For now, we'll show all Firestore users and add a note if there might be missing users
+        
+        // Merge and store
+        allUsers = firestoreUsers;
+        
+        // Set up real-time listener for Firestore updates
+        db.collection('users')
+            .orderBy('createdAt', 'desc')
+            .onSnapshot((snapshot) => {
+                allUsers = {};
+                snapshot.forEach((doc) => {
+                    allUsers[doc.id] = { id: doc.id, ...doc.data(), source: 'firestore' };
+                });
+                renderUsersList(allUsers);
+            }, (error) => {
+                console.error('Error loading users:', error);
+                const usersList = document.getElementById('usersList');
+                if (usersList) {
+                    if (error.code === 'permission-denied') {
+                        usersList.innerHTML = '<p style="color: #e74c3c; text-align: center; padding: 20px;">You do not have permission to view users.</p>';
+                        handlePermissionError('user management');
+                    } else {
+                        usersList.innerHTML = '<p style="color: #e74c3c; text-align: center; padding: 20px;">Error loading users. Please try again.</p>';
+                    }
+                }
+            });
+        
+        // Initial render
+        renderUsersList(allUsers);
+        
+    } catch (error) {
+        console.error('Error loading users:', error);
+        const usersList = document.getElementById('usersList');
+        if (usersList) {
+            if (error.code === 'permission-denied') {
+                usersList.innerHTML = '<p style="color: #e74c3c; text-align: center; padding: 20px;">You do not have permission to view users.</p>';
+                handlePermissionError('user management');
+            } else {
+                usersList.innerHTML = '<p style="color: #e74c3c; text-align: center; padding: 20px;">Error loading users. Please try again.</p>';
+            }
+        }
+    }
 }
 
 function renderUsersList(users) {
@@ -4315,18 +4347,33 @@ function renderUsersList(users) {
         return true;
     });
     
+    // Show info message about Firebase Auth users
+    const userCount = Object.keys(users).length;
+    let infoMessage = '';
+    if (userCount === 0) {
+        infoMessage = `
+            <div style="background: #fef3c7; border: 1px solid #fbbf24; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                <p style="margin: 0; color: #78350f; font-size: 0.9rem;">
+                    <strong>Note:</strong> This page shows users from Firestore. Users who exist in Firebase Authentication but don't have a Firestore document won't appear here. 
+                    To add them, use the "Invite User" button or manually create their Firestore document.
+                </p>
+            </div>
+        `;
+    }
+    
     if (filteredUsers.length === 0) {
-        usersList.innerHTML = `
+        usersList.innerHTML = infoMessage + `
             <div class="empty-state">
                 <div class="empty-state-icon">👥</div>
                 <p>No users found${searchTerm || roleFilter || statusFilter ? ' matching filters' : ''}.</p>
+                ${userCount === 0 ? '<p style="margin-top: 10px; font-size: 0.9rem; color: #666;">Check Firebase Console → Authentication to see all Auth users.</p>' : ''}
             </div>
         `;
         return;
     }
     
     // Render user cards
-    usersList.innerHTML = filteredUsers.map(user => {
+    usersList.innerHTML = infoMessage + filteredUsers.map(user => {
         const roleBadge = getRoleBadge(user.role);
         const statusBadge = getStatusBadge(user.isActive);
         const lastLogin = user.lastLogin ? formatDate(user.lastLogin) : 'Never';
