@@ -586,23 +586,33 @@ async function handleSignup(e) {
             displayName: fullName
         });
         
-        // Create user profile in Firestore
-        if (db) {
-            await createUserProfile(userCredential.user.uid, {
-                email: email,
-                displayName: fullName,
-                role: 'viewer',
-                isActive: false, // Requires admin approval
-                profile: {
-                    phone: phone || null
-                },
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                lastLogin: firebase.firestore.FieldValue.serverTimestamp()
-            });
-        }
+        // Check if there's a pending invitation for this email
+        const pendingUser = await checkPendingInvitation(email);
         
-        // Sign out (user needs admin approval)
-        await auth.signOut();
+        if (pendingUser) {
+            // Link to pending invitation (admin-invited user)
+            await linkPendingUserToAccount(userCredential.user.uid, email);
+            console.log('✅ User account linked to pending invitation');
+            // User is already active, no need to sign out
+        } else {
+            // Regular signup - create profile with isActive: false
+            if (db) {
+                await createUserProfile(userCredential.user.uid, {
+                    email: email,
+                    displayName: fullName,
+                    role: 'viewer',
+                    isActive: false, // Requires admin approval
+                    profile: {
+                        phone: phone || null
+                    },
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            }
+            
+            // Sign out (user needs admin approval)
+            await auth.signOut();
+        }
         
         // Show success message
         if (successDiv) {
@@ -4985,32 +4995,47 @@ async function handleInviteUser(e) {
     }
     
     try {
-        // Check if user already exists in Firebase Auth
-        // Note: We can't check this from client-side, so we'll try to create and handle errors
-        
-        // Create user in Firebase Auth (this will fail if email already exists)
-        if (!auth) {
-            throw new Error('Authentication not initialized');
-        }
-        
-        // Generate a temporary password (user will need to reset it)
-        const tempPassword = generateTempPassword();
-        
-        // Create Firebase Auth user
-        const userCredential = await auth.createUserWithEmailAndPassword(email, tempPassword);
-        console.log('✅ Firebase Auth user created');
-        
-        // Update display name
-        await userCredential.user.updateProfile({
-            displayName: fullName
-        });
-        
-        // Create Firestore user document
-        await db.collection('users').doc(userCredential.user.uid).set({
+        // Create user invitation document
+        // The user will sign up themselves, and we'll link their account to this invitation
+        const invitationData = {
             email: email,
             displayName: fullName,
             role: role,
-            isActive: true, // Admin-created users are active immediately
+            assignedProperties: propertyIds,
+            profile: {
+                phone: phone || null,
+                title: title || null,
+                department: department || null
+            },
+            invitedBy: currentUser.uid,
+            invitedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            status: 'pending',
+            sendEmail: sendEmail
+        };
+        
+        // Create invitation document
+        const invitationRef = await db.collection('userInvitations').add(invitationData);
+        console.log('✅ User invitation created');
+        
+        // Note: To actually create the Firebase Auth user, we would need Firebase Admin SDK
+        // For now, we'll create the invitation and the user can sign up
+        // When they sign up, we can check for pending invitations and auto-approve them
+        
+        // For immediate use: Create Firestore user document that will be linked when user signs up
+        // We'll use a placeholder UID that will be updated when the user signs up
+        // Actually, better approach: Just create invitation, user signs up, then admin approves
+        
+        // Alternative: Create the user document now with email as identifier
+        // When user signs up, we'll match by email and update the document
+        
+        // For now, let's create a user document with a special flag indicating it's pending signup
+        // We'll store it with email as a way to match later
+        const pendingUserRef = db.collection('pendingUsers').doc();
+        await pendingUserRef.set({
+            email: email,
+            displayName: fullName,
+            role: role,
+            isActive: true, // Admin-invited users are active immediately
             assignedProperties: propertyIds,
             profile: {
                 phone: phone || null,
@@ -5018,57 +5043,26 @@ async function handleInviteUser(e) {
                 department: department || null
             },
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            lastLogin: null,
-            createdBy: currentUser.uid
+            createdBy: currentUser.uid,
+            invitationId: invitationRef.id,
+            status: 'pending_signup'
         });
         
-        console.log('✅ User profile created in Firestore');
-        
-        // Send password reset email so user can set their own password
-        if (sendEmail) {
-            try {
-                await auth.sendPasswordResetEmail(email);
-                console.log('✅ Password reset email sent');
-            } catch (emailError) {
-                console.warn('Could not send password reset email:', emailError);
-                // Continue anyway - user can use "Forgot Password" later
-            }
-        }
-        
-        // Sign out the newly created user (we're logged in as admin)
-        await auth.signOut();
-        // Sign back in as the admin
-        if (currentUser && currentUser.email) {
-            // Note: This requires the admin to be logged in, which they should be
-            // We'll reload the page to restore the admin session
-            window.location.reload();
-        }
-        
-        alert(`User ${fullName} (${email}) has been created successfully!${sendEmail ? ' A password setup email has been sent.' : ' Please inform them to use "Forgot Password" to set up their account.'}`);
+        alert(`Invitation created for ${fullName} (${email}). They can now sign up and their account will be automatically configured with the assigned role and properties.${sendEmail ? ' (Email notification coming soon)' : ''}`);
         
         // Close modal and reload users
         closeInviteUserModal();
-        loadUsers();
+        // Note: User won't appear in list until they sign up
+        // We could add a "Pending Invitations" section later
         
     } catch (error) {
-        console.error('Error inviting user:', error);
-        let errorMessage = 'An error occurred while creating the user.';
+        console.error('Error creating invitation:', error);
+        let errorMessage = 'An error occurred while creating the invitation.';
         
-        switch (error.code) {
-            case 'auth/email-already-in-use':
-                errorMessage = 'An account with this email already exists. Please use the User Management page to manage this user.';
-                break;
-            case 'auth/invalid-email':
-                errorMessage = 'Invalid email address.';
-                break;
-            case 'auth/weak-password':
-                errorMessage = 'Password is too weak.';
-                break;
-            case 'permission-denied':
-                errorMessage = 'You do not have permission to create users.';
-                break;
-            default:
-                errorMessage = error.message || 'Failed to create user. Please try again.';
+        if (error.code === 'permission-denied') {
+            errorMessage = 'You do not have permission to create user invitations.';
+        } else {
+            errorMessage = error.message || 'Failed to create invitation. Please try again.';
         }
         
         if (errorDiv) {
