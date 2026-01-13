@@ -75,6 +75,23 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && isAdmin();
     }
     
+    // Pending users collection (for admin-invited users before they sign up)
+    match /pendingUsers/{pendingUserId} {
+      // Admins can read all pending users
+      allow read: if isAuthenticated() && isAdmin();
+      
+      // Only admins can create pending users
+      allow create: if isAuthenticated() && isAdmin();
+      
+      // System can update when linking to actual user account
+      // Users can read their own pending invitation (by email match)
+      allow read: if isAuthenticated() && 
+                    resource.data.email == request.auth.token.email;
+      
+      // Only admins can update/delete
+      allow update, delete: if isAuthenticated() && isAdmin();
+    }
+    
     // Properties collection - role-based access
     match /properties/{propertyId} {
       // Super admins have full access, others need proper permissions
