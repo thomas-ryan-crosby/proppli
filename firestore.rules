@@ -20,22 +20,22 @@ service cloud.firestore {
     
     // Helper function to check if user is admin or super admin
     function isAdmin() {
-      if (!isAuthenticated()) return false;
-      let role = getUserRole();
-      return role == 'admin' || role == 'super_admin';
+      return isAuthenticated() && 
+             (getUserRole() == 'admin' || getUserRole() == 'super_admin');
     }
     
     // Helper function to check if user is active
     function isUserActive() {
-      if (!isAuthenticated()) return false;
       let userDoc = getUserDoc();
-      return userDoc != null && userDoc.data != null && userDoc.data.isActive == true;
+      return isAuthenticated() && 
+             userDoc != null && 
+             userDoc.data != null && 
+             userDoc.data.isActive == true;
     }
     
     // Helper function to check if user is super admin
     function isSuperAdmin() {
-      if (!isAuthenticated()) return false;
-      return getUserRole() == 'super_admin';
+      return isAuthenticated() && getUserRole() == 'super_admin';
     }
     
     // Users collection
