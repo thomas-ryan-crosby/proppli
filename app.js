@@ -5072,21 +5072,77 @@ async function handleInviteUser(e) {
     }
 }
 
-function generateTempPassword() {
-    // Generate a secure temporary password
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
-    let password = '';
-    // Ensure at least one of each required type
-    password += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 26)];
-    password += 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)];
-    password += '0123456789'[Math.floor(Math.random() * 10)];
-    password += '!@#$%^&*'[Math.floor(Math.random() * 8)];
-    // Fill the rest
-    for (let i = 4; i < 16; i++) {
-        password += chars[Math.floor(Math.random() * chars.length)];
+// Check for pending user invitation when user signs up
+async function checkPendingInvitation(email) {
+    try {
+        // Check pendingUsers collection
+        const pendingUsersSnapshot = await db.collection('pendingUsers')
+            .where('email', '==', email)
+            .where('status', '==', 'pending_signup')
+            .limit(1)
+            .get();
+        
+        if (!pendingUsersSnapshot.empty) {
+            const pendingUser = pendingUsersSnapshot.docs[0].data();
+            return pendingUser;
+        }
+        return null;
+    } catch (error) {
+        console.error('Error checking pending invitation:', error);
+        return null;
     }
-    // Shuffle
-    return password.split('').sort(() => Math.random() - 0.5).join('');
+}
+
+// Link pending user to actual user account
+async function linkPendingUserToAccount(userId, email) {
+    try {
+        const pendingUser = await checkPendingInvitation(email);
+        if (pendingUser) {
+            // Create user document with pending user's data
+            await db.collection('users').doc(userId).set({
+                email: email,
+                displayName: pendingUser.displayName,
+                role: pendingUser.role,
+                isActive: pendingUser.isActive,
+                assignedProperties: pendingUser.assignedProperties || [],
+                profile: pendingUser.profile || {},
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                lastLogin: null,
+                createdBy: pendingUser.createdBy
+            });
+            
+            // Mark pending user as completed
+            const pendingDoc = await db.collection('pendingUsers')
+                .where('email', '==', email)
+                .where('status', '==', 'pending_signup')
+                .limit(1)
+                .get();
+            
+            if (!pendingDoc.empty) {
+                await pendingDoc.docs[0].ref.update({
+                    status: 'completed',
+                    linkedUserId: userId,
+                    linkedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            }
+            
+            // Update invitation status if exists
+            if (pendingUser.invitationId) {
+                await db.collection('userInvitations').doc(pendingUser.invitationId).update({
+                    status: 'accepted',
+                    acceptedBy: userId,
+                    acceptedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            }
+            
+            console.log('✅ Pending user linked to account');
+            return true;
+        }
+        return false;
+    } catch (error) {
+        console.error('Error linking pending user:', error);
+        return false;
+    }
 }
 
 function loadPropertiesForTenantFilter() {
