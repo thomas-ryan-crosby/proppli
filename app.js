@@ -185,10 +185,22 @@ async function loadUserProfile(userId) {
             }
         } else {
             console.warn('⚠️ User profile not found in Firestore');
-            // For new signups, show permission denied modal
-            // They need an admin to create their profile
-            showPermissionDeniedModal('Your account has been created but requires admin approval. Please contact a system administrator to activate your account and grant permissions.');
-            await auth.signOut();
+            // User signed up but profile doesn't exist yet
+            // Try to create it now (in case signup succeeded but profile creation failed)
+            try {
+                const authUser = currentUser || auth?.currentUser;
+                await createUserProfile(userIdToUse, {
+                    email: authUser?.email || '',
+                    displayName: authUser?.displayName || authUser?.email?.split('@')[0] || 'User',
+                    profile: {}
+                });
+                // Reload profile after creation
+                await loadUserProfile(userIdToUse);
+            } catch (createError) {
+                console.error('Error creating user profile on login:', createError);
+                showPermissionDeniedModal('Your account has been created but requires admin approval. Please contact a system administrator to activate your account and grant permissions.');
+                await auth.signOut();
+            }
         }
     } catch (error) {
         console.error('Error loading user profile:', error);
