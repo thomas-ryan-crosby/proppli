@@ -1330,6 +1330,104 @@ function setupEventListeners() {
             alert('Invite User functionality coming soon!');
         });
     }
+    
+    // User detail modal event listeners
+    const closeUserDetailModalBtn = document.getElementById('closeUserDetailModal');
+    const cancelUserDetailFormBtn = document.getElementById('cancelUserDetailForm');
+    const userDetailForm = document.getElementById('userDetailForm');
+    const saveUserPropertiesBtn = document.getElementById('saveUserPropertiesBtn');
+    
+    if (closeUserDetailModalBtn) {
+        closeUserDetailModalBtn.addEventListener('click', closeUserDetailModal);
+    }
+    
+    if (cancelUserDetailFormBtn) {
+        cancelUserDetailFormBtn.addEventListener('click', closeUserDetailModal);
+    }
+    
+    if (userDetailForm) {
+        userDetailForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (!editingUserId) {
+                alert('No user selected.');
+                return;
+            }
+            
+            try {
+                const userData = {
+                    displayName: document.getElementById('userDetailDisplayName').value,
+                    role: document.getElementById('userDetailRole').value,
+                    isActive: document.getElementById('userDetailStatus').value === 'true',
+                    phone: document.getElementById('userDetailPhone').value,
+                    title: document.getElementById('userDetailTitle').value,
+                    department: document.getElementById('userDetailDepartment').value,
+                    notes: document.getElementById('userDetailNotes').value
+                };
+                
+                await saveUserDetails(editingUserId, userData);
+                alert('User updated successfully!');
+                
+                // Reload users list
+                loadUsers();
+                
+                // Reload current user data in modal
+                await window.openUserDetailModal(editingUserId, true);
+                
+            } catch (error) {
+                console.error('Error saving user:', error);
+                alert('Error saving user: ' + error.message);
+            }
+        });
+    }
+    
+    if (saveUserPropertiesBtn) {
+        saveUserPropertiesBtn.addEventListener('click', async () => {
+            if (!editingUserId) {
+                alert('No user selected.');
+                return;
+            }
+            
+            try {
+                // Get checked property IDs
+                const checkboxes = document.querySelectorAll('#userPropertyCheckboxes input[type="checkbox"]:checked');
+                const propertyIds = Array.from(checkboxes).map(cb => cb.value);
+                
+                await saveUserProperties(editingUserId, propertyIds);
+                alert('Property assignments updated successfully!');
+                
+                // Reload user properties
+                const userDoc = await db.collection('users').doc(editingUserId).get();
+                if (userDoc.exists) {
+                    const user = { id: userDoc.id, ...userDoc.data() };
+                    await loadUserProperties(user);
+                }
+                
+                // Reload users list
+                loadUsers();
+                
+            } catch (error) {
+                console.error('Error saving user properties:', error);
+                alert('Error saving property assignments: ' + error.message);
+            }
+        });
+    }
+    
+    // User detail tab switching
+    document.querySelectorAll('[data-user-tab]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const tabName = e.target.getAttribute('data-user-tab');
+            switchUserDetailTab(tabName);
+        });
+    });
+    
+    // Close modal when clicking outside
+    window.addEventListener('click', (e) => {
+        const modal = document.getElementById('userDetailModal');
+        if (modal && e.target === modal) {
+            closeUserDetailModal();
+        }
+    });
 }
 
 // Property Management
@@ -4707,14 +4805,22 @@ window.toggleUserStatus = async function(userId, isActive) {
 // Save user details
 async function saveUserDetails(userId, userData) {
     try {
+        // Get current user data to preserve existing profile fields
+        const userDoc = await db.collection('users').doc(userId).get();
+        const currentUser = userDoc.exists ? userDoc.data() : {};
+        const currentProfile = currentUser.profile || {};
+        
         const updateData = {
             displayName: userData.displayName,
             role: userData.role,
             isActive: userData.isActive,
-            'profile.phone': userData.phone || null,
-            'profile.title': userData.title || null,
-            'profile.department': userData.department || null,
-            'profile.notes': userData.notes || null,
+            profile: {
+                ...currentProfile,
+                phone: userData.phone || null,
+                title: userData.title || null,
+                department: userData.department || null,
+                notes: userData.notes || null
+            },
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         

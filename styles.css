@@ -2484,6 +2484,43 @@ hr {
     background: #059669;
 }
 
+/* User Detail Modal Styles */
+.user-detail-tabs {
+    display: flex;
+    gap: 10px;
+    border-bottom: 2px solid #e2e8f0;
+    margin-bottom: 20px;
+}
+
+.user-detail-tabs .tab-btn {
+    padding: 10px 20px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-weight: 600;
+    color: #666;
+    transition: all 0.2s;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+}
+
+.user-detail-tabs .tab-btn:hover {
+    color: #667eea;
+}
+
+.user-detail-tabs .tab-btn.active {
+    color: #667eea;
+    border-bottom-color: #667eea;
+}
+
+.user-tab-content {
+    display: none;
+}
+
+.user-tab-content.active {
+    display: block;
+}
+
 /* Status Badge Improvements */
 .status-badge {
     display: inline-block;
