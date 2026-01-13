@@ -187,6 +187,7 @@
                 <button class="nav-link" data-page="tenants">Tenants</button>
                 <button class="nav-link" data-page="leases">Leases</button>
                 <button class="nav-link" data-page="finance">Finance</button>
+                <button class="nav-link" data-page="users" id="usersNavLink" style="display: none;">Users</button>
             </div>
             <div class="nav-user-menu">
                 <div class="user-menu-dropdown">
@@ -1753,6 +1754,56 @@
                             </div>
                             <div id="rentRollTable" class="rent-roll-container" style="overflow-x: auto;"></div>
                         </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- Users Management Page -->
+        <div id="usersPage" class="page" style="display: none;">
+            <header>
+                <h2>User Management</h2>
+                <div class="header-actions">
+                    <button id="inviteUserBtn" class="btn-primary">Invite User</button>
+                </div>
+            </header>
+
+            <main>
+                <!-- Filters and Search -->
+                <div class="filters-section" style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                    <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: end;">
+                        <div style="flex: 1; min-width: 200px;">
+                            <label for="userSearch" style="display: block; margin-bottom: 8px; font-weight: 600; color: #555;">Search</label>
+                            <input type="text" id="userSearch" placeholder="Search by name or email..." style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 6px; font-size: 14px;">
+                        </div>
+                        <div style="min-width: 150px;">
+                            <label for="userRoleFilter" style="display: block; margin-bottom: 8px; font-weight: 600; color: #555;">Role</label>
+                            <select id="userRoleFilter" style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 6px; font-size: 14px;">
+                                <option value="">All Roles</option>
+                                <option value="super_admin">Super Admin</option>
+                                <option value="admin">Admin</option>
+                                <option value="property_manager">Property Manager</option>
+                                <option value="maintenance">Maintenance</option>
+                                <option value="viewer">Viewer</option>
+                            </select>
+                        </div>
+                        <div style="min-width: 150px;">
+                            <label for="userStatusFilter" style="display: block; margin-bottom: 8px; font-weight: 600; color: #555;">Status</label>
+                            <select id="userStatusFilter" style="width: 100%; padding: 10px; border: 2px solid #e0e0e0; border-radius: 6px; font-size: 14px;">
+                                <option value="">All Status</option>
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
+                                <option value="pending">Pending</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Users List -->
+                <div id="usersList" class="users-list">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">👥</div>
+                        <p>Loading users...</p>
                     </div>
                 </div>
             </main>

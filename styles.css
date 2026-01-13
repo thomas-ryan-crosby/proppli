@@ -2378,6 +2378,112 @@ hr {
     border-top: 2px solid #f0f0f0;
 }
 
+/* User Management Styles */
+.users-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.user-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s;
+    border: 2px solid #e0e0e0;
+}
+
+.user-card:hover {
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+    border-color: #2563EB;
+    transform: translateY(-2px);
+}
+
+.user-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #f0f0f0;
+}
+
+.user-card-info h3 {
+    margin: 0 0 5px 0;
+    font-size: 1.2rem;
+    color: #333;
+}
+
+.user-email {
+    color: #666;
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+.user-card-badges {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-end;
+}
+
+.user-card-details {
+    margin-bottom: 15px;
+}
+
+.user-detail-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.user-detail-item:last-child {
+    border-bottom: none;
+}
+
+.detail-label {
+    color: #666;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.detail-value {
+    color: #333;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.user-card-actions {
+    display: flex;
+    gap: 8px;
+    padding-top: 15px;
+    border-top: 2px solid #f0f0f0;
+    flex-wrap: wrap;
+}
+
+.btn-warning {
+    background: #f59e0b;
+    color: white;
+    border: none;
+}
+
+.btn-warning:hover {
+    background: #d97706;
+}
+
+.btn-success {
+    background: #10b981;
+    color: white;
+    border: none;
+}
+
+.btn-success:hover {
+    background: #059669;
+}
+
 /* Status Badge Improvements */
 .status-badge {
     display: inline-block;

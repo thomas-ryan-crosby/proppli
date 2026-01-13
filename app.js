@@ -15,6 +15,9 @@ let currentUser = null;
 let currentUserProfile = null;
 let auth = null; // Firebase Auth instance
 
+// User Management
+let allUsers = {}; // Store all users for filtering
+
 // Tenant Management - moved to top for early initialization
 let editingTenantId = null;
 let currentTenantView = 'table'; // 'cards' or 'table' - table is now default
@@ -224,6 +227,16 @@ function updateUserMenu() {
             userMenuName.textContent = currentUser.displayName || currentUser.email || 'User';
         } else {
             userMenuName.textContent = 'User';
+        }
+    }
+    
+    // Show/hide Users nav link based on role
+    const usersNavLink = document.getElementById('usersNavLink');
+    if (usersNavLink) {
+        if (currentUserProfile && ['admin', 'super_admin'].includes(currentUserProfile.role)) {
+            usersNavLink.style.display = 'inline-block';
+        } else {
+            usersNavLink.style.display = 'none';
         }
     }
 }
@@ -796,6 +809,8 @@ function showPage(page) {
         loadLeases();
     } else if (page === 'finance') {
         loadFinance();
+    } else if (page === 'users') {
+        loadUsers();
     }
     
     // Update FAB visibility
@@ -1261,6 +1276,44 @@ function setupEventListeners() {
             closeOccupancyModal();
         }
     });
+    
+    // User management event listeners
+    const userSearch = document.getElementById('userSearch');
+    const userRoleFilter = document.getElementById('userRoleFilter');
+    const userStatusFilter = document.getElementById('userStatusFilter');
+    const inviteUserBtn = document.getElementById('inviteUserBtn');
+    
+    if (userSearch) {
+        userSearch.addEventListener('input', () => {
+            // Re-render users with current filters
+            if (currentPage === 'users' && Object.keys(allUsers).length > 0) {
+                renderUsersList(allUsers);
+            }
+        });
+    }
+    
+    if (userRoleFilter) {
+        userRoleFilter.addEventListener('change', () => {
+            if (currentPage === 'users' && Object.keys(allUsers).length > 0) {
+                renderUsersList(allUsers);
+            }
+        });
+    }
+    
+    if (userStatusFilter) {
+        userStatusFilter.addEventListener('change', () => {
+            if (currentPage === 'users' && Object.keys(allUsers).length > 0) {
+                renderUsersList(allUsers);
+            }
+        });
+    }
+    
+    if (inviteUserBtn) {
+        inviteUserBtn.addEventListener('click', () => {
+            // TODO: Open invite user modal
+            alert('Invite User functionality coming soon!');
+        });
+    }
 }
 
 // Property Management
@@ -4192,6 +4245,190 @@ function loadTenants() {
         }
     });
 }
+
+// User Management
+function loadUsers() {
+    // Don't load if user is not authenticated or not admin
+    if (!currentUser || !auth || !auth.currentUser) {
+        return;
+    }
+    
+    // Check if user is admin
+    if (!currentUserProfile || !['admin', 'super_admin'].includes(currentUserProfile.role)) {
+        const usersList = document.getElementById('usersList');
+        if (usersList) {
+            usersList.innerHTML = '<p style="color: #e74c3c; text-align: center; padding: 20px;">You do not have permission to view users.</p>';
+        }
+        return;
+    }
+    
+    db.collection('users')
+        .orderBy('createdAt', 'desc')
+        .onSnapshot((snapshot) => {
+            allUsers = {};
+            snapshot.forEach((doc) => {
+                allUsers[doc.id] = { id: doc.id, ...doc.data() };
+            });
+            renderUsersList(allUsers);
+        }, (error) => {
+            console.error('Error loading users:', error);
+            const usersList = document.getElementById('usersList');
+            if (usersList) {
+                if (error.code === 'permission-denied') {
+                    usersList.innerHTML = '<p style="color: #e74c3c; text-align: center; padding: 20px;">You do not have permission to view users.</p>';
+                    handlePermissionError('user management');
+                } else {
+                    usersList.innerHTML = '<p style="color: #e74c3c; text-align: center; padding: 20px;">Error loading users. Please try again.</p>';
+                }
+            }
+        });
+}
+
+function renderUsersList(users) {
+    const usersList = document.getElementById('usersList');
+    if (!usersList) return;
+    
+    // Get filter values
+    const searchTerm = (document.getElementById('userSearch')?.value || '').toLowerCase();
+    const roleFilter = document.getElementById('userRoleFilter')?.value || '';
+    const statusFilter = document.getElementById('userStatusFilter')?.value || '';
+    
+    // Filter users
+    const filteredUsers = Object.values(users).filter(user => {
+        // Search filter
+        if (searchTerm) {
+            const nameMatch = (user.displayName || '').toLowerCase().includes(searchTerm);
+            const emailMatch = (user.email || '').toLowerCase().includes(searchTerm);
+            if (!nameMatch && !emailMatch) return false;
+        }
+        
+        // Role filter
+        if (roleFilter && user.role !== roleFilter) return false;
+        
+        // Status filter
+        if (statusFilter) {
+            if (statusFilter === 'active' && !user.isActive) return false;
+            if (statusFilter === 'inactive' && user.isActive) return false;
+            if (statusFilter === 'pending' && user.isActive !== false) return false;
+        }
+        
+        return true;
+    });
+    
+    if (filteredUsers.length === 0) {
+        usersList.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">👥</div>
+                <p>No users found${searchTerm || roleFilter || statusFilter ? ' matching filters' : ''}.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    // Render user cards
+    usersList.innerHTML = filteredUsers.map(user => {
+        const roleBadge = getRoleBadge(user.role);
+        const statusBadge = getStatusBadge(user.isActive);
+        const lastLogin = user.lastLogin ? formatDate(user.lastLogin) : 'Never';
+        const assignedPropertiesCount = user.assignedProperties ? user.assignedProperties.length : 0;
+        
+        return `
+            <div class="user-card" data-user-id="${user.id}">
+                <div class="user-card-header">
+                    <div class="user-card-info">
+                        <h3>${escapeHtml(user.displayName || user.email || 'Unknown User')}</h3>
+                        <p class="user-email">${escapeHtml(user.email || 'No email')}</p>
+                    </div>
+                    <div class="user-card-badges">
+                        ${roleBadge}
+                        ${statusBadge}
+                    </div>
+                </div>
+                <div class="user-card-details">
+                    <div class="user-detail-item">
+                        <span class="detail-label">Last Login:</span>
+                        <span class="detail-value">${lastLogin}</span>
+                    </div>
+                    <div class="user-detail-item">
+                        <span class="detail-label">Properties:</span>
+                        <span class="detail-value">${assignedPropertiesCount}</span>
+                    </div>
+                </div>
+                <div class="user-card-actions">
+                    <button class="btn-small btn-primary" onclick="openUserDetailModal('${user.id}')">View</button>
+                    <button class="btn-small btn-secondary" onclick="openUserDetailModal('${user.id}', true)">Edit</button>
+                    ${user.isActive 
+                        ? `<button class="btn-small btn-warning" onclick="toggleUserStatus('${user.id}', false)">Deactivate</button>`
+                        : `<button class="btn-small btn-success" onclick="toggleUserStatus('${user.id}', true)">Activate</button>`
+                    }
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function getRoleBadge(role) {
+    const roleColors = {
+        'super_admin': { bg: '#dc2626', text: '#fff', label: 'Super Admin' },
+        'admin': { bg: '#ea580c', text: '#fff', label: 'Admin' },
+        'property_manager': { bg: '#2563eb', text: '#fff', label: 'Property Manager' },
+        'maintenance': { bg: '#059669', text: '#fff', label: 'Maintenance' },
+        'viewer': { bg: '#64748b', text: '#fff', label: 'Viewer' }
+    };
+    
+    const roleInfo = roleColors[role] || { bg: '#6b7280', text: '#fff', label: role || 'Unknown' };
+    
+    return `<span class="role-badge" style="background: ${roleInfo.bg}; color: ${roleInfo.text}; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">${roleInfo.label}</span>`;
+}
+
+function getStatusBadge(isActive) {
+    if (isActive === undefined || isActive === null) {
+        return `<span class="status-badge" style="background: #fbbf24; color: #78350f; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">Pending</span>`;
+    }
+    
+    if (isActive) {
+        return `<span class="status-badge" style="background: #10b981; color: #064e3b; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">Active</span>`;
+    } else {
+        return `<span class="status-badge" style="background: #ef4444; color: #7f1d1d; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">Inactive</span>`;
+    }
+}
+
+function formatDate(timestamp) {
+    if (!timestamp) return 'Never';
+    if (timestamp.toDate) {
+        const date = timestamp.toDate();
+        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    return 'Unknown';
+}
+
+// User detail modal functions (placeholder - to be implemented)
+window.openUserDetailModal = function(userId, editMode = false) {
+    console.log('Open user detail modal:', userId, editMode);
+    // TODO: Implement user detail modal
+    alert(`User detail modal for ${userId} (edit mode: ${editMode}) - Coming soon!`);
+};
+
+// Toggle user status
+window.toggleUserStatus = async function(userId, isActive) {
+    if (!confirm(`Are you sure you want to ${isActive ? 'activate' : 'deactivate'} this user?`)) {
+        return;
+    }
+    
+    try {
+        await db.collection('users').doc(userId).update({
+            isActive: isActive,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        console.log(`✅ User ${isActive ? 'activated' : 'deactivated'} successfully`);
+        // Reload users to refresh the list
+        loadUsers();
+    } catch (error) {
+        console.error('Error updating user status:', error);
+        alert(`Error ${isActive ? 'activating' : 'deactivating'} user: ${error.message}`);
+    }
+};
 
 function loadPropertiesForTenantFilter() {
     const propertyFilter = document.getElementById('tenantPropertyFilter');
