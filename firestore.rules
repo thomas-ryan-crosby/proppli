@@ -7,26 +7,35 @@ service cloud.firestore {
       return request.auth != null;
     }
     
-    // Helper function to get user role
+    // Helper function to get user document (returns null if doesn't exist)
+    function getUserDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+    
+    // Helper function to get user role (returns null if user doc doesn't exist)
     function getUserRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+      let userDoc = getUserDoc();
+      return userDoc != null && userDoc.data != null ? userDoc.data.role : null;
     }
     
     // Helper function to check if user is admin or super admin
     function isAdmin() {
-      return isAuthenticated() && 
-             (getUserRole() == 'admin' || getUserRole() == 'super_admin');
+      if (!isAuthenticated()) return false;
+      let role = getUserRole();
+      return role == 'admin' || role == 'super_admin';
     }
     
     // Helper function to check if user is active
     function isUserActive() {
-      return isAuthenticated() && 
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isActive == true;
+      if (!isAuthenticated()) return false;
+      let userDoc = getUserDoc();
+      return userDoc != null && userDoc.data != null && userDoc.data.isActive == true;
     }
     
     // Helper function to check if user is super admin
     function isSuperAdmin() {
-      return isAuthenticated() && getUserRole() == 'super_admin';
+      if (!isAuthenticated()) return false;
+      return getUserRole() == 'super_admin';
     }
     
     // Users collection

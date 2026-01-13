@@ -192,16 +192,27 @@ async function loadUserProfile(userId) {
                 if (!authUser) {
                     throw new Error('No authenticated user found');
                 }
+                
+                // Ensure we use the exact email from the auth token
+                const userEmail = authUser.email;
+                if (!userEmail) {
+                    throw new Error('User email not available');
+                }
+                
+                console.log('Creating Firestore profile for:', userEmail, 'UID:', userId);
+                
                 await createUserProfile(userId, {
-                    email: authUser.email || '',
-                    displayName: authUser.displayName || authUser.email?.split('@')[0] || 'User',
+                    email: userEmail,
+                    displayName: authUser.displayName || userEmail.split('@')[0] || 'User',
                     profile: {}
                 });
-                console.log('✅ Created missing user profile for:', authUser.email);
+                console.log('✅ Created missing user profile for:', userEmail);
                 // Reload profile after creation
                 await loadUserProfile(userId);
             } catch (createError) {
-                console.error('Error creating user profile on login:', createError);
+                console.error('❌ Error creating user profile on login:', createError);
+                console.error('Error code:', createError.code);
+                console.error('Error message:', createError.message);
                 showPermissionDeniedModal('Your account has been created but requires admin approval. Please contact a system administrator to activate your account and grant permissions.');
                 await auth.signOut();
             }
@@ -218,21 +229,49 @@ async function loadUserProfile(userId) {
 // Create user profile in Firestore (used during signup)
 async function createUserProfile(userId, userData) {
     try {
+        if (!db) {
+            throw new Error('Database not initialized');
+        }
+        
+        if (!userId) {
+            throw new Error('User ID is required');
+        }
+        
+        if (!userData || !userData.email) {
+            throw new Error('User email is required');
+        }
+        
         // Users can create their own profile with isActive: false and role: 'viewer'
         // Security rules enforce these restrictions
-        await db.collection('users').doc(userId).set({
+        const profileData = {
             email: userData.email,
-            displayName: userData.displayName,
+            displayName: userData.displayName || userData.email.split('@')[0] || 'User',
             role: 'viewer', // Default role, admins can change later
             isActive: false, // Requires admin approval
             assignedProperties: [],
             profile: userData.profile || {},
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             lastLogin: null // No login yet
+        };
+        
+        console.log('Creating user profile with data:', {
+            userId: userId,
+            email: profileData.email,
+            displayName: profileData.displayName,
+            role: profileData.role,
+            isActive: profileData.isActive
         });
-        console.log('✅ User profile created successfully');
+        
+        await db.collection('users').doc(userId).set(profileData);
+        console.log('✅ User profile created successfully for:', userData.email);
     } catch (error) {
-        console.error('Error creating user profile:', error);
+        console.error('❌ Error creating user profile:', error);
+        console.error('Error details:', {
+            code: error.code,
+            message: error.message,
+            userId: userId,
+            email: userData?.email
+        });
         throw error;
     }
 }
@@ -4456,14 +4495,28 @@ async function loadUsers() {
         allUsers = firestoreUsers;
         
         // Set up real-time listener for Firestore updates
+        // Use get() instead of orderBy to avoid index requirements and handle missing createdAt
         db.collection('users')
-            .orderBy('createdAt', 'desc')
             .onSnapshot((snapshot) => {
                 allUsers = {};
                 snapshot.forEach((doc) => {
                     allUsers[doc.id] = { id: doc.id, ...doc.data(), source: 'firestore' };
                 });
-                renderUsersList(allUsers);
+                // Sort by createdAt if available, otherwise by email
+                const sortedUsers = Object.values(allUsers).sort((a, b) => {
+                    if (a.createdAt && b.createdAt) {
+                        return b.createdAt.toMillis() - a.createdAt.toMillis();
+                    }
+                    if (a.createdAt) return -1;
+                    if (b.createdAt) return 1;
+                    return (a.email || '').localeCompare(b.email || '');
+                });
+                // Convert back to object for renderUsersList
+                const sortedUsersObj = {};
+                sortedUsers.forEach(user => {
+                    sortedUsersObj[user.id] = user;
+                });
+                renderUsersList(sortedUsersObj);
             }, (error) => {
                 console.error('Error loading users:', error);
                 const usersList = document.getElementById('usersList');
