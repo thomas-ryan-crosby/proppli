@@ -4923,12 +4923,38 @@ window.toggleUserStatus = async function(userId, isActive) {
     }
     
     try {
+        // Get user data before updating (for email)
+        let userData = null;
+        if (isActive) {
+            const userDoc = await db.collection('users').doc(userId).get();
+            if (userDoc.exists) {
+                userData = userDoc.data();
+            }
+        }
         await db.collection('users').doc(userId).update({
             isActive: isActive,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         
         console.log(`✅ User ${isActive ? 'activated' : 'deactivated'} successfully`);
+        
+        // Send activation email if user was activated
+        if (isActive && userData) {
+            try {
+                const sendActivationEmail = firebase.functions().httpsCallable('sendActivationEmail');
+                await sendActivationEmail({
+                    email: userData.email,
+                    displayName: userData.displayName,
+                    role: userData.role
+                });
+                console.log('✅ Activation email sent to:', userData.email);
+            } catch (emailError) {
+                console.error('Error sending activation email:', emailError);
+                // Don't fail the activation if email fails - just log it
+                console.warn('User activated but activation email could not be sent');
+            }
+        }
+        
         // Reload users to refresh the list
         loadUsers();
     } catch (error) {
@@ -5174,7 +5200,27 @@ async function handleInviteUser(e) {
             status: 'pending_signup'
         });
         
-        alert(`Invitation created for ${fullName} (${email}). They can now sign up and their account will be automatically configured with the assigned role and properties.${sendEmail ? ' (Email notification coming soon)' : ''}`);
+        // Send invitation email if requested
+        if (sendEmail) {
+            try {
+                const sendInvitationEmail = firebase.functions().httpsCallable('sendInvitationEmail');
+                await sendInvitationEmail({
+                    email: email,
+                    displayName: fullName,
+                    role: role,
+                    assignedProperties: propertyIds
+                });
+                console.log('✅ Invitation email sent to:', email);
+            } catch (emailError) {
+                console.error('Error sending invitation email:', emailError);
+                // Don't fail the invitation if email fails - just log it
+                alert(`Invitation created for ${fullName} (${email}), but email could not be sent. Error: ${emailError.message}`);
+                closeInviteUserModal();
+                return;
+            }
+        }
+        
+        alert(`Invitation created for ${fullName} (${email}).${sendEmail ? ' An invitation email has been sent.' : ''} They can now sign up and their account will be automatically configured with the assigned role and properties.`);
         
         // Close modal and reload users
         closeInviteUserModal();
