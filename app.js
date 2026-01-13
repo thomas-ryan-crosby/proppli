@@ -189,13 +189,17 @@ async function loadUserProfile(userId) {
             // Try to create it now (in case signup succeeded but profile creation failed)
             try {
                 const authUser = currentUser || auth?.currentUser;
-                await createUserProfile(userIdToUse, {
-                    email: authUser?.email || '',
-                    displayName: authUser?.displayName || authUser?.email?.split('@')[0] || 'User',
+                if (!authUser) {
+                    throw new Error('No authenticated user found');
+                }
+                await createUserProfile(userId, {
+                    email: authUser.email || '',
+                    displayName: authUser.displayName || authUser.email?.split('@')[0] || 'User',
                     profile: {}
                 });
+                console.log('✅ Created missing user profile for:', authUser.email);
                 // Reload profile after creation
-                await loadUserProfile(userIdToUse);
+                await loadUserProfile(userId);
             } catch (createError) {
                 console.error('Error creating user profile on login:', createError);
                 showPermissionDeniedModal('Your account has been created but requires admin approval. Please contact a system administrator to activate your account and grant permissions.');
@@ -318,6 +322,45 @@ function showPermissionDeniedModal(message) {
 // Close permission denied modal
 window.closePermissionDeniedModal = function() {
     const modal = document.getElementById('permissionDeniedModal');
+    if (modal) {
+        modal.remove();
+        document.body.style.overflow = '';
+    }
+};
+
+// Show no account found modal
+function showNoAccountModal() {
+    // Remove existing modal if present
+    const existingModal = document.getElementById('noAccountModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    const modal = document.createElement('div');
+    modal.id = 'noAccountModal';
+    modal.className = 'modal show';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>No Account Found</h2>
+                <button class="close-btn" onclick="closeNoAccountModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 20px; color: #64748b;">We couldn't find an account with those credentials. Would you like to create a new account?</p>
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button class="btn btn-secondary" onclick="closeNoAccountModal()" style="flex: 1;">Cancel</button>
+                    <button class="btn btn-primary" onclick="closeNoAccountModal(); showSignupPage();" style="flex: 1;">Sign Up</button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    document.body.style.overflow = 'hidden';
+}
+
+// Close no account modal
+window.closeNoAccountModal = function() {
+    const modal = document.getElementById('noAccountModal');
     if (modal) {
         modal.remove();
         document.body.style.overflow = '';
@@ -493,11 +536,20 @@ async function handleLogin(e) {
         const userCredential = await auth.signInWithEmailAndPassword(email, password);
         console.log('✅ Login successful');
         
-        // Update last login
+        // Update last login (if profile exists)
         if (userCredential.user && db) {
-            await db.collection('users').doc(userCredential.user.uid).update({
-                lastLogin: firebase.firestore.FieldValue.serverTimestamp()
-            });
+            try {
+                const userDoc = await db.collection('users').doc(userCredential.user.uid).get();
+                if (userDoc.exists) {
+                    await db.collection('users').doc(userCredential.user.uid).update({
+                        lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+                // If profile doesn't exist, loadUserProfile will create it
+            } catch (updateError) {
+                console.warn('Could not update last login:', updateError);
+                // Continue anyway - profile creation will happen in loadUserProfile
+            }
         }
         
         // Auth state change will handle showing the app
@@ -505,13 +557,16 @@ async function handleLogin(e) {
         console.error('Login error:', error);
         let errorMessage = 'An error occurred during login.';
         
+        // Check for invalid credential errors (user not found or wrong password)
+        if (error.code === 'auth/invalid-credential' || 
+            error.code === 'auth/user-not-found' || 
+            error.code === 'auth/wrong-password') {
+            // Show modal for account not found
+            showNoAccountModal();
+            return;
+        }
+        
         switch (error.code) {
-            case 'auth/user-not-found':
-                errorMessage = 'No account found with this email address.';
-                break;
-            case 'auth/wrong-password':
-                errorMessage = 'Incorrect password.';
-                break;
             case 'auth/invalid-email':
                 errorMessage = 'Invalid email address.';
                 break;
