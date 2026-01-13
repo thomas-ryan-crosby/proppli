@@ -199,20 +199,24 @@ async function loadUserProfile(userId) {
     }
 }
 
-// Create user profile in Firestore (only used during signup, requires admin permissions)
+// Create user profile in Firestore (used during signup)
 async function createUserProfile(userId, userData) {
     try {
-        // Note: This will fail for new users due to security rules
-        // Admins must create user profiles manually or through the admin interface
+        // Users can create their own profile with isActive: false and role: 'viewer'
+        // Security rules enforce these restrictions
         await db.collection('users').doc(userId).set({
-            ...userData,
+            email: userData.email,
+            displayName: userData.displayName,
+            role: 'viewer', // Default role, admins can change later
+            isActive: false, // Requires admin approval
+            assignedProperties: [],
+            profile: userData.profile || {},
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+            lastLogin: null // No login yet
         });
-        console.log('✅ User profile created');
+        console.log('✅ User profile created successfully');
     } catch (error) {
         console.error('Error creating user profile:', error);
-        // This is expected for new signups - they need admin approval
         throw error;
     }
 }
