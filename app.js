@@ -1326,8 +1326,7 @@ function setupEventListeners() {
     
     if (inviteUserBtn) {
         inviteUserBtn.addEventListener('click', () => {
-            // TODO: Open invite user modal
-            alert('Invite User functionality coming soon!');
+            openInviteUserModal();
         });
     }
     
