@@ -51,6 +51,7 @@ This comprehensive test plan covers all implemented features in the Proppli prop
 
 **Pass/Fail:** ☐ Pass ☐ Fail  
 **Notes:**
+Properly is miss spelled.
 
 ---
 
@@ -75,6 +76,8 @@ This comprehensive test plan covers all implemented features in the Proppli prop
 
 **Pass/Fail:** ☐ Pass ☐ Fail  
 **Notes:**
+The system auto-logs in even if remember me is not checked.
+Auth via Google is enabled on firebase, but I do not see any capabilities to sign in with google.
 
 ---
 
@@ -95,6 +98,7 @@ This comprehensive test plan covers all implemented features in the Proppli prop
 
 **Pass/Fail:** ☐ Pass ☐ Fail  
 **Notes:**
+If password is wrong, the No Account Found pop up is shown. I would expect it to just say password incorrect.
 
 ---
 
@@ -124,6 +128,8 @@ This comprehensive test plan covers all implemented features in the Proppli prop
 
 **Pass/Fail:** ☐ Pass ☐ Fail  
 **Notes:**
+Note1: Account Access Required modal should not have a sign out button. That would imply that a user was able to sign into the software.
+Note2: When a User Signs up, send a thank you for signing up for Properli email and that the system administrator will provide access or will be in touch shortly.
 
 ---
 
@@ -172,6 +178,7 @@ This comprehensive test plan covers all implemented features in the Proppli prop
 
 **Pass/Fail:** ☐ Pass ☐ Fail  
 **Notes:**
+On password reset, please make sure that a user enters the new password twice, so something is not incorrectly keyed in. Also for all password items, add a view password capability so someone can see what they are typing in.
 
 ---
 
@@ -257,7 +264,7 @@ This comprehensive test plan covers all implemented features in the Proppli prop
 
 **Pass/Fail:** ☐ Pass ☐ Fail  
 **Notes:**
-
+On the users page, allow a user to open up a window giving details on what users are able to do what - what does changing these settings do?
 ---
 
 ### Test Case 2.2: Invite User
@@ -373,7 +380,7 @@ This comprehensive test plan covers all implemented features in the Proppli prop
 
 **Pass/Fail:** ☐ Pass ☐ Fail  
 **Notes:**
-
+Saving changes should close the modal. Properties tab can be better designed.
 ---
 
 ### Test Case 2.6: Activate User
@@ -396,7 +403,7 @@ This comprehensive test plan covers all implemented features in the Proppli prop
 
 **Pass/Fail:** ☐ Pass ☐ Fail  
 **Notes:**
-
+Account activated email does not have good properli branding.
 ---
 
 ### Test Case 2.7: Deactivate User
@@ -488,7 +495,7 @@ This comprehensive test plan covers all implemented features in the Proppli prop
 
 **Pass/Fail:** ☐ Pass ☐ Fail  
 **Notes:**
-
+As an admin / super admin, I was able to create a signup for an account that already was in the system. This is incorrect behavior. It should throw a notifaciton that the user already exists.
 ---
 
 ## 3. Property Management
@@ -669,6 +676,7 @@ This comprehensive test plan covers all implemented features in the Proppli prop
 
 **Pass/Fail:** ☐ Pass ☐ Fail  
 **Notes:**
+I would like all of the assignments, creation, etc. to get auto-linked to the user that is logged into the system rather than having a user have to type it in. Tickets should only be assign-able to users in the system.
 
 ---
 
