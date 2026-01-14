@@ -237,8 +237,11 @@ async function sendInvitationEmailInternal(data) {
   const template = emailTemplates.invitation(emailData);
   
   // Send email
+  // Get from address from config, with fallback
+  const fromAddress = functions.config().email?.from || 'noreply@proppli.com';
+  
   const mailOptions = {
-    from: functions.config().email?.from || 'noreply@proppli.com',
+    from: fromAddress,
     to: data.email,
     subject: template.subject,
     html: template.html,
