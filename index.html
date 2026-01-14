@@ -296,12 +296,33 @@
                                 <input type="number" id="billingRate" min="0" step="0.01" placeholder="e.g., 75.00">
                             </div>
                             <div class="form-group">
+                                <label for="ticketCreatedBy">Created By</label>
+                                <input type="text" id="ticketCreatedBy" readonly style="background-color: #f3f4f6; cursor: not-allowed;">
+                                <small style="color: #666; font-size: 12px;">Automatically set to current user</small>
+                            </div>
+                            <div class="form-group">
                                 <label for="requestedBy">Requested By *</label>
-                                <input type="text" id="requestedBy" required>
+                                <select id="requestedBy" required>
+                                    <option value="">Select a user...</option>
+                                    <option value="__other__">Other (enter manually)</option>
+                                </select>
+                                <input type="text" id="requestedByOther" placeholder="Enter name manually" style="display: none; margin-top: 8px;">
                             </div>
                             <div class="form-group">
                                 <label for="managedBy">Managed By *</label>
-                                <input type="text" id="managedBy" required>
+                                <select id="managedBy" required>
+                                    <option value="">Select a user...</option>
+                                    <option value="__other__">Other (enter manually)</option>
+                                </select>
+                                <input type="text" id="managedByOther" placeholder="Enter name manually" style="display: none; margin-top: 8px;">
+                            </div>
+                            <div class="form-group">
+                                <label for="assignedTo">Assigned To</label>
+                                <select id="assignedTo">
+                                    <option value="">Unassigned</option>
+                                    <option value="__other__">Other (enter manually)</option>
+                                </select>
+                                <input type="text" id="assignedToOther" placeholder="Enter name manually" style="display: none; margin-top: 8px;">
                             </div>
                             <div class="form-group">
                                 <label for="ticketStatus">Status</label>
@@ -342,7 +363,11 @@
                             </div>
                             <div class="form-group" id="completedByGroup" style="display: none;">
                                 <label for="completedBy">Completed By *</label>
-                                <input type="text" id="completedBy">
+                                <select id="completedBy">
+                                    <option value="">Select a user...</option>
+                                    <option value="__other__">Other (enter manually)</option>
+                                </select>
+                                <input type="text" id="completedByOther" placeholder="Enter name manually" style="display: none; margin-top: 8px;">
                             </div>
                             <div class="form-group" id="howResolvedGroup" style="display: none;">
                                 <label for="howResolved">How Resolved</label>
@@ -417,7 +442,11 @@
                         <form id="completionForm">
                             <div class="form-group">
                                 <label for="completionCompletedBy">Completed By *</label>
-                                <input type="text" id="completionCompletedBy" required>
+                                <select id="completionCompletedBy" required>
+                                    <option value="">Select a user...</option>
+                                    <option value="__other__">Other (enter manually)</option>
+                                </select>
+                                <input type="text" id="completionCompletedByOther" placeholder="Enter name manually" style="display: none; margin-top: 8px;">
                             </div>
                             <div class="form-group">
                                 <label for="completionHowResolved">How Resolved</label>

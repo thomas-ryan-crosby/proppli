@@ -1252,6 +1252,30 @@ function setupEventListeners() {
     if (cancelTicketFormBtn) cancelTicketFormBtn.addEventListener('click', closeTicketModal);
     if (ticketStatus) ticketStatus.addEventListener('change', handleStatusChange);
     
+    // Handle "Other" option for user dropdowns
+    function setupUserDropdownOtherToggle(selectId, otherInputId) {
+        const select = document.getElementById(selectId);
+        const otherInput = document.getElementById(otherInputId);
+        if (select && otherInput) {
+            select.addEventListener('change', function() {
+                if (this.value === '__other__') {
+                    otherInput.style.display = 'block';
+                    otherInput.required = select.required;
+                } else {
+                    otherInput.style.display = 'none';
+                    otherInput.value = '';
+                    otherInput.required = false;
+                }
+            });
+        }
+    }
+    
+    setupUserDropdownOtherToggle('requestedBy', 'requestedByOther');
+    setupUserDropdownOtherToggle('managedBy', 'managedByOther');
+    setupUserDropdownOtherToggle('assignedTo', 'assignedToOther');
+    setupUserDropdownOtherToggle('completedBy', 'completedByOther');
+    setupUserDropdownOtherToggle('completionCompletedBy', 'completionCompletedByOther');
+    
     // Billing type toggle
     const billingTypeHourly = document.getElementById('billingTypeHourly');
     const billingTypeFlat = document.getElementById('billingTypeFlat');
@@ -3632,11 +3656,19 @@ function createTicketCard(ticket, isDeleted = false) {
     const isCompleted = ticket.status === 'Completed';
     const statusClass = `status-${ticket.status.toLowerCase().replace(' ', '-')}`;
 
+    // Get assigned to display name
+    const assignedToDisplay = ticket.assignedTo || 'Unassigned';
+    
     card.innerHTML = `
         <div class="ticket-header">
             <div class="ticket-title">${escapeHtml(ticket.workDescription)}</div>
             <span class="ticket-status ${statusClass}">${escapeHtml(ticket.status)}</span>
         </div>
+        ${ticket.assignedTo ? `
+            <div class="ticket-assigned-badge" style="text-align: center; margin: 10px 0; padding: 8px 16px; background: #e0e7ff; border-radius: 20px; display: inline-block; width: 100%; box-sizing: border-box;">
+                <span style="font-size: 0.9rem; color: #667eea; font-weight: 600;">👤 Assigned to: ${escapeHtml(assignedToDisplay)}</span>
+            </div>
+        ` : ''}
         <div class="ticket-details">
             ${selectedPropertyId ? '' : `<div class="ticket-detail"><span class="ticket-detail-label">Property</span><span class="ticket-detail-value property-name">Loading...</span></div>`}
             ${ticket.buildingNumber ? `
@@ -3779,6 +3811,64 @@ function createTicketCard(ticket, isDeleted = false) {
     return card;
 }
 
+// Load users for dropdowns (simpler version than loadUsers for admin page)
+let usersForDropdowns = {};
+async function loadUsersForDropdowns() {
+    try {
+        const snapshot = await db.collection('users')
+            .where('isActive', '==', true)
+            .get();
+        
+        usersForDropdowns = {};
+        snapshot.forEach((doc) => {
+            const userData = doc.data();
+            usersForDropdowns[doc.id] = {
+                id: doc.id,
+                displayName: userData.displayName || userData.email || 'Unknown',
+                email: userData.email
+            };
+        });
+        
+        return usersForDropdowns;
+    } catch (error) {
+        console.error('Error loading users for dropdowns:', error);
+        return {};
+    }
+}
+
+// Populate user dropdown
+function populateUserDropdown(selectId, selectedValue = '') {
+    const select = document.getElementById(selectId);
+    if (!select) return;
+    
+    // Clear existing options except first two (Select... and Other)
+    while (select.options.length > 2) {
+        select.remove(2);
+    }
+    
+    // Add users
+    Object.values(usersForDropdowns).forEach(user => {
+        const option = document.createElement('option');
+        option.value = user.id;
+        option.textContent = user.displayName;
+        if (selectedValue === user.id) {
+            option.selected = true;
+        }
+        select.appendChild(option);
+    });
+    
+    // Handle "Other" option
+    if (selectedValue && selectedValue !== '__other__' && !usersForDropdowns[selectedValue]) {
+        // Value is not a user ID, so it must be "Other"
+        select.value = '__other__';
+        const otherInput = document.getElementById(selectId + 'Other');
+        if (otherInput) {
+            otherInput.value = selectedValue;
+            otherInput.style.display = 'block';
+        }
+    }
+}
+
 function openTicketModal(ticketId = null) {
     if (!selectedPropertyId && !ticketId) {
         // Check if there are any properties
@@ -3830,6 +3920,24 @@ function openTicketModal(ticketId = null) {
     document.getElementById('howResolvedGroup').style.display = 'none';
     document.getElementById('afterPhotoGroup').style.display = 'none';
     document.getElementById('retroactiveDatesGroup').style.display = 'none';
+    
+    // Set "Created by" to current user
+    if (currentUserProfile) {
+        document.getElementById('ticketCreatedBy').value = currentUserProfile.displayName || currentUserProfile.email || 'Current User';
+    }
+    
+    // Load and populate user dropdowns
+    loadUsersForDropdowns().then(() => {
+        populateUserDropdown('requestedBy', currentUserProfile?.id || '');
+        populateUserDropdown('managedBy');
+        populateUserDropdown('assignedTo');
+        populateUserDropdown('completedBy');
+        
+        // Set "Requested by" to current user by default
+        if (currentUserProfile?.id) {
+            document.getElementById('requestedBy').value = currentUserProfile.id;
+        }
+    });
     document.getElementById('customDateCreated').value = '';
     document.getElementById('customDateCompleted').value = '';
     // Before photo is always visible, so no need to hide it
@@ -3970,8 +4078,21 @@ function loadTicketForEdit(ticketId) {
                     billingRateInput.placeholder = 'e.g., 75.00';
                 }
             }
-            document.getElementById('requestedBy').value = ticket.requestedBy || '';
-            document.getElementById('managedBy').value = ticket.managedBy || '';
+            // Load users for dropdowns first, then populate
+            loadUsersForDropdowns().then(() => {
+                // Populate user dropdowns with ticket data
+                populateUserDropdown('requestedBy', ticket.requestedByUserId || ticket.requestedBy || '');
+                populateUserDropdown('managedBy', ticket.managedByUserId || ticket.managedBy || '');
+                populateUserDropdown('assignedTo', ticket.assignedToUserId || ticket.assignedTo || '');
+                
+                // Set "Created by" if it exists
+                if (ticket.createdBy) {
+                    document.getElementById('ticketCreatedBy').value = ticket.createdBy;
+                } else if (currentUserProfile) {
+                    document.getElementById('ticketCreatedBy').value = currentUserProfile.displayName || currentUserProfile.email || 'Current User';
+                }
+            });
+            
             document.getElementById('ticketStatus').value = ticket.status || 'Not Started';
             
             // Always show before photo if it exists
@@ -3981,7 +4102,10 @@ function loadTicketForEdit(ticketId) {
             }
             
             if (ticket.status === 'Completed') {
-                document.getElementById('completedBy').value = ticket.completedBy || '';
+                // Populate completedBy dropdown
+                loadUsersForDropdowns().then(() => {
+                    populateUserDropdown('completedBy', ticket.completedByUserId || ticket.completedBy || '');
+                });
                 document.getElementById('howResolved').value = ticket.howResolved || '';
                 document.getElementById('completedByGroup').style.display = 'block';
                 document.getElementById('howResolvedGroup').style.display = 'block';
@@ -4046,11 +4170,43 @@ function handleTicketSubmit(e) {
     const billingRate = billingRateInput && billingRateInput.value ? parseFloat(billingRateInput.value) : null;
     const billingTypeHourly = document.getElementById('billingTypeHourly');
     const billingType = billingRateInput && billingRateInput.value && billingTypeHourly && billingTypeHourly.checked ? 'hourly' : (billingRateInput && billingRateInput.value ? 'flat' : null);
-    const requestedBy = document.getElementById('requestedBy').value.trim();
-    const managedBy = document.getElementById('managedBy').value.trim();
+    
+    // Get user assignments - handle dropdowns with "Other" option
+    const requestedBySelect = document.getElementById('requestedBy');
+    const requestedByOther = document.getElementById('requestedByOther');
+    const requestedBy = requestedBySelect?.value === '__other__' 
+        ? (requestedByOther?.value.trim() || '') 
+        : (requestedBySelect?.value ? (usersForDropdowns[requestedBySelect.value]?.displayName || requestedBySelect.value) : '');
+    const requestedByUserId = requestedBySelect?.value && requestedBySelect.value !== '__other__' ? requestedBySelect.value : null;
+    
+    const managedBySelect = document.getElementById('managedBy');
+    const managedByOther = document.getElementById('managedByOther');
+    const managedBy = managedBySelect?.value === '__other__' 
+        ? (managedByOther?.value.trim() || '') 
+        : (managedBySelect?.value ? (usersForDropdowns[managedBySelect.value]?.displayName || managedBySelect.value) : '');
+    const managedByUserId = managedBySelect?.value && managedBySelect.value !== '__other__' ? managedBySelect.value : null;
+    
+    const assignedToSelect = document.getElementById('assignedTo');
+    const assignedToOther = document.getElementById('assignedToOther');
+    const assignedTo = assignedToSelect?.value === '__other__' 
+        ? (assignedToOther?.value.trim() || '') 
+        : (assignedToSelect?.value ? (usersForDropdowns[assignedToSelect.value]?.displayName || '') : '');
+    const assignedToUserId = assignedToSelect?.value && assignedToSelect.value !== '__other__' ? assignedToSelect.value : null;
+    
     const status = document.getElementById('ticketStatus').value;
-    const completedBy = document.getElementById('completedBy').value.trim();
+    
+    const completedBySelect = document.getElementById('completedBy');
+    const completedByOther = document.getElementById('completedByOther');
+    const completedBy = completedBySelect?.value === '__other__' 
+        ? (completedByOther?.value.trim() || '') 
+        : (completedBySelect?.value ? (usersForDropdowns[completedBySelect.value]?.displayName || completedBySelect.value) : '');
+    const completedByUserId = completedBySelect?.value && completedBySelect.value !== '__other__' ? completedBySelect.value : null;
+    
     const howResolved = document.getElementById('howResolved').value.trim();
+    
+    // Get created by (current user for new tickets, existing value for edits)
+    const createdBy = document.getElementById('ticketCreatedBy')?.value || (currentUserProfile?.displayName || currentUserProfile?.email || 'Current User');
+    const createdByUserId = currentUserProfile?.id || null;
 
     if (!propertyId || !workDescription || !requestedBy || !managedBy) {
         alert('Please fill in all required fields');
@@ -4118,7 +4274,13 @@ function handleTicketSubmit(e) {
                     billingRate: billingRate || null,
                     billingType: billingRate ? billingType : null,
                     requestedBy,
+                    requestedByUserId: requestedByUserId || null,
                     managedBy,
+                    managedByUserId: managedByUserId || null,
+                    assignedTo: assignedTo || null,
+                    assignedToUserId: assignedToUserId || null,
+                    createdBy: id ? (existing?.createdBy || createdBy) : createdBy, // Preserve existing for edits
+                    createdByUserId: id ? (existing?.createdByUserId || createdByUserId) : createdByUserId,
                     status,
                     // Always update the lastUpdated timestamp
                     lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
@@ -4137,6 +4299,7 @@ function handleTicketSubmit(e) {
                 // Only save after photo if status is Completed
                 if (status === 'Completed') {
                     ticketData.completedBy = completedBy;
+                    ticketData.completedByUserId = completedByUserId || null;
                     ticketData.howResolved = howResolved || null;
                     if (afterUrl) ticketData.afterPhotoUrl = afterUrl;
                     // Only set dateCompleted if it wasn't already completed
@@ -4195,7 +4358,13 @@ function handleTicketSubmit(e) {
                 timeAllocated,
                 billingRate: billingRate || null,
                 requestedBy,
+                requestedByUserId: requestedByUserId || null,
                 managedBy,
+                managedByUserId: managedByUserId || null,
+                assignedTo: assignedTo || null,
+                assignedToUserId: assignedToUserId || null,
+                createdBy: createdBy,
+                createdByUserId: createdByUserId || null,
                 status: status || 'Not Started',
                 dateCreated: firebase.firestore.FieldValue.serverTimestamp(),
                 lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
@@ -4212,6 +4381,7 @@ function handleTicketSubmit(e) {
             
             if (status === 'Completed') {
                 ticketData.completedBy = completedBy;
+                ticketData.completedByUserId = completedByUserId || null;
                 ticketData.howResolved = howResolved || null;
                 if (customDateCompleted) {
                     ticketData.dateCompleted = firebase.firestore.Timestamp.fromDate(new Date(customDateCompleted));
@@ -4279,13 +4449,21 @@ function handleTicketSubmit(e) {
 window.markTicketComplete = function(ticketId) {
     editingTicketId = ticketId;
     document.getElementById('completionModal').classList.add('show');
-    document.getElementById('completionCompletedBy').value = '';
     document.getElementById('completionHowResolved').value = '';
     document.getElementById('completionAfterPhoto').value = '';
     document.getElementById('completionAfterPhotoPreview').innerHTML = '';
     document.getElementById('removeCompletionAfterPhoto').style.display = 'none';
     completionAfterPhotoFile = null;
-    document.getElementById('completionCompletedBy').focus();
+    
+    // Load and populate completion dropdown, default to current user
+    loadUsersForDropdowns().then(() => {
+        populateUserDropdown('completionCompletedBy', currentUserProfile?.id || '');
+        // Set default to current user if available
+        if (currentUserProfile?.id) {
+            document.getElementById('completionCompletedBy').value = currentUserProfile.id;
+        }
+        document.getElementById('completionCompletedBy').focus();
+    });
 };
 
 function closeCompletionModal() {
@@ -4295,7 +4473,12 @@ function closeCompletionModal() {
 
 function handleTicketCompletion(e) {
     e.preventDefault();
-    const completedBy = document.getElementById('completionCompletedBy').value.trim();
+    const completedBySelect = document.getElementById('completionCompletedBy');
+    const completedByOther = document.getElementById('completionCompletedByOther');
+    const completedBy = completedBySelect?.value === '__other__' 
+        ? (completedByOther?.value.trim() || '') 
+        : (completedBySelect?.value ? (usersForDropdowns[completedBySelect.value]?.displayName || completedBySelect.value) : '');
+    const completedByUserId = completedBySelect?.value && completedBySelect.value !== '__other__' ? completedBySelect.value : null;
     const howResolved = document.getElementById('completionHowResolved').value.trim();
 
     if (!completedBy) {
@@ -4344,6 +4527,7 @@ function handleTicketCompletion(e) {
             const updateData = {
                 status: 'Completed',
                 completedBy: completedBy,
+                completedByUserId: completedByUserId || null,
                 howResolved: howResolved || null,
                 dateCompleted: firebase.firestore.FieldValue.serverTimestamp(),
                 lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
