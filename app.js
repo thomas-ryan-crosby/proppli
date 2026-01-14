@@ -457,6 +457,23 @@ window.closePermissionDeniedModal = function() {
     }
 };
 
+// Toggle password visibility
+window.togglePasswordVisibility = function(inputId, button) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    
+    const eyeIcon = button.querySelector('.eye-icon');
+    if (input.type === 'password') {
+        input.type = 'text';
+        if (eyeIcon) eyeIcon.textContent = '🙈';
+        button.setAttribute('aria-label', 'Hide password');
+    } else {
+        input.type = 'password';
+        if (eyeIcon) eyeIcon.textContent = '👁️';
+        button.setAttribute('aria-label', 'Show password');
+    }
+};
+
 // Show no account found modal
 function showNoAccountModal() {
     // Remove existing modal if present
