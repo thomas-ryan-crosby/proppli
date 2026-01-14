@@ -1162,6 +1162,16 @@ function setupUserMenu() {
             window.logout();
         });
     }
+    
+    // Profile button
+    const profileBtn = document.getElementById('profileBtn');
+    if (profileBtn) {
+        profileBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            userMenuDropdown.classList.remove('active');
+            switchPage('profile');
+        });
+    }
 }
 
 // Check if DOM is already loaded, if so run immediately, otherwise wait
@@ -1197,11 +1207,14 @@ function initializeApp() {
 
 // Navigation
 function setupNavigation() {
-    const navLinks = document.querySelectorAll('.nav-link');
+    // Sidebar navigation links
+    const navLinks = document.querySelectorAll('.sidebar-nav-link');
     navLinks.forEach(link => {
         link.addEventListener('click', (e) => {
-            const page = e.target.getAttribute('data-page');
-            switchPage(page);
+            const page = e.target.closest('.sidebar-nav-link').getAttribute('data-page');
+            if (page) {
+                switchPage(page);
+            }
         });
     });
 }
@@ -1212,12 +1225,32 @@ function switchPage(page) {
     showPage(page);
     
     // Update active nav link
-    document.querySelectorAll('.nav-link').forEach(link => {
+    document.querySelectorAll('.sidebar-nav-link').forEach(link => {
         link.classList.remove('active');
         if (link.getAttribute('data-page') === page) {
             link.classList.add('active');
         }
     });
+    
+    // Update page title
+    updatePageTitle(page);
+}
+
+function updatePageTitle(page) {
+    const pageTitles = {
+        'maintenance': 'Maintenance',
+        'properties': 'Properties',
+        'tenants': 'Tenants',
+        'leases': 'Leases',
+        'finance': 'Finance',
+        'users': 'User Management',
+        'profile': 'Profile'
+    };
+    
+    const pageTitleElement = document.getElementById('currentPageTitle');
+    if (pageTitleElement && pageTitles[page]) {
+        pageTitleElement.textContent = pageTitles[page];
+    }
 }
 
 function showPage(page) {
@@ -1235,7 +1268,7 @@ function showPage(page) {
     }
     
     // Update nav link active state to match the page
-    document.querySelectorAll('.nav-link').forEach(link => {
+    document.querySelectorAll('.sidebar-nav-link').forEach(link => {
         link.classList.remove('active');
         if (link.getAttribute('data-page') === page) {
             link.classList.add('active');
@@ -1255,6 +1288,8 @@ function showPage(page) {
         loadFinance();
     } else if (page === 'users') {
         loadUsers();
+    } else if (page === 'profile') {
+        loadProfile();
     }
     
     // Update FAB visibility
@@ -1896,6 +1931,214 @@ function setupEventListeners() {
             closeUserDetailModal();
         }
     });
+    
+    // Profile page event listeners
+    // Profile tabs
+    document.querySelectorAll('[data-profile-tab]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const tabName = e.target.getAttribute('data-profile-tab');
+            switchProfileTab(tabName);
+        });
+    });
+    
+    // Profile personal information form
+    const profilePersonalForm = document.getElementById('profilePersonalForm');
+    if (profilePersonalForm) {
+        profilePersonalForm.addEventListener('submit', handleProfilePersonalSubmit);
+    }
+    
+    // Profile password form
+    const profilePasswordForm = document.getElementById('profilePasswordForm');
+    if (profilePasswordForm) {
+        profilePasswordForm.addEventListener('submit', handleProfilePasswordSubmit);
+    }
+    
+    // Profile preferences form
+    const profilePreferencesForm = document.getElementById('profilePreferencesForm');
+    if (profilePreferencesForm) {
+        profilePreferencesForm.addEventListener('submit', handleProfilePreferencesSubmit);
+    }
+    
+    // Resend verification email
+    const resendVerificationBtn = document.getElementById('resendVerificationBtn');
+    if (resendVerificationBtn) {
+        resendVerificationBtn.addEventListener('click', handleResendVerification);
+    }
+    
+    // Avatar change
+    const changeAvatarBtn = document.getElementById('changeAvatarBtn');
+    const avatarFileInput = document.getElementById('avatarFileInput');
+    if (changeAvatarBtn && avatarFileInput) {
+        changeAvatarBtn.addEventListener('click', () => {
+            avatarFileInput.click();
+        });
+        if (avatarFileInput) {
+            avatarFileInput.addEventListener('change', handleAvatarChange);
+        }
+    }
+}
+
+// Profile page functions
+function switchProfileTab(tabName) {
+    // Update tab buttons
+    document.querySelectorAll('.profile-tab').forEach(tab => {
+        tab.classList.remove('active');
+        if (tab.getAttribute('data-profile-tab') === tabName) {
+            tab.classList.add('active');
+        }
+    });
+    
+    // Update tab content
+    document.querySelectorAll('.profile-tab-content').forEach(content => {
+        content.classList.remove('active');
+        content.style.display = 'none';
+    });
+    
+    const activeContent = document.getElementById('profile' + tabName.charAt(0).toUpperCase() + tabName.slice(1) + 'Tab');
+    if (activeContent) {
+        activeContent.classList.add('active');
+        activeContent.style.display = 'block';
+    }
+}
+
+async function handleProfilePersonalSubmit(e) {
+    e.preventDefault();
+    if (!currentUser || !auth || !auth.currentUser) {
+        alert('You must be logged in to update your profile.');
+        return;
+    }
+    
+    try {
+        const userId = auth.currentUser.uid;
+        const updates = {
+            displayName: document.getElementById('profileFormDisplayName').value.trim(),
+            phone: document.getElementById('profileFormPhone').value.trim() || null,
+            title: document.getElementById('profileFormTitle').value.trim() || null,
+            department: document.getElementById('profileFormDepartment').value.trim() || null,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        
+        await db.collection('users').doc(userId).update(updates);
+        
+        // Update current user profile
+        currentUserProfile = { ...currentUserProfile, ...updates };
+        
+        // Reload profile to show updated data
+        await loadProfile();
+        
+        alert('Profile updated successfully!');
+    } catch (error) {
+        console.error('Error updating profile:', error);
+        alert('Error updating profile: ' + error.message);
+    }
+}
+
+async function handleProfilePasswordSubmit(e) {
+    e.preventDefault();
+    if (!currentUser || !auth || !auth.currentUser) {
+        alert('You must be logged in to change your password.');
+        return;
+    }
+    
+    const currentPassword = document.getElementById('profileCurrentPassword').value;
+    const newPassword = document.getElementById('profileNewPassword').value;
+    const confirmPassword = document.getElementById('profileConfirmPassword').value;
+    
+    if (newPassword !== confirmPassword) {
+        alert('New passwords do not match.');
+        return;
+    }
+    
+    if (newPassword.length < 8) {
+        alert('Password must be at least 8 characters long.');
+        return;
+    }
+    
+    try {
+        // Re-authenticate user
+        const credential = firebase.auth.EmailAuthProvider.credential(
+            auth.currentUser.email,
+            currentPassword
+        );
+        await auth.currentUser.reauthenticateWithCredential(credential);
+        
+        // Update password
+        await auth.currentUser.updatePassword(newPassword);
+        
+        // Clear form
+        document.getElementById('profilePasswordForm').reset();
+        
+        alert('Password updated successfully!');
+    } catch (error) {
+        console.error('Error updating password:', error);
+        if (error.code === 'auth/wrong-password') {
+            alert('Current password is incorrect.');
+        } else {
+            alert('Error updating password: ' + error.message);
+        }
+    }
+}
+
+async function handleProfilePreferencesSubmit(e) {
+    e.preventDefault();
+    if (!currentUser || !auth || !auth.currentUser) {
+        alert('You must be logged in to update preferences.');
+        return;
+    }
+    
+    try {
+        const userId = auth.currentUser.uid;
+        const preferences = {
+            theme: document.getElementById('profileTheme').value,
+            language: document.getElementById('profileLanguage').value,
+            timezone: document.getElementById('profileTimezone').value,
+            emailNotifications: document.getElementById('profileEmailNotifications').checked,
+            desktopNotifications: document.getElementById('profileDesktopNotifications').checked
+        };
+        
+        await db.collection('users').doc(userId).update({
+            preferences: preferences,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        alert('Preferences saved successfully!');
+    } catch (error) {
+        console.error('Error saving preferences:', error);
+        alert('Error saving preferences: ' + error.message);
+    }
+}
+
+async function handleResendVerification() {
+    if (!auth || !auth.currentUser) {
+        alert('You must be logged in to resend verification email.');
+        return;
+    }
+    
+    try {
+        await auth.currentUser.sendEmailVerification();
+        alert('Verification email sent! Please check your inbox.');
+    } catch (error) {
+        console.error('Error sending verification email:', error);
+        alert('Error sending verification email: ' + error.message);
+    }
+}
+
+function handleAvatarChange(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    if (!file.type.startsWith('image/')) {
+        alert('Please select an image file.');
+        return;
+    }
+    
+    if (file.size > 5 * 1024 * 1024) {
+        alert('Image size must be less than 5MB.');
+        return;
+    }
+    
+    // TODO: Implement avatar upload to Firebase Storage
+    alert('Avatar upload functionality coming soon!');
 }
 
 // Property Management
@@ -5238,6 +5481,157 @@ function renderUsersList(users) {
             </div>
         `;
     }).join('');
+}
+
+// Load user profile page
+async function loadProfile() {
+    if (!currentUser || !auth || !auth.currentUser || !currentUserProfile) {
+        console.error('User not authenticated or profile not loaded');
+        return;
+    }
+    
+    try {
+        const userId = auth.currentUser.uid;
+        const profile = currentUserProfile;
+        
+        // Update profile header
+        const displayName = profile.displayName || profile.email || 'User';
+        const email = profile.email || auth.currentUser.email || '';
+        const role = profile.role || 'viewer';
+        const isActive = profile.isActive !== false;
+        
+        // Update avatar initials
+        const initials = displayName.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2) || 'U';
+        const avatarElement = document.getElementById('profileAvatarInitials');
+        if (avatarElement) {
+            avatarElement.textContent = initials;
+        }
+        
+        // Update header info
+        const profileDisplayNameEl = document.getElementById('profileDisplayName');
+        if (profileDisplayNameEl) profileDisplayNameEl.textContent = displayName;
+        
+        const profileEmailEl = document.getElementById('profileEmail');
+        if (profileEmailEl) profileEmailEl.textContent = email;
+        
+        const roleBadgeEl = document.getElementById('profileRoleBadge');
+        if (roleBadgeEl) {
+            const roleLabels = {
+                'super_admin': 'Super Admin',
+                'admin': 'Admin',
+                'property_manager': 'Property Manager',
+                'maintenance': 'Maintenance',
+                'viewer': 'Viewer'
+            };
+            roleBadgeEl.textContent = roleLabels[role] || role;
+        }
+        
+        const statusBadgeEl = document.getElementById('profileStatusBadge');
+        if (statusBadgeEl) {
+            statusBadgeEl.textContent = isActive ? 'Active' : 'Inactive';
+        }
+        
+        // Update overview tab
+        if (document.getElementById('overviewEmail')) document.getElementById('overviewEmail').textContent = email;
+        if (document.getElementById('overviewName')) document.getElementById('overviewName').textContent = displayName;
+        if (document.getElementById('overviewRole')) {
+            const roleLabels = {
+                'super_admin': 'Super Admin',
+                'admin': 'Admin',
+                'property_manager': 'Property Manager',
+                'maintenance': 'Maintenance',
+                'viewer': 'Viewer'
+            };
+            document.getElementById('overviewRole').textContent = roleLabels[role] || role;
+        }
+        if (document.getElementById('overviewStatus')) {
+            document.getElementById('overviewStatus').textContent = isActive ? 'Active' : 'Inactive';
+        }
+        if (document.getElementById('overviewPhone')) {
+            document.getElementById('overviewPhone').textContent = profile.phone || '—';
+        }
+        if (document.getElementById('overviewCreated')) {
+            const created = profile.createdAt ? formatDate(profile.createdAt) : '—';
+            document.getElementById('overviewCreated').textContent = created;
+        }
+        
+        // Load assigned properties
+        await loadProfileAssignedProperties(profile.assignedProperties || []);
+        
+        // Update personal information form
+        if (document.getElementById('profileFormDisplayName')) {
+            document.getElementById('profileFormDisplayName').value = displayName;
+        }
+        if (document.getElementById('profileFormEmail')) {
+            document.getElementById('profileFormEmail').value = email;
+        }
+        if (document.getElementById('profileFormPhone')) {
+            document.getElementById('profileFormPhone').value = profile.phone || '';
+        }
+        if (document.getElementById('profileFormTitle')) {
+            document.getElementById('profileFormTitle').value = profile.title || '';
+        }
+        if (document.getElementById('profileFormDepartment')) {
+            document.getElementById('profileFormDepartment').value = profile.department || '';
+        }
+        
+        // Check email verification status
+        if (auth.currentUser) {
+            const emailVerified = auth.currentUser.emailVerified;
+            const verificationStatusEl = document.getElementById('emailVerificationStatus');
+            if (verificationStatusEl) {
+                if (emailVerified) {
+                    verificationStatusEl.innerHTML = '<span style="color: #10b981;">✓ Email verified</span>';
+                } else {
+                    verificationStatusEl.innerHTML = '<span style="color: #f59e0b;">⚠ Email not verified</span>';
+                    const resendBtn = document.getElementById('resendVerificationBtn');
+                    if (resendBtn) {
+                        resendBtn.style.display = 'inline-block';
+                    }
+                }
+            }
+        }
+        
+    } catch (error) {
+        console.error('Error loading profile:', error);
+    }
+}
+
+// Load assigned properties for profile
+async function loadProfileAssignedProperties(assignedPropertyIds) {
+    const propertiesListEl = document.getElementById('profileAssignedProperties');
+    if (!propertiesListEl) return;
+    
+    if (!assignedPropertyIds || assignedPropertyIds.length === 0) {
+        propertiesListEl.innerHTML = '<p style="color: #999; font-style: italic;">No properties assigned</p>';
+        return;
+    }
+    
+    try {
+        const propertyPromises = assignedPropertyIds.map(propId => 
+            db.collection('properties').doc(propId).get()
+        );
+        const propertyDocs = await Promise.all(propertyPromises);
+        
+        const properties = propertyDocs
+            .filter(doc => doc.exists)
+            .map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        if (properties.length === 0) {
+            propertiesListEl.innerHTML = '<p style="color: #999; font-style: italic;">No properties found</p>';
+            return;
+        }
+        
+        propertiesListEl.innerHTML = properties.map(prop => `
+            <div class="properties-list-item">
+                <strong>${escapeHtml(prop.name || prop.id)}</strong>
+                ${prop.address ? `<span style="color: #666; margin-left: 10px;">${escapeHtml(prop.address)}</span>` : ''}
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('Error loading assigned properties:', error);
+        propertiesListEl.innerHTML = '<p style="color: #dc2626;">Error loading properties</p>';
+    }
 }
 
 // View pending user invitation details

@@ -204,32 +204,63 @@
 
     <!-- Application Container (hidden initially) -->
     <div id="appContainer" class="app-container" style="display: none;">
-    <div class="container">
-        <!-- Navigation Bar -->
-        <nav class="main-nav">
-            <div class="nav-brand">
-                <img src="assets/images/logos/Logo+Word.png" alt="proppli" class="nav-logo" height="32">
+    <div class="app-layout">
+        <!-- Left Sidebar Navigation -->
+        <aside class="sidebar-nav">
+            <div class="sidebar-brand">
+                <img src="assets/images/logos/Logo+Word.png" alt="proppli" class="sidebar-logo" height="32">
             </div>
-            <div class="nav-links">
-                <button class="nav-link active" data-page="maintenance">Maintenance</button>
-                <button class="nav-link" data-page="properties">Properties</button>
-                <button class="nav-link" data-page="tenants">Tenants</button>
-                <button class="nav-link" data-page="leases">Leases</button>
-                <button class="nav-link" data-page="finance">Finance</button>
-                <button class="nav-link" data-page="users" id="usersNavLink" style="display: none;">Users</button>
-            </div>
-            <div class="nav-user-menu">
-                <div class="user-menu-dropdown">
-                    <button class="user-menu-btn" id="userMenuBtn">
-                        <span id="userMenuName">User</span>
-                        <span class="dropdown-arrow">▼</span>
-                    </button>
-                    <div class="user-menu-dropdown-content" id="userMenuDropdown">
-                        <a href="#" id="logoutBtn">Sign Out</a>
+            <nav class="sidebar-nav-links">
+                <button class="sidebar-nav-link active" data-page="maintenance" title="Maintenance">
+                    <span class="nav-icon">🔧</span>
+                    <span class="nav-label">Maintenance</span>
+                </button>
+                <button class="sidebar-nav-link" data-page="properties" title="Properties">
+                    <span class="nav-icon">🏢</span>
+                    <span class="nav-label">Properties</span>
+                </button>
+                <button class="sidebar-nav-link" data-page="tenants" title="Tenants">
+                    <span class="nav-icon">👥</span>
+                    <span class="nav-label">Tenants</span>
+                </button>
+                <button class="sidebar-nav-link" data-page="leases" title="Leases">
+                    <span class="nav-icon">📄</span>
+                    <span class="nav-label">Leases</span>
+                </button>
+                <button class="sidebar-nav-link" data-page="finance" title="Finance">
+                    <span class="nav-icon">💰</span>
+                    <span class="nav-label">Finance</span>
+                </button>
+                <button class="sidebar-nav-link" data-page="users" id="usersNavLink" style="display: none;" title="Users">
+                    <span class="nav-icon">👤</span>
+                    <span class="nav-label">Users</span>
+                </button>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <div class="main-content-wrapper">
+            <!-- Top Bar with User Menu -->
+            <header class="top-bar">
+                <div class="top-bar-content">
+                    <h1 class="page-title" id="currentPageTitle">Maintenance</h1>
+                    <div class="nav-user-menu">
+                        <div class="user-menu-dropdown">
+                            <button class="user-menu-btn" id="userMenuBtn">
+                                <span id="userMenuName">User</span>
+                                <span class="dropdown-arrow">▼</span>
+                            </button>
+                            <div class="user-menu-dropdown-content" id="userMenuDropdown">
+                                <a href="#" id="profileBtn">Profile</a>
+                                <a href="#" id="logoutBtn">Sign Out</a>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </nav>
+            </header>
+
+            <!-- Page Content Container -->
+            <div class="container">
 
         <!-- Maintenance Tracker Page -->
         <div id="maintenancePage" class="page active">
@@ -2066,6 +2097,223 @@
                 </div>
             </div>
         </div>
+
+        <!-- User Profile Page -->
+        <div id="profilePage" class="page" style="display: none;">
+            <div class="profile-container">
+                <div class="profile-header">
+                    <div class="profile-avatar-section">
+                        <div class="profile-avatar" id="profileAvatar">
+                            <span id="profileAvatarInitials">U</span>
+                        </div>
+                        <button class="btn-secondary" id="changeAvatarBtn" style="margin-top: 10px;">Change Photo</button>
+                        <input type="file" id="avatarFileInput" accept="image/*" style="display: none;">
+                    </div>
+                    <div class="profile-header-info">
+                        <h1 id="profileDisplayName">User Name</h1>
+                        <p id="profileEmail" class="profile-email">user@example.com</p>
+                        <div class="profile-badges">
+                            <span class="profile-badge" id="profileRoleBadge">Viewer</span>
+                            <span class="profile-badge" id="profileStatusBadge">Active</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="profile-tabs">
+                    <button class="profile-tab active" data-profile-tab="overview">Overview</button>
+                    <button class="profile-tab" data-profile-tab="personal">Personal Information</button>
+                    <button class="profile-tab" data-profile-tab="security">Security</button>
+                    <button class="profile-tab" data-profile-tab="preferences">Preferences</button>
+                </div>
+
+                <div class="profile-content">
+                    <!-- Overview Tab -->
+                    <div id="profileOverviewTab" class="profile-tab-content active">
+                        <div class="profile-section">
+                            <h2>Account Overview</h2>
+                            <div class="profile-info-grid">
+                                <div class="info-card">
+                                    <div class="info-label">Email</div>
+                                    <div class="info-value" id="overviewEmail">—</div>
+                                </div>
+                                <div class="info-card">
+                                    <div class="info-label">Full Name</div>
+                                    <div class="info-value" id="overviewName">—</div>
+                                </div>
+                                <div class="info-card">
+                                    <div class="info-label">Role</div>
+                                    <div class="info-value" id="overviewRole">—</div>
+                                </div>
+                                <div class="info-card">
+                                    <div class="info-label">Status</div>
+                                    <div class="info-value" id="overviewStatus">—</div>
+                                </div>
+                                <div class="info-card">
+                                    <div class="info-label">Phone</div>
+                                    <div class="info-value" id="overviewPhone">—</div>
+                                </div>
+                                <div class="info-card">
+                                    <div class="info-label">Member Since</div>
+                                    <div class="info-value" id="overviewCreated">—</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="profile-section">
+                            <h2>Assigned Properties</h2>
+                            <div id="profileAssignedProperties" class="properties-list">
+                                <p style="color: #999; font-style: italic;">Loading properties...</p>
+                            </div>
+                        </div>
+
+                        <div class="profile-section">
+                            <h2>Recent Activity</h2>
+                            <div id="profileRecentActivity" class="activity-list">
+                                <p style="color: #999; font-style: italic;">No recent activity</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Personal Information Tab -->
+                    <div id="profilePersonalTab" class="profile-tab-content">
+                        <div class="profile-section">
+                            <h2>Personal Information</h2>
+                            <form id="profilePersonalForm">
+                                <div class="form-group">
+                                    <label for="profileFormDisplayName">Full Name *</label>
+                                    <input type="text" id="profileFormDisplayName" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="profileFormEmail">Email</label>
+                                    <input type="email" id="profileFormEmail" readonly style="background: #f5f5f5; cursor: not-allowed;">
+                                    <small style="color: #666; font-size: 12px;">Email cannot be changed. Contact an administrator if you need to update your email.</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="profileFormPhone">Phone</label>
+                                    <input type="tel" id="profileFormPhone">
+                                </div>
+                                <div class="form-group">
+                                    <label for="profileFormTitle">Title</label>
+                                    <input type="text" id="profileFormTitle" placeholder="e.g., Property Manager, Maintenance Lead">
+                                </div>
+                                <div class="form-group">
+                                    <label for="profileFormDepartment">Department</label>
+                                    <input type="text" id="profileFormDepartment" placeholder="e.g., Operations, Maintenance">
+                                </div>
+                                <div class="form-actions">
+                                    <button type="submit" class="btn-primary">Save Changes</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Security Tab -->
+                    <div id="profileSecurityTab" class="profile-tab-content">
+                        <div class="profile-section">
+                            <h2>Password</h2>
+                            <form id="profilePasswordForm">
+                                <div class="form-group">
+                                    <label for="profileCurrentPassword">Current Password *</label>
+                                    <div class="password-input-wrapper">
+                                        <input type="password" id="profileCurrentPassword" required>
+                                        <button type="button" class="password-toggle" onclick="togglePasswordVisibility('profileCurrentPassword', this)">
+                                            <span class="eye-icon">👁️</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="profileNewPassword">New Password *</label>
+                                    <div class="password-input-wrapper">
+                                        <input type="password" id="profileNewPassword" required>
+                                        <button type="button" class="password-toggle" onclick="togglePasswordVisibility('profileNewPassword', this)">
+                                            <span class="eye-icon">👁️</span>
+                                        </button>
+                                    </div>
+                                    <small class="password-hint">Must be at least 8 characters with uppercase, lowercase, number, and special character</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="profileConfirmPassword">Confirm New Password *</label>
+                                    <div class="password-input-wrapper">
+                                        <input type="password" id="profileConfirmPassword" required>
+                                        <button type="button" class="password-toggle" onclick="togglePasswordVisibility('profileConfirmPassword', this)">
+                                            <span class="eye-icon">👁️</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="form-actions">
+                                    <button type="submit" class="btn-primary">Update Password</button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <div class="profile-section">
+                            <h2>Email Verification</h2>
+                            <div class="verification-status">
+                                <p id="emailVerificationStatus">Checking verification status...</p>
+                                <button type="button" class="btn-secondary" id="resendVerificationBtn" style="display: none;">Resend Verification Email</button>
+                            </div>
+                        </div>
+
+                        <div class="profile-section">
+                            <h2>Active Sessions</h2>
+                            <div id="activeSessionsList">
+                                <p style="color: #999; font-style: italic;">Session management coming soon...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Preferences Tab -->
+                    <div id="profilePreferencesTab" class="profile-tab-content">
+                        <div class="profile-section">
+                            <h2>Display Preferences</h2>
+                            <form id="profilePreferencesForm">
+                                <div class="form-group">
+                                    <label for="profileTheme">Theme</label>
+                                    <select id="profileTheme">
+                                        <option value="light">Light</option>
+                                        <option value="dark">Dark</option>
+                                        <option value="system">System Default</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="profileLanguage">Language</label>
+                                    <select id="profileLanguage">
+                                        <option value="en">English</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="profileTimezone">Timezone</label>
+                                    <select id="profileTimezone">
+                                        <option value="America/New_York">Eastern Time (ET)</option>
+                                        <option value="America/Chicago">Central Time (CT)</option>
+                                        <option value="America/Denver">Mountain Time (MT)</option>
+                                        <option value="America/Los_Angeles">Pacific Time (PT)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group checkbox-group">
+                                    <label>
+                                        <input type="checkbox" id="profileEmailNotifications">
+                                        <span>Email Notifications</span>
+                                    </label>
+                                </div>
+                                <div class="form-group checkbox-group">
+                                    <label>
+                                        <input type="checkbox" id="profileDesktopNotifications">
+                                        <span>Desktop Notifications</span>
+                                    </label>
+                                </div>
+                                <div class="form-actions">
+                                    <button type="submit" class="btn-primary">Save Preferences</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+            </div> <!-- End container -->
+        </div> <!-- End main-content-wrapper -->
+    </div> <!-- End app-layout -->
 
     <!-- Floating Action Buttons -->
     <div class="fab-container">
