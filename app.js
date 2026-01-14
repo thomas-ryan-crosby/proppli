@@ -218,7 +218,7 @@ async function loadUserProfile(userId) {
         } else {
             console.warn('⚠️ User profile not found in Firestore');
             // User signed up but profile doesn't exist yet
-            // Try to create it now (in case signup succeeded but profile creation failed)
+            // FIRST: Check if there's a pending invitation that should be linked
             try {
                 const authUser = currentUser || auth?.currentUser;
                 if (!authUser) {
@@ -231,14 +231,54 @@ async function loadUserProfile(userId) {
                     throw new Error('User email not available');
                 }
                 
-                console.log('Creating Firestore profile for:', userEmail, 'UID:', userId);
+                const normalizedEmail = (userEmail || '').toLowerCase().trim();
+                console.log('🔍 Checking for pending invitation before creating profile:', normalizedEmail);
+                
+                // Check for pending invitation FIRST
+                const pendingUser = await checkPendingInvitation(normalizedEmail);
+                if (pendingUser) {
+                    console.log('✅ Found pending invitation, linking account...');
+                    try {
+                        await linkPendingUserToAccount(userId, normalizedEmail);
+                        console.log('✅ User account linked to pending invitation');
+                        
+                        // Reload the profile
+                        const linkedUserDoc = await db.collection('users').doc(userId).get();
+                        if (linkedUserDoc.exists) {
+                            currentUserProfile = { id: linkedUserDoc.id, ...linkedUserDoc.data() };
+                            console.log('✅ User profile loaded after linking:', currentUserProfile);
+                            updateUserMenu();
+                            
+                            // Check if user is active
+                            if (!currentUserProfile.isActive) {
+                                console.warn('⚠️ User account is not active - requires admin approval');
+                                showPermissionDeniedModal('Your account has been created but requires admin approval. Please contact a system administrator to activate your account.');
+                                await auth.signOut();
+                                return;
+                            }
+                            // User is active, allow access
+                            return;
+                        } else {
+                            throw new Error('Profile not found after linking');
+                        }
+                    } catch (linkError) {
+                        console.error('❌ Failed to link pending invitation:', linkError);
+                        // Don't create default profile if linking fails - show error instead
+                        showPermissionDeniedModal('Your account was created but there was an error linking your invitation. Please contact an administrator.');
+                        await auth.signOut();
+                        return;
+                    }
+                }
+                
+                // No pending invitation - create default profile
+                console.log('No pending invitation found, creating default profile for:', normalizedEmail);
                 
                 await createUserProfile(userId, {
-                    email: userEmail,
-                    displayName: authUser.displayName || userEmail.split('@')[0] || 'User',
+                    email: normalizedEmail,
+                    displayName: authUser.displayName || normalizedEmail.split('@')[0] || 'User',
                     profile: {}
                 });
-                console.log('✅ Created missing user profile for:', userEmail);
+                console.log('✅ Created missing user profile for:', normalizedEmail);
                 
                 // Load the newly created profile
                 const newUserDoc = await db.collection('users').doc(userId).get();
@@ -5626,30 +5666,54 @@ async function linkPendingUserToAccount(userId, email) {
             displayName: pendingUser.displayName
         });
         
-        // Create user document with pending user's data
-        try {
-            const userData = {
-                email: normalizedEmail, // Use normalized email
-                displayName: pendingUser.displayName,
-                role: pendingUser.role,
-                isActive: pendingUser.isActive,
-                assignedProperties: pendingUser.assignedProperties || [],
-                profile: pendingUser.profile || {},
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                lastLogin: null,
-                createdBy: pendingUser.createdBy
-            };
+        // Check if user profile already exists - prevent duplicates
+        const existingProfile = await db.collection('users').doc(userId).get();
+        if (existingProfile.exists) {
+            const existingData = existingProfile.data();
+            console.log('⚠️ User profile already exists:', existingData);
             
-            console.log('📝 Creating user profile with data:', userData);
-            await db.collection('users').doc(userId).set(userData);
-            console.log('✅ User profile created with pending invitation data');
-        } catch (createError) {
-            console.error('❌ Error creating user profile:', createError);
-            // Provide specific error message
-            if (createError.code === 'permission-denied') {
-                throw new Error('Permission denied: Unable to create user profile. Please contact an administrator.');
+            // If profile exists but doesn't match pending invitation, update it
+            if (existingData.role !== pendingUser.role || existingData.isActive !== pendingUser.isActive) {
+                console.log('🔄 Updating existing profile to match pending invitation...');
+                await db.collection('users').doc(userId).update({
+                    email: normalizedEmail,
+                    displayName: pendingUser.displayName,
+                    role: pendingUser.role,
+                    isActive: pendingUser.isActive,
+                    assignedProperties: pendingUser.assignedProperties || [],
+                    profile: pendingUser.profile || {},
+                    createdBy: pendingUser.createdBy
+                });
+                console.log('✅ Updated existing profile with pending invitation data');
             } else {
-                throw new Error(`Failed to create user profile: ${createError.message}`);
+                console.log('✅ Existing profile already matches pending invitation');
+            }
+        } else {
+            // Create user document with pending user's data
+            try {
+                const userData = {
+                    email: normalizedEmail, // Use normalized email
+                    displayName: pendingUser.displayName,
+                    role: pendingUser.role,
+                    isActive: pendingUser.isActive,
+                    assignedProperties: pendingUser.assignedProperties || [],
+                    profile: pendingUser.profile || {},
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    lastLogin: null,
+                    createdBy: pendingUser.createdBy
+                };
+                
+                console.log('📝 Creating user profile with data:', userData);
+                await db.collection('users').doc(userId).set(userData);
+                console.log('✅ User profile created with pending invitation data');
+            } catch (createError) {
+                console.error('❌ Error creating user profile:', createError);
+                // Provide specific error message
+                if (createError.code === 'permission-denied') {
+                    throw new Error('Permission denied: Unable to create user profile. Please contact an administrator.');
+                } else {
+                    throw new Error(`Failed to create user profile: ${createError.message}`);
+                }
             }
         }
         
