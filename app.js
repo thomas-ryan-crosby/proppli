@@ -4547,9 +4547,34 @@ async function loadUsers() {
             firestoreUsers[doc.id] = { id: doc.id, ...doc.data(), source: 'firestore' };
         });
         
-        // Also get all Firebase Auth users (requires Admin SDK, but we can try to get current user's auth info)
-        // Note: We can't list all Auth users from client-side, but we can check if Firestore users match Auth users
-        // For now, we'll show all Firestore users and add a note if there might be missing users
+        // Also load pending invitations to show in the list
+        try {
+            const pendingUsersSnapshot = await db.collection('pendingUsers')
+                .where('status', '==', 'pending_signup')
+                .get();
+            
+            pendingUsersSnapshot.forEach((doc) => {
+                const pendingUser = doc.data();
+                // Add pending users to the list with a special flag
+                const tempId = `pending_${doc.id}`;
+                firestoreUsers[tempId] = {
+                    id: tempId,
+                    email: pendingUser.email,
+                    displayName: pendingUser.displayName,
+                    role: pendingUser.role,
+                    isActive: pendingUser.isActive || false,
+                    assignedProperties: pendingUser.assignedProperties || [],
+                    status: 'pending',
+                    isPending: true,
+                    pendingUserId: doc.id,
+                    createdAt: pendingUser.createdAt,
+                    source: 'pending'
+                };
+            });
+        } catch (pendingError) {
+            console.warn('Could not load pending users:', pendingError);
+            // Continue without pending users
+        }
         
         // Merge and store
         allUsers = firestoreUsers;
@@ -4557,11 +4582,39 @@ async function loadUsers() {
         // Set up real-time listener for Firestore updates
         // Use get() instead of orderBy to avoid index requirements and handle missing createdAt
         db.collection('users')
-            .onSnapshot((snapshot) => {
+            .onSnapshot(async (snapshot) => {
                 allUsers = {};
                 snapshot.forEach((doc) => {
                     allUsers[doc.id] = { id: doc.id, ...doc.data(), source: 'firestore' };
                 });
+                
+                // Also load pending users for real-time updates
+                try {
+                    const pendingUsersSnapshot = await db.collection('pendingUsers')
+                        .where('status', '==', 'pending_signup')
+                        .get();
+                    
+                    pendingUsersSnapshot.forEach((doc) => {
+                        const pendingUser = doc.data();
+                        const tempId = `pending_${doc.id}`;
+                        allUsers[tempId] = {
+                            id: tempId,
+                            email: pendingUser.email,
+                            displayName: pendingUser.displayName,
+                            role: pendingUser.role,
+                            isActive: pendingUser.isActive || false,
+                            assignedProperties: pendingUser.assignedProperties || [],
+                            status: 'pending',
+                            isPending: true,
+                            pendingUserId: doc.id,
+                            createdAt: pendingUser.createdAt,
+                            source: 'pending'
+                        };
+                    });
+                } catch (pendingError) {
+                    console.warn('Could not load pending users:', pendingError);
+                }
+                
                 // Sort by createdAt if available, otherwise by email
                 const sortedUsers = Object.values(allUsers).sort((a, b) => {
                     if (a.createdAt && b.createdAt) {
@@ -4630,9 +4683,9 @@ function renderUsersList(users) {
         
         // Status filter
         if (statusFilter) {
-            if (statusFilter === 'active' && !user.isActive) return false;
-            if (statusFilter === 'inactive' && user.isActive) return false;
-            if (statusFilter === 'pending' && user.isActive !== false) return false;
+            if (statusFilter === 'active' && (!user.isActive || user.isPending)) return false;
+            if (statusFilter === 'inactive' && (user.isActive || user.isPending)) return false;
+            if (statusFilter === 'pending' && !user.isPending) return false;
         }
         
         return true;
@@ -4666,16 +4719,38 @@ function renderUsersList(users) {
     // Render user cards
     usersList.innerHTML = infoMessage + filteredUsers.map(user => {
         const roleBadge = getRoleBadge(user.role);
-        const statusBadge = getStatusBadge(user.isActive);
-        const lastLogin = user.lastLogin ? formatDate(user.lastLogin) : 'Never';
+        // Handle pending users differently
+        const statusBadge = user.isPending 
+            ? `<span class="status-badge" style="background: #fbbf24; color: #78350f; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">Pending Signup</span>`
+            : getStatusBadge(user.isActive);
+        const lastLogin = user.isPending ? 'Not signed up yet' : (user.lastLogin ? formatDate(user.lastLogin) : 'Never');
         const assignedPropertiesCount = user.assignedProperties ? user.assignedProperties.length : 0;
         
+        // Different actions for pending users
+        let actionsHtml = '';
+        if (user.isPending) {
+            actionsHtml = `
+                <button class="btn-small btn-primary" onclick="viewPendingUser('${user.pendingUserId}')">View Invitation</button>
+                <span style="color: #666; font-size: 0.85rem; font-style: italic;">Waiting for signup</span>
+            `;
+        } else {
+            actionsHtml = `
+                <button class="btn-small btn-primary" onclick="openUserDetailModal('${user.id}')">View</button>
+                <button class="btn-small btn-secondary" onclick="openUserDetailModal('${user.id}', true)">Edit</button>
+                ${user.isActive 
+                    ? `<button class="btn-small btn-warning" onclick="toggleUserStatus('${user.id}', false)">Deactivate</button>`
+                    : `<button class="btn-small btn-success" onclick="toggleUserStatus('${user.id}', true)">Activate</button>`
+                }
+            `;
+        }
+        
         return `
-            <div class="user-card" data-user-id="${user.id}">
+            <div class="user-card" data-user-id="${user.id}" ${user.isPending ? 'style="border-left: 4px solid #fbbf24;"' : ''}>
                 <div class="user-card-header">
                     <div class="user-card-info">
                         <h3>${escapeHtml(user.displayName || user.email || 'Unknown User')}</h3>
                         <p class="user-email">${escapeHtml(user.email || 'No email')}</p>
+                        ${user.isPending ? '<p style="color: #f59e0b; font-size: 0.85rem; margin-top: 4px; font-style: italic;">⏳ Invitation sent - waiting for user to sign up</p>' : ''}
                     </div>
                     <div class="user-card-badges">
                         ${roleBadge}
@@ -4693,17 +4768,49 @@ function renderUsersList(users) {
                     </div>
                 </div>
                 <div class="user-card-actions">
-                    <button class="btn-small btn-primary" onclick="openUserDetailModal('${user.id}')">View</button>
-                    <button class="btn-small btn-secondary" onclick="openUserDetailModal('${user.id}', true)">Edit</button>
-                    ${user.isActive 
-                        ? `<button class="btn-small btn-warning" onclick="toggleUserStatus('${user.id}', false)">Deactivate</button>`
-                        : `<button class="btn-small btn-success" onclick="toggleUserStatus('${user.id}', true)">Activate</button>`
-                    }
+                    ${actionsHtml}
                 </div>
             </div>
         `;
     }).join('');
 }
+
+// View pending user invitation details
+window.viewPendingUser = async function(pendingUserId) {
+    try {
+        const pendingUserDoc = await db.collection('pendingUsers').doc(pendingUserId).get();
+        if (!pendingUserDoc.exists) {
+            alert('Pending invitation not found.');
+            return;
+        }
+        
+        const pendingUser = pendingUserDoc.data();
+        const properties = [];
+        
+        if (pendingUser.assignedProperties && pendingUser.assignedProperties.length > 0) {
+            const propertyPromises = pendingUser.assignedProperties.map(propId => 
+                db.collection('properties').doc(propId).get()
+            );
+            const propertyDocs = await Promise.all(propertyPromises);
+            propertyDocs.forEach(doc => {
+                if (doc.exists) {
+                    properties.push(doc.data().name || doc.id);
+                }
+            });
+        }
+        
+        alert(`Pending Invitation Details:\n\n` +
+              `Name: ${pendingUser.displayName}\n` +
+              `Email: ${pendingUser.email}\n` +
+              `Role: ${pendingUser.role}\n` +
+              `Properties: ${properties.length > 0 ? properties.join(', ') : 'None'}\n` +
+              `Status: Waiting for user to sign up\n\n` +
+              `The user will receive an invitation email and can sign up to activate their account.`);
+    } catch (error) {
+        console.error('Error viewing pending user:', error);
+        alert('Error loading pending invitation details.');
+    }
+};
 
 function getRoleBadge(role) {
     const roleColors = {
@@ -4721,7 +4828,7 @@ function getRoleBadge(role) {
 
 function getStatusBadge(isActive) {
     if (isActive === undefined || isActive === null) {
-        return `<span class="status-badge" style="background: #fbbf24; color: #78350f; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">Pending</span>`;
+        return `<span class="status-badge" style="background: #fbbf24; color: #78350f; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">Pending Approval</span>`;
     }
     
     if (isActive) {
@@ -5243,31 +5350,74 @@ async function handleInviteUser(e) {
         });
         
         // Send invitation email if requested
+        let emailSent = false;
+        let emailError = null;
+        
         if (sendEmail) {
             try {
+                // Check if Firebase Functions is available
+                if (!firebase.functions) {
+                    throw new Error('Firebase Functions not available. Make sure firebase-functions-compat.js is loaded.');
+                }
+                
                 const sendInvitationEmail = firebase.functions().httpsCallable('sendInvitationEmail');
-                await sendInvitationEmail({
+                const result = await sendInvitationEmail({
                     email: email,
                     displayName: fullName,
                     role: role,
                     assignedProperties: propertyIds
                 });
-                console.log('✅ Invitation email sent to:', email);
+                
+                if (result.data && result.data.success) {
+                    emailSent = true;
+                    console.log('✅ Invitation email sent to:', email);
+                } else {
+                    throw new Error(result.data?.message || 'Email sending failed');
+                }
             } catch (emailError) {
-                console.error('Error sending invitation email:', emailError);
-                // Don't fail the invitation if email fails - just log it
-                alert(`Invitation created for ${fullName} (${email}), but email could not be sent. Error: ${emailError.message}`);
-                closeInviteUserModal();
-                return;
+                console.error('❌ Error sending invitation email:', emailError);
+                console.error('Error details:', {
+                    code: emailError.code,
+                    message: emailError.message,
+                    details: emailError.details
+                });
+                emailError = emailError;
+                // Don't fail the invitation if email fails - invitation is still created
             }
         }
         
-        alert(`Invitation created for ${fullName} (${email}).${sendEmail ? ' An invitation email has been sent.' : ''} They can now sign up and their account will be automatically configured with the assigned role and properties.`);
+        // Show success message
+        let successMessage = `Invitation created for ${fullName} (${email}).\n\n`;
         
-        // Close modal and reload users
+        if (sendEmail) {
+            if (emailSent) {
+                successMessage += '✅ An invitation email has been sent.\n\n';
+            } else {
+                successMessage += `⚠️ Invitation created, but email could not be sent.\n`;
+                if (emailError) {
+                    successMessage += `Error: ${emailError.message}\n`;
+                    if (emailError.code === 'functions/not-found') {
+                        successMessage += '\nNote: Cloud Functions may not be deployed. Run: firebase deploy --only functions';
+                    } else if (emailError.code === 'functions/unauthenticated') {
+                        successMessage += '\nNote: You must be logged in to send emails.';
+                    } else if (emailError.code === 'functions/permission-denied') {
+                        successMessage += '\nNote: Only admins can send invitation emails.';
+                    }
+                }
+                successMessage += '\n';
+            }
+        }
+        
+        successMessage += 'The user can now sign up and their account will be automatically configured with the assigned role and properties.\n\n';
+        successMessage += 'Note: The user will appear in the Users list after they sign up.';
+        
+        alert(successMessage);
+        
+        // Close modal
         closeInviteUserModal();
-        // Note: User won't appear in list until they sign up
-        // We could add a "Pending Invitations" section later
+        
+        // Reload users list (though invited user won't appear until they sign up)
+        loadUsers();
         
     } catch (error) {
         console.error('Error creating invitation:', error);
