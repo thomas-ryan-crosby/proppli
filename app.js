@@ -139,6 +139,18 @@ function initAuth() {
                 currentUser = user;
                 // Reset permission error flag on new login
                 permissionErrorShown = false;
+                
+                // Check email verification (optional - can be enabled/disabled)
+                // Uncomment the block below to require email verification
+                /*
+                if (!user.emailVerified) {
+                    console.warn('⚠️ Email not verified');
+                    showPermissionDeniedModal('Please verify your email address before accessing the application. Check your inbox for the verification email.');
+                    await auth.signOut();
+                    return;
+                }
+                */
+                
                 await loadUserProfile(user.uid);
                 // Only show application if user profile loaded successfully and is active
                 if (currentUserProfile && currentUserProfile.isActive) {
