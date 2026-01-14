@@ -35,7 +35,12 @@
                         </div>
                         <div class="form-group">
                             <label for="loginPassword">Password</label>
-                            <input type="password" id="loginPassword" required autocomplete="current-password">
+                            <div class="password-input-wrapper">
+                                <input type="password" id="loginPassword" required autocomplete="current-password">
+                                <button type="button" class="password-toggle" onclick="togglePasswordVisibility('loginPassword', this)" aria-label="Show password">
+                                    <span class="eye-icon">👁️</span>
+                                </button>
+                            </div>
                         </div>
                         <div class="form-group checkbox-group">
                             <label>
@@ -69,12 +74,22 @@
                         </div>
                         <div class="form-group">
                             <label for="signupPassword">Password</label>
-                            <input type="password" id="signupPassword" required autocomplete="new-password">
+                            <div class="password-input-wrapper">
+                                <input type="password" id="signupPassword" required autocomplete="new-password">
+                                <button type="button" class="password-toggle" onclick="togglePasswordVisibility('signupPassword', this)" aria-label="Show password">
+                                    <span class="eye-icon">👁️</span>
+                                </button>
+                            </div>
                             <small class="password-hint">Must be at least 8 characters with uppercase, lowercase, number, and special character</small>
                         </div>
                         <div class="form-group">
                             <label for="signupPasswordConfirm">Confirm Password</label>
-                            <input type="password" id="signupPasswordConfirm" required autocomplete="new-password">
+                            <div class="password-input-wrapper">
+                                <input type="password" id="signupPasswordConfirm" required autocomplete="new-password">
+                                <button type="button" class="password-toggle" onclick="togglePasswordVisibility('signupPasswordConfirm', this)" aria-label="Show password">
+                                    <span class="eye-icon">👁️</span>
+                                </button>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label for="signupFullName">Full Name</label>
