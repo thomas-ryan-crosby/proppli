@@ -701,8 +701,17 @@ async function handleSignup(e) {
             throw new Error('Authentication not initialized');
         }
         
+        // Normalize email (lowercase, trim) for consistent matching
+        const normalizedEmail = (email || '').toLowerCase().trim();
+        
+        if (!normalizedEmail) {
+            throw new Error('Email is required');
+        }
+        
+        console.log('🔵 Starting signup for email:', normalizedEmail);
+        
         // Create user account
-        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        const userCredential = await auth.createUserWithEmailAndPassword(normalizedEmail, password);
         console.log('✅ Account created successfully');
         
         // Update user display name
@@ -720,12 +729,14 @@ async function handleSignup(e) {
         }
         
         // Check if there's a pending invitation for this email
-        const pendingUser = await checkPendingInvitation(email);
+        console.log('🔍 Checking for pending invitation...');
+        const pendingUser = await checkPendingInvitation(normalizedEmail);
         
         if (pendingUser) {
             // Link to pending invitation (admin-invited user)
+            console.log('🔗 Pending invitation found, linking account...');
             try {
-                await linkPendingUserToAccount(userCredential.user.uid, email);
+                await linkPendingUserToAccount(userCredential.user.uid, normalizedEmail);
                 console.log('✅ User account linked to pending invitation');
                 // User is already active, no need to sign out
             } catch (linkError) {
@@ -734,17 +745,17 @@ async function handleSignup(e) {
                 console.log('⚠️ Creating fallback default profile...');
                 try {
                     if (db) {
-                        await createUserProfile(userCredential.user.uid, {
-                            email: email,
-                            displayName: fullName,
-                            role: 'viewer',
-                            isActive: false, // Requires admin approval
-                            profile: {
-                                phone: phone || null
-                            },
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                            lastLogin: firebase.firestore.FieldValue.serverTimestamp()
-                        });
+                    await createUserProfile(userCredential.user.uid, {
+                        email: normalizedEmail,
+                        displayName: fullName,
+                        role: 'viewer',
+                        isActive: false, // Requires admin approval
+                        profile: {
+                            phone: phone || null
+                        },
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+                    });
                         console.log('✅ Fallback profile created');
                     }
                     // Sign out and show message
@@ -766,7 +777,7 @@ async function handleSignup(e) {
             if (db) {
                 try {
                     await createUserProfile(userCredential.user.uid, {
-                        email: email,
+                        email: normalizedEmail,
                         displayName: fullName,
                         role: 'viewer',
                         isActive: false, // Requires admin approval
@@ -5379,10 +5390,13 @@ async function handleInviteUser(e) {
     }
     
     try {
+        // Normalize email (lowercase, trim) for consistent matching
+        const normalizedEmail = (email || '').toLowerCase().trim();
+        
         // Create user invitation document
         // The user will sign up themselves, and we'll link their account to this invitation
         const invitationData = {
-            email: email,
+            email: normalizedEmail, // Store normalized email
             displayName: fullName,
             role: role,
             assignedProperties: propertyIds,
@@ -5408,11 +5422,14 @@ async function handleInviteUser(e) {
         }
         
         // Create pending user document
+        // Normalize email (lowercase, trim) for consistent matching
+        const normalizedEmail = (email || '').toLowerCase().trim();
+        
         let pendingUserRef;
         try {
             pendingUserRef = db.collection('pendingUsers').doc();
             await pendingUserRef.set({
-                email: email,
+                email: normalizedEmail, // Store normalized email
                 displayName: fullName,
                 role: role,
                 isActive: true, // Admin-invited users are active immediately
@@ -5471,7 +5488,7 @@ async function handleInviteUser(e) {
                     
                     const result = await Promise.race([
                         sendInvitationEmail({
-                            email: email,
+                            email: normalizedEmail,
                             displayName: fullName,
                             role: role,
                             assignedProperties: propertyIds
@@ -5491,7 +5508,7 @@ async function handleInviteUser(e) {
         }
         
         // Show success message
-        let successMessage = `Invitation created for ${fullName} (${email}).\n\n`;
+        let successMessage = `Invitation created for ${fullName} (${normalizedEmail}).\n\n`;
         
         if (sendEmail) {
             // Email is sent via Firestore trigger, so it should always succeed
@@ -5529,20 +5546,33 @@ async function handleInviteUser(e) {
 // Check for pending user invitation when user signs up
 async function checkPendingInvitation(email) {
     try {
+        // Normalize email (lowercase, trim) for consistent matching
+        const normalizedEmail = (email || '').toLowerCase().trim();
+        
+        if (!normalizedEmail) {
+            console.log('⚠️ No email provided to checkPendingInvitation');
+            return null;
+        }
+        
+        console.log('🔍 Checking for pending invitation with email:', normalizedEmail);
+        
         // Check pendingUsers collection
         const pendingUsersSnapshot = await db.collection('pendingUsers')
-            .where('email', '==', email)
+            .where('email', '==', normalizedEmail)
             .where('status', '==', 'pending_signup')
             .limit(1)
             .get();
         
         if (!pendingUsersSnapshot.empty) {
             const pendingUser = pendingUsersSnapshot.docs[0].data();
+            console.log('✅ Found pending invitation:', pendingUser);
             return pendingUser;
         }
+        
+        console.log('ℹ️ No pending invitation found for:', normalizedEmail);
         return null;
     } catch (error) {
-        console.error('Error checking pending invitation:', error);
+        console.error('❌ Error checking pending invitation:', error);
         return null;
     }
 }
@@ -5550,16 +5580,26 @@ async function checkPendingInvitation(email) {
 // Link pending user to actual user account
 async function linkPendingUserToAccount(userId, email) {
     try {
-        const pendingUser = await checkPendingInvitation(email);
+        // Normalize email for consistent matching
+        const normalizedEmail = (email || '').toLowerCase().trim();
+        console.log('🔗 Linking pending user to account:', { userId, email: normalizedEmail });
+        
+        const pendingUser = await checkPendingInvitation(normalizedEmail);
         if (!pendingUser) {
-            console.log('No pending invitation found for:', email);
+            console.log('❌ No pending invitation found for:', normalizedEmail);
             return false;
         }
         
+        console.log('✅ Found pending user data:', {
+            role: pendingUser.role,
+            isActive: pendingUser.isActive,
+            displayName: pendingUser.displayName
+        });
+        
         // Create user document with pending user's data
         try {
-            await db.collection('users').doc(userId).set({
-                email: email,
+            const userData = {
+                email: normalizedEmail, // Use normalized email
                 displayName: pendingUser.displayName,
                 role: pendingUser.role,
                 isActive: pendingUser.isActive,
@@ -5568,7 +5608,10 @@ async function linkPendingUserToAccount(userId, email) {
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                 lastLogin: null,
                 createdBy: pendingUser.createdBy
-            });
+            };
+            
+            console.log('📝 Creating user profile with data:', userData);
+            await db.collection('users').doc(userId).set(userData);
             console.log('✅ User profile created with pending invitation data');
         } catch (createError) {
             console.error('❌ Error creating user profile:', createError);
@@ -5583,7 +5626,7 @@ async function linkPendingUserToAccount(userId, email) {
         // Mark pending user as completed
         try {
             const pendingDoc = await db.collection('pendingUsers')
-                .where('email', '==', email)
+                .where('email', '==', normalizedEmail)
                 .where('status', '==', 'pending_signup')
                 .limit(1)
                 .get();
