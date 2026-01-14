@@ -285,6 +285,33 @@ async function sendActivationEmailInternal(data) {
   console.log(`Activation email sent to ${data.email}`);
 }
 
+// Helper function to send welcome email (for self-registration)
+async function sendWelcomeEmailInternal(data) {
+  // Prepare email data
+  const emailData = {
+    email: data.email,
+    displayName: data.displayName
+  };
+  
+  // Get email template
+  const template = emailTemplates.welcome(emailData);
+  
+  // Send email
+  // Get from address from config, with fallback
+  const fromAddress = functions.config().email?.from || 'noreply@proppli.com';
+  
+  const mailOptions = {
+    from: fromAddress,
+    to: data.email,
+    subject: template.subject,
+    html: template.html,
+    text: template.text
+  };
+  
+  await transporter.sendMail(mailOptions);
+  console.log(`Welcome email sent to ${data.email}`);
+}
+
 // Triggered when a user invitation is created (if sendEmail is true)
 exports.onInvitationCreated = functions.firestore
   .document('userInvitations/{invitationId}')
@@ -333,6 +360,32 @@ exports.onUserActivated = functions.firestore
         return null;
       } catch (error) {
         console.error('Error triggering activation email:', error);
+        return null;
+      }
+    }
+    
+    return null;
+  });
+
+// Triggered when a new user profile is created (for self-registration welcome email)
+exports.onUserSignup = functions.firestore
+  .document('users/{userId}')
+  .onCreate(async (snap) => {
+    const userData = snap.data();
+    
+    // Only send welcome email for self-registered users (isActive: false)
+    // Admin-invited users will be active immediately and get activation email instead
+    if (userData.isActive === false) {
+      try {
+        await sendWelcomeEmailInternal({
+          email: userData.email,
+          displayName: userData.displayName
+        });
+        
+        console.log(`Welcome email triggered for ${userData.email}`);
+        return null;
+      } catch (error) {
+        console.error('Error triggering welcome email:', error);
         return null;
       }
     }
