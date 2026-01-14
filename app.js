@@ -5422,9 +5422,7 @@ async function handleInviteUser(e) {
         }
         
         // Create pending user document
-        // Normalize email (lowercase, trim) for consistent matching
-        const normalizedEmail = (email || '').toLowerCase().trim();
-        
+        // Use normalizedEmail already declared above
         let pendingUserRef;
         try {
             pendingUserRef = db.collection('pendingUsers').doc();
