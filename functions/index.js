@@ -288,7 +288,7 @@ async function sendActivationEmailInternal(data) {
 // Triggered when a user invitation is created (if sendEmail is true)
 exports.onInvitationCreated = functions.firestore
   .document('userInvitations/{invitationId}')
-  .onCreate(async (snap, context) => {
+  .onCreate(async (snap) => {
     const invitation = snap.data();
     
     // Only send email if sendEmail is true
@@ -316,7 +316,7 @@ exports.onInvitationCreated = functions.firestore
 // Triggered when a user is activated
 exports.onUserActivated = functions.firestore
   .document('users/{userId}')
-  .onUpdate(async (change, context) => {
+  .onUpdate(async (change) => {
     const before = change.before.data();
     const after = change.after.data();
     
