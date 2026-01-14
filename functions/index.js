@@ -373,9 +373,10 @@ exports.onUserSignup = functions.firestore
   .onCreate(async (snap) => {
     const userData = snap.data();
     
-    // Only send welcome email for self-registered users (isActive: false)
+    // Only send welcome email for self-registered users (isActive: false or undefined/null)
     // Admin-invited users will be active immediately and get activation email instead
-    if (userData.isActive === false) {
+    // Check for false, null, or undefined (new self-registered users)
+    if (userData.isActive === false || userData.isActive === null || userData.isActive === undefined) {
       try {
         await sendWelcomeEmailInternal({
           email: userData.email,

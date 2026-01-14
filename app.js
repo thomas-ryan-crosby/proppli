@@ -155,6 +155,27 @@ function initAuth() {
         // Listen for auth state changes
         auth.onAuthStateChanged(async (user) => {
             if (user) {
+                // Check if "Remember Me" was set
+                // We check both sessionStorage (clears on tab close) and a flag in the user's metadata
+                // If user logged in without "Remember Me", the flag won't be set
+                const rememberMe = sessionStorage.getItem('rememberMe') === 'true' || localStorage.getItem('rememberMe') === 'true';
+                
+                // If user is authenticated but "Remember Me" was not checked, sign them out
+                // This prevents auto-login when "Remember Me" was unchecked
+                // Note: This check happens on every auth state change, including page load
+                if (!rememberMe) {
+                    console.log('⚠️ User authenticated but "Remember Me" was not checked - signing out');
+                    try {
+                        await auth.signOut();
+                        sessionStorage.removeItem('rememberMe');
+                        localStorage.removeItem('rememberMe');
+                        // Don't show app - user needs to log in again
+                        return;
+                    } catch (signOutError) {
+                        console.error('Error signing out:', signOutError);
+                    }
+                }
+                
                 console.log('👤 User authenticated:', user.email);
                 currentUser = user;
                 // Reset permission error flag on new login
@@ -650,6 +671,12 @@ function initAuthPages() {
             showLoginPage();
         });
     }
+    
+    // Google Sign-In button
+    const googleSignInBtn = document.getElementById('googleSignInBtn');
+    if (googleSignInBtn) {
+        googleSignInBtn.addEventListener('click', handleGoogleSignIn);
+    }
 }
 
 // Handle login
@@ -677,6 +704,16 @@ async function handleLogin(e) {
         const persistence = rememberMe 
             ? firebase.auth.Auth.Persistence.LOCAL 
             : firebase.auth.Auth.Persistence.SESSION;
+        
+        // Store "Remember Me" preference in sessionStorage (clears when tab closes)
+        // This allows us to check on page load if user should be auto-logged in
+        if (rememberMe) {
+            sessionStorage.setItem('rememberMe', 'true');
+            localStorage.setItem('rememberMe', 'true'); // Also store in localStorage for cross-tab consistency
+        } else {
+            sessionStorage.removeItem('rememberMe');
+            localStorage.removeItem('rememberMe');
+        }
         
         // If "Remember Me" is not checked, ensure we're using SESSION persistence
         // This means the session will only last for the current browser session
@@ -943,6 +980,67 @@ async function handleSignup(e) {
     }
 }
 
+// Handle Google Sign-In
+async function handleGoogleSignIn() {
+    try {
+        if (!auth) {
+            throw new Error('Authentication not initialized');
+        }
+        
+        const provider = new firebase.auth.GoogleAuthProvider();
+        
+        // Set persistence to LOCAL for Google sign-in (users typically want to stay logged in)
+        await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+        sessionStorage.setItem('rememberMe', 'true');
+        localStorage.setItem('rememberMe', 'true');
+        
+        // Sign in with Google
+        const result = await auth.signInWithPopup(provider);
+        const user = result.user;
+        
+        console.log('✅ Google Sign-In successful:', user.email);
+        
+        // Check if user profile exists, create if not
+        if (user && db) {
+            const userDoc = await db.collection('users').doc(user.uid).get();
+            if (!userDoc.exists) {
+                // Create user profile
+                const normalizedEmail = (user.email || '').toLowerCase().trim();
+                
+                // Check for pending invitation
+                const pendingUser = await checkPendingInvitation(normalizedEmail);
+                
+                if (pendingUser) {
+                    // Link to pending invitation
+                    await linkPendingUserToAccount(user.uid, normalizedEmail);
+                } else {
+                    // Create default profile
+                    await createUserProfile(user.uid, {
+                        email: normalizedEmail,
+                        displayName: user.displayName || normalizedEmail.split('@')[0] || 'User',
+                        profile: {}
+                    });
+                }
+            }
+        }
+        
+        // Auth state change will handle showing the app
+    } catch (error) {
+        console.error('Google Sign-In error:', error);
+        const errorDiv = document.getElementById('loginError');
+        if (errorDiv) {
+            if (error.code === 'auth/popup-closed-by-user') {
+                errorDiv.textContent = 'Sign-in was cancelled.';
+            } else if (error.code === 'auth/popup-blocked') {
+                errorDiv.textContent = 'Popup was blocked. Please allow popups for this site.';
+            } else {
+                errorDiv.textContent = 'Error signing in with Google: ' + (error.message || 'Unknown error');
+            }
+            errorDiv.style.display = 'block';
+        }
+    }
+}
+
 // Handle password reset
 async function handlePasswordReset(e) {
     e.preventDefault();
@@ -1026,6 +1124,9 @@ window.logout = async function() {
             console.log('✅ Logged out successfully');
             currentUser = null;
             currentUserProfile = null;
+            // Clear "Remember Me" flags on logout
+            sessionStorage.removeItem('rememberMe');
+            localStorage.removeItem('rememberMe');
             showAuthPages();
         }
     } catch (error) {
@@ -5691,20 +5792,36 @@ async function handleInviteUser(e) {
         // Check if user already exists in the system
         console.log('🔍 Checking if user already exists:', normalizedEmail);
         
-        // Check Firestore users collection
+        // Check Firestore users collection - only check active users (not deleted)
+        // Note: We can't check Firebase Auth directly from client, but we check Firestore
+        // If a user was deleted from Auth, they shouldn't have an active Firestore profile
         const existingUsersSnapshot = await db.collection('users')
             .where('email', '==', normalizedEmail)
             .limit(1)
             .get();
         
         if (!existingUsersSnapshot.empty) {
-            const errorMsg = 'A user with this email already exists in the system.';
-            console.warn('⚠️', errorMsg);
-            if (errorDiv) {
-                errorDiv.textContent = errorMsg;
-                errorDiv.style.display = 'block';
+            const userDoc = existingUsersSnapshot.docs[0];
+            const userData = userDoc.data();
+            
+            // Only block if user is active (not deleted/inactive)
+            // If user was deleted from Auth, their Firestore doc might still exist but should be inactive
+            // Allow re-inviting deleted users
+            if (userData.isActive !== false) {
+                const errorMsg = 'A user with this email already exists in the system.';
+                console.warn('⚠️', errorMsg);
+                if (errorDiv) {
+                    errorDiv.textContent = errorMsg;
+                    errorDiv.style.display = 'block';
+                }
+                return;
+            } else {
+                // User exists but is inactive - this might be a deleted user
+                // Check if there's a corresponding Firebase Auth user
+                // Since we can't check Auth directly, we'll allow the invitation
+                // The system will handle linking if the user signs up again
+                console.log('ℹ️ Found inactive user with this email - allowing re-invitation');
             }
-            return;
         }
         
         // Check pendingUsers collection
