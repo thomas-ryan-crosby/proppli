@@ -724,23 +724,64 @@ async function handleSignup(e) {
         
         if (pendingUser) {
             // Link to pending invitation (admin-invited user)
-            await linkPendingUserToAccount(userCredential.user.uid, email);
-            console.log('✅ User account linked to pending invitation');
-            // User is already active, no need to sign out
+            try {
+                await linkPendingUserToAccount(userCredential.user.uid, email);
+                console.log('✅ User account linked to pending invitation');
+                // User is already active, no need to sign out
+            } catch (linkError) {
+                console.error('❌ Failed to link pending user account:', linkError);
+                // Fallback: Create default profile if linking fails
+                console.log('⚠️ Creating fallback default profile...');
+                try {
+                    if (db) {
+                        await createUserProfile(userCredential.user.uid, {
+                            email: email,
+                            displayName: fullName,
+                            role: 'viewer',
+                            isActive: false, // Requires admin approval
+                            profile: {
+                                phone: phone || null
+                            },
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                        console.log('✅ Fallback profile created');
+                    }
+                    // Sign out and show message
+                    await auth.signOut();
+                    if (errorDiv) {
+                        errorDiv.textContent = 'Account created, but there was an issue linking your invitation. Your account is pending admin approval.';
+                        errorDiv.style.display = 'block';
+                    }
+                    // Don't show success message
+                    return;
+                } catch (fallbackError) {
+                    console.error('❌ Fallback profile creation also failed:', fallbackError);
+                    // Re-throw the original link error
+                    throw linkError;
+                }
+            }
         } else {
             // Regular signup - create profile with isActive: false
             if (db) {
-                await createUserProfile(userCredential.user.uid, {
-                    email: email,
-                    displayName: fullName,
-                    role: 'viewer',
-                    isActive: false, // Requires admin approval
-                    profile: {
-                        phone: phone || null
-                    },
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    lastLogin: firebase.firestore.FieldValue.serverTimestamp()
-                });
+                try {
+                    await createUserProfile(userCredential.user.uid, {
+                        email: email,
+                        displayName: fullName,
+                        role: 'viewer',
+                        isActive: false, // Requires admin approval
+                        profile: {
+                            phone: phone || null
+                        },
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                } catch (profileError) {
+                    console.error('❌ Failed to create user profile:', profileError);
+                    // Sign out anyway to prevent access without profile
+                    await auth.signOut();
+                    throw new Error('Account created, but failed to create profile. Please contact an administrator.');
+                }
             }
             
             // Sign out (user needs admin approval)
@@ -5315,39 +5356,53 @@ async function handleInviteUser(e) {
         };
         
         // Create invitation document
-        const invitationRef = await db.collection('userInvitations').add(invitationData);
-        console.log('✅ User invitation created');
+        let invitationRef;
+        try {
+            invitationRef = await db.collection('userInvitations').add(invitationData);
+            console.log('✅ User invitation created:', invitationRef.id);
+        } catch (inviteError) {
+            console.error('❌ Failed to create invitation:', inviteError);
+            throw new Error(`Failed to create invitation: ${inviteError.message || 'Unknown error'}`);
+        }
         
-        // Note: To actually create the Firebase Auth user, we would need Firebase Admin SDK
-        // For now, we'll create the invitation and the user can sign up
-        // When they sign up, we can check for pending invitations and auto-approve them
-        
-        // For immediate use: Create Firestore user document that will be linked when user signs up
-        // We'll use a placeholder UID that will be updated when the user signs up
-        // Actually, better approach: Just create invitation, user signs up, then admin approves
-        
-        // Alternative: Create the user document now with email as identifier
-        // When user signs up, we'll match by email and update the document
-        
-        // For now, let's create a user document with a special flag indicating it's pending signup
-        // We'll store it with email as a way to match later
-        const pendingUserRef = db.collection('pendingUsers').doc();
-        await pendingUserRef.set({
-            email: email,
-            displayName: fullName,
-            role: role,
-            isActive: true, // Admin-invited users are active immediately
-            assignedProperties: propertyIds,
-            profile: {
-                phone: phone || null,
-                title: title || null,
-                department: department || null
-            },
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            createdBy: currentUser.uid,
-            invitationId: invitationRef.id,
-            status: 'pending_signup'
-        });
+        // Create pending user document
+        let pendingUserRef;
+        try {
+            pendingUserRef = db.collection('pendingUsers').doc();
+            await pendingUserRef.set({
+                email: email,
+                displayName: fullName,
+                role: role,
+                isActive: true, // Admin-invited users are active immediately
+                assignedProperties: propertyIds,
+                profile: {
+                    phone: phone || null,
+                    title: title || null,
+                    department: department || null
+                },
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                createdBy: currentUser.uid,
+                invitationId: invitationRef.id,
+                status: 'pending_signup'
+            });
+            console.log('✅ Pending user document created:', pendingUserRef.id);
+            
+            // Verify the document was actually created
+            const verifyDoc = await pendingUserRef.get();
+            if (!verifyDoc.exists) {
+                throw new Error('Pending user document was not created successfully');
+            }
+        } catch (pendingError) {
+            console.error('❌ Failed to create pending user:', pendingError);
+            // Try to clean up invitation if pending user creation fails
+            try {
+                await invitationRef.delete();
+                console.log('⚠️ Cleaned up invitation due to pending user creation failure');
+            } catch (cleanupError) {
+                console.error('⚠️ Could not clean up invitation:', cleanupError);
+            }
+            throw new Error(`Failed to create pending user: ${pendingError.message || 'Unknown error'}`);
+        }
         
         // Send invitation email if requested
         let emailSent = false;
@@ -5461,8 +5516,13 @@ async function checkPendingInvitation(email) {
 async function linkPendingUserToAccount(userId, email) {
     try {
         const pendingUser = await checkPendingInvitation(email);
-        if (pendingUser) {
-            // Create user document with pending user's data
+        if (!pendingUser) {
+            console.log('No pending invitation found for:', email);
+            return false;
+        }
+        
+        // Create user document with pending user's data
+        try {
             await db.collection('users').doc(userId).set({
                 email: email,
                 displayName: pendingUser.displayName,
@@ -5474,8 +5534,19 @@ async function linkPendingUserToAccount(userId, email) {
                 lastLogin: null,
                 createdBy: pendingUser.createdBy
             });
-            
-            // Mark pending user as completed
+            console.log('✅ User profile created with pending invitation data');
+        } catch (createError) {
+            console.error('❌ Error creating user profile:', createError);
+            // Provide specific error message
+            if (createError.code === 'permission-denied') {
+                throw new Error('Permission denied: Unable to create user profile. Please contact an administrator.');
+            } else {
+                throw new Error(`Failed to create user profile: ${createError.message}`);
+            }
+        }
+        
+        // Mark pending user as completed
+        try {
             const pendingDoc = await db.collection('pendingUsers')
                 .where('email', '==', email)
                 .where('status', '==', 'pending_signup')
@@ -5488,24 +5559,34 @@ async function linkPendingUserToAccount(userId, email) {
                     linkedUserId: userId,
                     linkedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
+                console.log('✅ Pending user marked as completed');
             }
-            
-            // Update invitation status if exists
+        } catch (updateError) {
+            console.warn('⚠️ Could not update pending user status:', updateError);
+            // Don't fail the whole process if this update fails
+        }
+        
+        // Update invitation status if exists
+        try {
             if (pendingUser.invitationId) {
                 await db.collection('userInvitations').doc(pendingUser.invitationId).update({
                     status: 'accepted',
                     acceptedBy: userId,
                     acceptedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
+                console.log('✅ Invitation marked as accepted');
             }
-            
-            console.log('✅ Pending user linked to account');
-            return true;
+        } catch (inviteError) {
+            console.warn('⚠️ Could not update invitation status:', inviteError);
+            // Don't fail the whole process if this update fails
         }
-        return false;
+        
+        console.log('✅ Pending user successfully linked to account');
+        return true;
     } catch (error) {
-        console.error('Error linking pending user:', error);
-        return false;
+        console.error('❌ Error linking pending user:', error);
+        // Re-throw with more context
+        throw error;
     }
 }
 

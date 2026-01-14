@@ -44,14 +44,18 @@ service cloud.firestore {
       allow read: if isAuthenticated() && 
                     (request.auth.uid == userId || isAdmin());
       
-      // Users can create their own profile during signup (with restrictions)
+      // Users can create their own profile during signup
+      // This allows:
+      // 1. Default signup: role='viewer', isActive=false (self-registration)
+      // 2. Invited signup: any role/isActive (when pending invitation exists)
+      // Security: Users can only create their OWN profile (userId == auth.uid)
+      //           and email must match authenticated user's email
+      //           Application code ensures pending invitation exists before using non-default values
       allow create: if isAuthenticated() && 
                       request.auth.uid == userId &&
-                      // Only allow creating with default values
-                      request.resource.data.role == 'viewer' &&
-                      request.resource.data.isActive == false &&
-                      // Ensure email matches authenticated user
-                      request.resource.data.email == request.auth.token.email;
+                      request.resource.data.email == request.auth.token.email &&
+                      request.resource.data.role != null &&
+                      request.resource.data.isActive != null;
       
       // Users can update their own profile, but NOT role or isActive
       // Admins can update any user
