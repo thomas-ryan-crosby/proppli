@@ -1535,6 +1535,23 @@ function setupEventListeners() {
         });
     }
     
+    // Invite user modal event listeners
+    const inviteUserForm = document.getElementById('inviteUserForm');
+    const closeInviteUserModalBtn = document.getElementById('closeInviteUserModal');
+    const cancelInviteUserFormBtn = document.getElementById('cancelInviteUserForm');
+    
+    if (inviteUserForm) {
+        inviteUserForm.addEventListener('submit', handleInviteUser);
+    }
+    
+    if (closeInviteUserModalBtn) {
+        closeInviteUserModalBtn.addEventListener('click', closeInviteUserModal);
+    }
+    
+    if (cancelInviteUserFormBtn) {
+        cancelInviteUserFormBtn.addEventListener('click', closeInviteUserModal);
+    }
+    
     // User detail modal event listeners
     const closeUserDetailModalBtn = document.getElementById('closeUserDetailModal');
     const cancelUserDetailFormBtn = document.getElementById('cancelUserDetailForm');
@@ -5298,15 +5315,40 @@ async function loadInviteProperties() {
 
 async function handleInviteUser(e) {
     e.preventDefault();
+    e.stopPropagation();
     
-    const email = document.getElementById('inviteEmail').value;
-    const fullName = document.getElementById('inviteFullName').value;
-    const phone = document.getElementById('invitePhone').value;
-    const role = document.getElementById('inviteRole').value;
-    const title = document.getElementById('inviteTitle').value;
-    const department = document.getElementById('inviteDepartment').value;
-    const sendEmail = document.getElementById('sendInviteEmail').checked;
+    console.log('🔵 handleInviteUser called');
+    
+    // Safety checks
+    if (!db) {
+        console.error('❌ Firestore database not initialized');
+        alert('Error: Database not initialized. Please refresh the page.');
+        return;
+    }
+    
+    if (!currentUser || !currentUser.uid) {
+        console.error('❌ Current user not available');
+        alert('Error: You must be logged in to invite users.');
+        return;
+    }
+    
+    const email = document.getElementById('inviteEmail')?.value;
+    const fullName = document.getElementById('inviteFullName')?.value;
+    const phone = document.getElementById('invitePhone')?.value;
+    const role = document.getElementById('inviteRole')?.value;
+    const title = document.getElementById('inviteTitle')?.value;
+    const department = document.getElementById('inviteDepartment')?.value;
+    const sendEmail = document.getElementById('sendInviteEmail')?.checked || false;
     const errorDiv = document.getElementById('inviteUserError');
+    
+    // Validate required fields
+    if (!email || !fullName) {
+        if (errorDiv) {
+            errorDiv.textContent = 'Please fill in all required fields (Email and Full Name).';
+            errorDiv.style.display = 'block';
+        }
+        return;
+    }
     
     // Get selected properties
     const propertyCheckboxes = document.querySelectorAll('#invitePropertiesCheckboxes input[type="checkbox"]:checked');
@@ -5429,14 +5471,14 @@ async function handleInviteUser(e) {
                 } else {
                     throw new Error(result.data?.message || 'Email sending failed');
                 }
-            } catch (emailError) {
-                console.error('❌ Error sending invitation email:', emailError);
+            } catch (emailErr) {
+                console.error('❌ Error sending invitation email:', emailErr);
                 console.error('Error details:', {
-                    code: emailError.code,
-                    message: emailError.message,
-                    details: emailError.details
+                    code: emailErr.code,
+                    message: emailErr.message,
+                    details: emailErr.details
                 });
-                emailError = emailError;
+                emailError = emailErr;
                 // Don't fail the invitation if email fails - invitation is still created
             }
         }
