@@ -21,19 +21,34 @@ SendGrid will handle:
 
 **Note:** Free tier includes 100 emails/day forever - perfect for getting started!
 
-## Step 2: Create SendGrid API Key
+## Step 2: Choose Integration Method
 
-1. Log in to SendGrid dashboard
-2. Go to **Settings** → **API Keys** (or click your profile → **API Keys**)
-3. Click **"Create API Key"**
-4. Choose **"Full Access"** (or "Restricted Access" with Mail Send permissions)
-5. Give it a name: `Proppli Cloud Functions`
-6. Click **"Create & View"**
-7. **IMPORTANT:** Copy the API key immediately - you won't be able to see it again!
+SendGrid will ask you to choose between **Web API** or **SMTP Relay**.
+
+**Choose: SMTP Relay** ✅
+
+**Why SMTP?**
+- Works with both Firebase Auth (requires SMTP) and Cloud Functions (using Nodemailer)
+- Simpler setup - one configuration for everything
+- No code changes needed
+
+**Note:** Web API is more efficient, but requires code changes. We'll use SMTP for simplicity.
+
+1. On the SendGrid setup page, click **"Choose"** under **SMTP Relay**
+2. You'll be taken to the API key creation page
+
+## Step 3: Create SendGrid API Key
+
+1. You should now be on the API Keys page
+2. Click **"Create API Key"**
+3. Choose **"Full Access"** (or "Restricted Access" with Mail Send permissions)
+4. Give it a name: `Proppli Email Service`
+5. Click **"Create & View"**
+6. **IMPORTANT:** Copy the API key immediately - you won't be able to see it again!
    - It will look like: `SG.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`
    - Save it somewhere secure (password manager, etc.)
 
-## Step 3: Verify Sender Identity (Required for Production)
+## Step 4: Verify Sender Identity (Required for Production)
 
 SendGrid requires you to verify your sender identity before sending emails.
 
@@ -70,16 +85,16 @@ SendGrid requires you to verify your sender identity before sending emails.
 
 **Note:** Domain authentication is better for deliverability and allows you to send from any email address on that domain.
 
-## Step 4: Configure Firebase Cloud Functions
+## Step 5: Configure Firebase Cloud Functions
 
-### 4.1 Install Dependencies
+### 5.1 Install Dependencies
 
 ```bash
 cd functions
 npm install
 ```
 
-### 4.2 Set Firebase Functions Config
+### 5.2 Set Firebase Functions Config
 
 Set your SendGrid API key in Firebase Functions config:
 
@@ -94,7 +109,7 @@ Replace `YOUR_SENDGRID_API_KEY_HERE` with the API key you copied in Step 2.
 firebase functions:config:set sendgrid.api_key="SG.abc123xyz789..."
 ```
 
-### 4.3 Set Email Configuration
+### 5.3 Set Email Configuration
 
 Set your email "from" address and app URL:
 
@@ -109,7 +124,7 @@ firebase functions:config:set email.from="noreply@proppli.com" app.url="https://
 
 **Important:** The `email.from` address must match your verified sender in SendGrid!
 
-### 4.4 Deploy Functions
+### 5.4 Deploy Functions
 
 ```bash
 cd functions
@@ -126,7 +141,7 @@ Wait for deployment to complete. You should see:
 ✔  functions[onUserActivated]: Successful create operation.
 ```
 
-## Step 5: Configure Firebase Auth SMTP (For Password Reset & Verification)
+## Step 6: Configure Firebase Auth SMTP (For Password Reset & Verification)
 
 1. Go to [Firebase Console](https://console.firebase.google.com/)
 2. Select your project (e.g., `proppli-production`)
@@ -143,7 +158,7 @@ Wait for deployment to complete. You should see:
 8. You should see: ✅ "Connection successful"
 9. Click **"Save"**
 
-## Step 6: Customize Firebase Auth Email Templates
+## Step 7: Customize Firebase Auth Email Templates
 
 1. Still in **Authentication** → **Templates**
 2. Click on **"Password reset"** template
@@ -156,7 +171,7 @@ Wait for deployment to complete. You should see:
 4. Click **"Save"**
 5. Repeat for **"Email address verification"** template if desired
 
-## Step 7: Test Everything
+## Step 8: Test Everything
 
 ### Test 1: Password Reset Email
 
@@ -186,7 +201,7 @@ Wait for deployment to complete. You should see:
 5. Check the user's email inbox
 6. ✅ They should receive the activation email
 
-## Step 8: Monitor Email Delivery
+## Step 9: Monitor Email Delivery
 
 ### In SendGrid Dashboard
 
