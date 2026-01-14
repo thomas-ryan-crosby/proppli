@@ -4,39 +4,14 @@ const nodemailer = require('nodemailer');
 
 admin.initializeApp();
 
-// Email configuration - Update these with your email service credentials
-// Options: Gmail, SendGrid, Mailgun, AWS SES, etc.
+// Email configuration - Using SendGrid
 const emailConfig = {
-  // For Gmail (less secure apps must be enabled, or use OAuth2)
-  // service: 'gmail',
-  // auth: {
-  //   user: functions.config().email.user,
-  //   pass: functions.config().email.password
-  // }
-  
-  // For SendGrid (recommended for production)
-  // host: 'smtp.sendgrid.net',
-  // port: 587,
-  // auth: {
-  //   user: 'apikey',
-  //   pass: functions.config().sendgrid.api_key
-  // }
-  
-  // For Mailgun
-  // host: 'smtp.mailgun.org',
-  // port: 587,
-  // auth: {
-  //   user: functions.config().mailgun.user,
-  //   pass: functions.config().mailgun.password
-  // }
-  
-  // For custom SMTP
-  host: functions.config().smtp?.host || 'smtp.gmail.com',
-  port: functions.config().smtp?.port || 587,
-  secure: false, // true for 465, false for other ports
+  host: 'smtp.sendgrid.net',
+  port: 587,
+  secure: false, // false for 587, true for 465
   auth: {
-    user: functions.config().smtp?.user,
-    pass: functions.config().smtp?.password
+    user: 'apikey',
+    pass: functions.config().sendgrid.api_key
   }
 };
 
@@ -292,8 +267,11 @@ async function sendActivationEmailInternal(data) {
   const template = emailTemplates.activation(emailData);
   
   // Send email
+  // Get from address from config, with fallback
+  const fromAddress = functions.config().email?.from || 'noreply@proppli.com';
+  
   const mailOptions = {
-    from: functions.config().email?.from || 'noreply@proppli.com',
+    from: fromAddress,
     to: data.email,
     subject: template.subject,
     html: template.html,

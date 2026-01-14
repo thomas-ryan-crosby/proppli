@@ -1,5 +1,21 @@
 # Firebase Authentication Email Setup
 
+## Quick Setup with SendGrid (Recommended)
+
+**For complete SendGrid setup instructions, see `SENDGRID_SETUP.md`**
+
+### Quick Steps:
+1. Create SendGrid account at https://sendgrid.com
+2. Create API key in SendGrid dashboard
+3. Configure Firebase Auth SMTP:
+   - Host: `smtp.sendgrid.net`
+   - Port: `587`
+   - Username: `apikey`
+   - Password: Your SendGrid API key
+4. Done! Password reset and verification emails will now work.
+
+---
+
 ## Problem: Password Reset Emails Not Sending
 
 If password reset emails (or email verification) aren't being received, Firebase Auth needs SMTP configuration.
@@ -40,14 +56,15 @@ You have two options:
      - Generate an app password for "Mail"
    - Enable TLS: Yes
 
-   **For SendGrid (Recommended for Production):**
+   **For SendGrid (Recommended - See SENDGRID_SETUP.md for full instructions):**
    - Sign up at https://sendgrid.com
-   - Create an API key
+   - Create an API key in Settings → API Keys
    - Host: `smtp.sendgrid.net`
    - Port: `587`
-   - Username: `apikey`
-   - Password: Your SendGrid API key
+   - Username: `apikey` (literally the word "apikey")
+   - Password: Your SendGrid API key (starts with SG.)
    - Enable TLS: Yes
+   - **Important:** Verify sender identity in SendGrid first!
 
    **For Mailgun:**
    - Sign up at https://mailgun.com
