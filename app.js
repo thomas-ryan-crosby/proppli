@@ -440,7 +440,7 @@ function showPermissionDeniedModal(message) {
                         <strong>Email:</strong> <a href="mailto:thomas.ryan.crosby@gmail.com" style="color: #667eea; text-decoration: none;">thomas.ryan.crosby@gmail.com</a>
                     </p>
                 </div>
-                <button class="btn btn-primary" onclick="closePermissionDeniedModal(); window.logout();" style="width: 100%;">Sign Out</button>
+                <button class="btn btn-secondary" onclick="closePermissionDeniedModal()" style="width: 100%;">Close</button>
             </div>
         </div>
     `;
@@ -655,10 +655,14 @@ async function handleLogin(e) {
             throw new Error('Authentication not initialized');
         }
         
-        // Set persistence
+        // Set persistence BEFORE sign-in
+        // Note: setPersistence must be called before signInWithEmailAndPassword
         const persistence = rememberMe 
             ? firebase.auth.Auth.Persistence.LOCAL 
             : firebase.auth.Auth.Persistence.SESSION;
+        
+        // If "Remember Me" is not checked, ensure we're using SESSION persistence
+        // This means the session will only last for the current browser session
         await auth.setPersistence(persistence);
         
         // Sign in
@@ -686,11 +690,29 @@ async function handleLogin(e) {
         console.error('Login error:', error);
         let errorMessage = 'An error occurred during login.';
         
-        // Check for invalid credential errors (user not found or wrong password)
-        if (error.code === 'auth/invalid-credential' || 
-            error.code === 'auth/user-not-found' || 
-            error.code === 'auth/wrong-password') {
-            // Show modal for account not found
+        // Check for invalid credential errors - distinguish between wrong password and user not found
+        if (error.code === 'auth/wrong-password') {
+            // Wrong password - show specific error message
+            if (errorDiv) {
+                errorDiv.textContent = 'Invalid password. Please try again.';
+                errorDiv.style.display = 'block';
+            }
+            return;
+        }
+        
+        if (error.code === 'auth/invalid-credential') {
+            // Could be either wrong password or user not found
+            // Firebase sometimes returns invalid-credential for both cases
+            // Try to be more specific if possible
+            if (errorDiv) {
+                errorDiv.textContent = 'Invalid email or password. Please check your credentials and try again.';
+                errorDiv.style.display = 'block';
+            }
+            return;
+        }
+        
+        if (error.code === 'auth/user-not-found') {
+            // User not found - show modal for account not found
             showNoAccountModal();
             return;
         }
@@ -5464,6 +5486,60 @@ async function handleInviteUser(e) {
     try {
         // Normalize email (lowercase, trim) for consistent matching
         const normalizedEmail = (email || '').toLowerCase().trim();
+        
+        // Check if user already exists in the system
+        console.log('🔍 Checking if user already exists:', normalizedEmail);
+        
+        // Check Firestore users collection
+        const existingUsersSnapshot = await db.collection('users')
+            .where('email', '==', normalizedEmail)
+            .limit(1)
+            .get();
+        
+        if (!existingUsersSnapshot.empty) {
+            const errorMsg = 'A user with this email already exists in the system.';
+            console.warn('⚠️', errorMsg);
+            if (errorDiv) {
+                errorDiv.textContent = errorMsg;
+                errorDiv.style.display = 'block';
+            }
+            return;
+        }
+        
+        // Check pendingUsers collection
+        const existingPendingSnapshot = await db.collection('pendingUsers')
+            .where('email', '==', normalizedEmail)
+            .limit(1)
+            .get();
+        
+        if (!existingPendingSnapshot.empty) {
+            const errorMsg = 'A pending invitation already exists for this email address.';
+            console.warn('⚠️', errorMsg);
+            if (errorDiv) {
+                errorDiv.textContent = errorMsg;
+                errorDiv.style.display = 'block';
+            }
+            return;
+        }
+        
+        // Check userInvitations collection for pending invitations
+        const existingInvitationsSnapshot = await db.collection('userInvitations')
+            .where('email', '==', normalizedEmail)
+            .where('status', '==', 'pending')
+            .limit(1)
+            .get();
+        
+        if (!existingInvitationsSnapshot.empty) {
+            const errorMsg = 'A pending invitation already exists for this email address.';
+            console.warn('⚠️', errorMsg);
+            if (errorDiv) {
+                errorDiv.textContent = errorMsg;
+                errorDiv.style.display = 'block';
+            }
+            return;
+        }
+        
+        console.log('✅ Email is unique, proceeding with invitation creation');
         
         // Create user invitation document
         // The user will sign up themselves, and we'll link their account to this invitation
