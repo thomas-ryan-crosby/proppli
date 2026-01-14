@@ -698,6 +698,15 @@ async function handleSignup(e) {
             displayName: fullName
         });
         
+        // Send email verification (Firebase Auth built-in)
+        try {
+            await userCredential.user.sendEmailVerification();
+            console.log('✅ Email verification sent');
+        } catch (verifyError) {
+            console.warn('Could not send email verification:', verifyError);
+            // Don't fail signup if verification email fails
+        }
+        
         // Check if there's a pending invitation for this email
         const pendingUser = await checkPendingInvitation(email);
         

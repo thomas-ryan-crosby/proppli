@@ -4,11 +4,36 @@ This guide will help you set up email notifications for Proppli user management.
 
 ## Overview
 
-The email integration uses Firebase Cloud Functions with Nodemailer to send:
-- **Invitation emails** when admins invite new users
-- **Activation emails** when user accounts are activated
+Proppli uses **two different email systems**:
 
-## Prerequisites
+### 1. Firebase Authentication (Built-in) ✅ Already Configured
+Firebase Auth automatically handles these emails (no setup needed):
+- **Email verification** - Sent when users sign up
+- **Password reset** - Sent when users request password reset
+- **Email change verification** - Sent when users change their email
+
+**Configuration:** These are managed in Firebase Console → Authentication → Templates
+- You can customize the email templates, sender name, and reply-to address
+- No Cloud Functions or external email service needed for these
+
+### 2. Cloud Functions (Custom) - Setup Required
+Firebase Cloud Functions with Nodemailer send:
+- **Invitation emails** - When admins invite new users
+- **Activation emails** - When user accounts are activated by admins
+
+**Why Custom Functions?** These are specific to our user management workflow and not part of Firebase Auth's built-in features.
+
+## Quick Start
+
+**For Firebase Auth emails (verification, password reset):**
+- ✅ Already working! Just customize templates in Firebase Console
+- Go to: Firebase Console → Authentication → Templates
+- Customize sender name, email templates, etc.
+
+**For Custom emails (invitations, activations):**
+- Follow the setup steps below to configure Cloud Functions
+
+## Prerequisites (For Custom Emails Only)
 
 1. **Firebase CLI** installed
    ```bash
