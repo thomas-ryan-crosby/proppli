@@ -221,8 +221,8 @@ exports.sendActivationEmail = functions.https.onCall(async (data, context) => {
 // Helper function to send invitation email (used by both callable and trigger)
 async function sendInvitationEmailInternal(data) {
   // Get app URL from config or use default
-  const appUrl = functions.config().app?.url || 'https://your-app-url.com';
-  const signupUrl = `${appUrl}/#signup`;
+  const appUrl = functions.config().app?.url || 'https://www.proppli.com';
+  const signupUrl = `${appUrl}#signup`;
   
   // Prepare email data
   const emailData = {

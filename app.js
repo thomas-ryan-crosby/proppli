@@ -100,6 +100,26 @@ function updateFABsVisibility() {
 function startApp() {
     console.log('📄 Starting app initialization...');
     
+    // Check for hash routing (e.g., #signup, #login)
+    const handleHashRouting = () => {
+        const hash = window.location.hash;
+        if (hash === '#signup') {
+            // Show auth pages and signup modal
+            showAuthPages();
+            showSignupPage();
+        } else if (hash === '#login') {
+            // Show auth pages and login
+            showAuthPages();
+            showLoginPage();
+        }
+    };
+    
+    // Handle hash on load
+    handleHashRouting();
+    
+    // Listen for hash changes
+    window.addEventListener('hashchange', handleHashRouting);
+    
     // Initialize auth first
     initAuth();
     
@@ -728,6 +748,33 @@ async function handleSignup(e) {
             // Don't fail signup if verification email fails
         }
         
+        // Check if user profile already exists (prevent duplicates)
+        const existingProfile = await db.collection('users').doc(userCredential.user.uid).get();
+        if (existingProfile.exists) {
+            console.log('⚠️ User profile already exists, skipping creation');
+            const existingData = existingProfile.data();
+            // If user is already active, let them in
+            if (existingData.isActive) {
+                console.log('✅ Existing user is active, allowing access');
+                // Show success and reload
+                if (successDiv) {
+                    successDiv.style.display = 'block';
+                }
+                document.getElementById('signupForm').reset();
+                // Reload page to show app
+                window.location.reload();
+                return;
+            } else {
+                // User exists but inactive
+                await auth.signOut();
+                if (errorDiv) {
+                    errorDiv.textContent = 'An account with this email already exists and is pending admin approval.';
+                    errorDiv.style.display = 'block';
+                }
+                return;
+            }
+        }
+        
         // Check if there's a pending invitation for this email
         console.log('🔍 Checking for pending invitation...');
         const pendingUser = await checkPendingInvitation(normalizedEmail);
@@ -739,38 +786,23 @@ async function handleSignup(e) {
                 await linkPendingUserToAccount(userCredential.user.uid, normalizedEmail);
                 console.log('✅ User account linked to pending invitation');
                 // User is already active, no need to sign out
+                // Show success and reload
+                if (successDiv) {
+                    successDiv.style.display = 'block';
+                }
+                document.getElementById('signupForm').reset();
+                // Reload page to show app
+                window.location.reload();
+                return;
             } catch (linkError) {
                 console.error('❌ Failed to link pending user account:', linkError);
-                // Fallback: Create default profile if linking fails
-                console.log('⚠️ Creating fallback default profile...');
-                try {
-                    if (db) {
-                    await createUserProfile(userCredential.user.uid, {
-                        email: normalizedEmail,
-                        displayName: fullName,
-                        role: 'viewer',
-                        isActive: false, // Requires admin approval
-                        profile: {
-                            phone: phone || null
-                        },
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                        lastLogin: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                        console.log('✅ Fallback profile created');
-                    }
-                    // Sign out and show message
-                    await auth.signOut();
-                    if (errorDiv) {
-                        errorDiv.textContent = 'Account created, but there was an issue linking your invitation. Your account is pending admin approval.';
-                        errorDiv.style.display = 'block';
-                    }
-                    // Don't show success message
-                    return;
-                } catch (fallbackError) {
-                    console.error('❌ Fallback profile creation also failed:', fallbackError);
-                    // Re-throw the original link error
-                    throw linkError;
+                // Sign out and show error - DO NOT create fallback profile
+                await auth.signOut();
+                if (errorDiv) {
+                    errorDiv.textContent = `Failed to link your invitation: ${linkError.message}. Please contact an administrator.`;
+                    errorDiv.style.display = 'block';
                 }
+                throw linkError; // Re-throw to prevent continuing
             }
         } else {
             // Regular signup - create profile with isActive: false
