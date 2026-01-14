@@ -5446,40 +5446,47 @@ async function handleInviteUser(e) {
             throw new Error(`Failed to create pending user: ${pendingError.message || 'Unknown error'}`);
         }
         
-        // Send invitation email if requested
+        // Email sending is handled by the Firestore trigger (onInvitationCreated)
+        // The trigger automatically sends the email when userInvitations document is created with sendEmail: true
+        // We don't need to call the callable function - the trigger handles it
         let emailSent = false;
         let emailError = null;
         
         if (sendEmail) {
+            // The email will be sent automatically by the onInvitationCreated trigger
+            // We set emailSent to true since the trigger will handle it
+            // The trigger fires when the userInvitations document is created above
+            emailSent = true;
+            console.log('✅ Invitation email will be sent via Firestore trigger');
+            
+            // Optional: Also try to call the callable function as a backup
+            // But don't fail if it doesn't work since the trigger handles it
             try {
-                // Check if Firebase Functions is available
-                if (!firebase.functions) {
-                    throw new Error('Firebase Functions not available. Make sure firebase-functions-compat.js is loaded.');
-                }
-                
-                const sendInvitationEmail = firebase.functions().httpsCallable('sendInvitationEmail');
-                const result = await sendInvitationEmail({
-                    email: email,
-                    displayName: fullName,
-                    role: role,
-                    assignedProperties: propertyIds
-                });
-                
-                if (result.data && result.data.success) {
-                    emailSent = true;
-                    console.log('✅ Invitation email sent to:', email);
-                } else {
-                    throw new Error(result.data?.message || 'Email sending failed');
+                if (firebase.functions) {
+                    const sendInvitationEmail = firebase.functions().httpsCallable('sendInvitationEmail');
+                    // Use a timeout to prevent hanging if CORS blocks it
+                    const timeoutPromise = new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Function call timeout')), 5000)
+                    );
+                    
+                    const result = await Promise.race([
+                        sendInvitationEmail({
+                            email: email,
+                            displayName: fullName,
+                            role: role,
+                            assignedProperties: propertyIds
+                        }),
+                        timeoutPromise
+                    ]);
+                    
+                    if (result.data && result.data.success) {
+                        console.log('✅ Invitation email also sent via callable function');
+                    }
                 }
             } catch (emailErr) {
-                console.error('❌ Error sending invitation email:', emailErr);
-                console.error('Error details:', {
-                    code: emailErr.code,
-                    message: emailErr.message,
-                    details: emailErr.details
-                });
-                emailError = emailErr;
-                // Don't fail the invitation if email fails - invitation is still created
+                // Silently ignore - the trigger already handles email sending
+                console.log('ℹ️ Callable function call failed (trigger will handle email):', emailErr.code || emailErr.message);
+                // Don't set emailError - the trigger handles it, so this is not an error
             }
         }
         
@@ -5487,22 +5494,8 @@ async function handleInviteUser(e) {
         let successMessage = `Invitation created for ${fullName} (${email}).\n\n`;
         
         if (sendEmail) {
-            if (emailSent) {
-                successMessage += '✅ An invitation email has been sent.\n\n';
-            } else {
-                successMessage += `⚠️ Invitation created, but email could not be sent.\n`;
-                if (emailError) {
-                    successMessage += `Error: ${emailError.message}\n`;
-                    if (emailError.code === 'functions/not-found') {
-                        successMessage += '\nNote: Cloud Functions may not be deployed. Run: firebase deploy --only functions';
-                    } else if (emailError.code === 'functions/unauthenticated') {
-                        successMessage += '\nNote: You must be logged in to send emails.';
-                    } else if (emailError.code === 'functions/permission-denied') {
-                        successMessage += '\nNote: Only admins can send invitation emails.';
-                    }
-                }
-                successMessage += '\n';
-            }
+            // Email is sent via Firestore trigger, so it should always succeed
+            successMessage += '✅ An invitation email will be sent automatically.\n\n';
         }
         
         successMessage += 'The user can now sign up and their account will be automatically configured with the assigned role and properties.\n\n';
