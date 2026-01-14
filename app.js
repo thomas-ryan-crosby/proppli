@@ -802,11 +802,22 @@ async function handlePasswordReset(e) {
             throw new Error('Authentication not initialized');
         }
         
-        await auth.sendPasswordResetEmail(email);
-        console.log('✅ Password reset email sent');
+        await auth.sendPasswordResetEmail(email, {
+            // Optional: Customize the action URL
+            url: window.location.origin + '/#login',
+            handleCodeInApp: false
+        });
+        console.log('✅ Password reset email sent to:', email);
         
         if (successDiv) {
             successDiv.style.display = 'block';
+            successDiv.innerHTML = `
+                <p><strong>Password reset link sent!</strong></p>
+                <p>Check your email inbox (and spam folder) for instructions to reset your password.</p>
+                <p style="font-size: 0.9rem; color: #666; margin-top: 10px;">
+                    If you don't see the email, check your spam folder or contact your administrator.
+                </p>
+            `;
         }
         
         // Reset form
@@ -814,6 +825,9 @@ async function handlePasswordReset(e) {
         
     } catch (error) {
         console.error('Password reset error:', error);
+        console.error('Error code:', error.code);
+        console.error('Error message:', error.message);
+        
         let errorMessage = 'An error occurred.';
         
         switch (error.code) {
@@ -823,8 +837,15 @@ async function handlePasswordReset(e) {
             case 'auth/invalid-email':
                 errorMessage = 'Invalid email address.';
                 break;
+            case 'auth/too-many-requests':
+                errorMessage = 'Too many requests. Please try again later.';
+                break;
             default:
                 errorMessage = error.message || 'Failed to send reset email. Please try again.';
+                // Add helpful message if it's a configuration issue
+                if (error.code && error.code.includes('email') || error.message.includes('email')) {
+                    errorMessage += ' Note: Email sending may need to be configured in Firebase Console → Authentication → Templates → SMTP settings.';
+                }
         }
         
         if (errorDiv) {
