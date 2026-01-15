@@ -5187,6 +5187,14 @@ async function loadTenantsForTicketForm(propertyId) {
     }
     
     try {
+        // For maintenance users, verify property is assigned
+        if (currentUserProfile && currentUserProfile.role === 'maintenance' && 
+            Array.isArray(currentUserProfile.assignedProperties) && 
+            !currentUserProfile.assignedProperties.includes(propertyId)) {
+            console.warn('⚠️ Maintenance user trying to access unassigned property:', propertyId);
+            return Promise.resolve(); // Don't load tenants for unassigned properties
+        }
+        
         // Load tenants, occupancies, units, and buildings
         const [tenantsSnapshot, occupanciesSnapshot, unitsSnapshot, buildingsSnapshot] = await Promise.all([
             db.collection('tenants').orderBy('tenantName').get(),
@@ -11910,6 +11918,7 @@ async function loadLeases() {
     try {
         // Build query based on user role
         let leasesQuery = db.collection('leases');
+        let needsClientSideSort = false;
         
         // For maintenance users, filter by assigned properties
         if (currentUserProfile.role === 'maintenance' && 
@@ -11919,18 +11928,21 @@ async function loadLeases() {
             if (currentUserProfile.assignedProperties.length <= 10) {
                 leasesQuery = leasesQuery.where('propertyId', 'in', currentUserProfile.assignedProperties);
                 console.log('🔍 Filtering leases for maintenance user by properties:', currentUserProfile.assignedProperties);
+                // Note: Can't use orderBy with whereIn without a composite index, so we'll sort client-side
+                needsClientSideSort = true;
             } else {
                 console.warn('⚠️ User has more than 10 assigned properties, loading all leases (will be filtered by rules)');
+                leasesQuery = leasesQuery.orderBy('leaseStartDate', 'desc');
             }
+        } else {
+            // Admins and super admins can see all leases with orderBy
+            // Property managers are handled by Firestore rules
+            leasesQuery = leasesQuery.orderBy('leaseStartDate', 'desc');
         }
-        // Admins and super admins can see all leases (no filter)
-        // Property managers are handled by Firestore rules
-        
-        // Apply orderBy after where clause (Firestore requires where before orderBy when using whereIn)
-        leasesQuery = leasesQuery.orderBy('leaseStartDate', 'desc');
         
         const leasesSnapshot = await leasesQuery.get();
         const leases = {};
+        const leasesArray = []; // For client-side sorting if needed
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         
@@ -11972,16 +11984,53 @@ async function loadLeases() {
                     }
                 }
             }
-            leases[doc.id] = leaseData;
+            
+            // Store in array for sorting if needed, otherwise directly in object
+            if (needsClientSideSort) {
+                leasesArray.push(leaseData);
+            } else {
+                leases[doc.id] = leaseData;
+            }
         });
         
-        // Load related data
+        // Sort client-side if needed (for maintenance users with whereIn query)
+        if (needsClientSideSort && leasesArray.length > 0) {
+            leasesArray.sort((a, b) => {
+                const dateA = a.leaseStartDate?.toDate ? a.leaseStartDate.toDate() : (a.leaseStartDate ? new Date(a.leaseStartDate) : new Date(0));
+                const dateB = b.leaseStartDate?.toDate ? b.leaseStartDate.toDate() : (b.leaseStartDate ? new Date(b.leaseStartDate) : new Date(0));
+                return dateB - dateA; // Descending order
+            });
+            // Convert back to object
+            leasesArray.forEach(lease => {
+                leases[lease.id] = lease;
+            });
+        }
+        
+        // Load related data - filter for maintenance users
+        let propertiesQuery = db.collection('properties');
+        let tenantsQuery = db.collection('tenants');
+        let unitsQuery = db.collection('units');
+        let buildingsQuery = db.collection('buildings');
+        let occupanciesQuery = db.collection('occupancies');
+        
+        // For maintenance users, filter by assigned properties
+        if (currentUserProfile.role === 'maintenance' && 
+            Array.isArray(currentUserProfile.assignedProperties) && 
+            currentUserProfile.assignedProperties.length > 0 &&
+            currentUserProfile.assignedProperties.length <= 10) {
+            unitsQuery = unitsQuery.where('propertyId', 'in', currentUserProfile.assignedProperties);
+            buildingsQuery = buildingsQuery.where('propertyId', 'in', currentUserProfile.assignedProperties);
+            occupanciesQuery = occupanciesQuery.where('propertyId', 'in', currentUserProfile.assignedProperties);
+            // Properties are already filtered by rules, but we can still query them
+            // Tenants need to be filtered via occupancies (handled below)
+        }
+        
         const [propertiesSnapshot, tenantsSnapshot, unitsSnapshot, buildingsSnapshot, occupanciesSnapshot] = await Promise.all([
-            db.collection('properties').get(),
-            db.collection('tenants').get(),
-            db.collection('units').get(),
-            db.collection('buildings').get(),
-            db.collection('occupancies').get()
+            propertiesQuery.get(),
+            tenantsQuery.get(),
+            unitsQuery.get(),
+            buildingsQuery.get(),
+            occupanciesQuery.get()
         ]);
         
         const properties = {};
