@@ -1043,10 +1043,8 @@ async function handleSignup(e) {
             } else {
                 // User exists but inactive
                 await auth.signOut();
-                if (errorDiv) {
-                    errorDiv.textContent = 'An account with this email already exists and is pending admin approval.';
-                    errorDiv.style.display = 'block';
-                }
+                // Show modal instead of text error
+                showPermissionDeniedModal('An account with this email already exists and is pending admin approval. Please contact a system administrator to activate your account.');
                 return;
             }
         }
