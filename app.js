@@ -9197,7 +9197,17 @@ async function renderTenantsTableView(tenants) {
         // Don't throw - continue with rendering
     }
     
-    console.log('✅ renderTenantsTableView: Completed successfully');
+        console.log('✅ renderTenantsTableView: Completed successfully');
+    } catch (error) {
+        console.error('❌ renderTenantsTableView: FATAL ERROR:', error);
+        console.error('❌ renderTenantsTableView: Error stack:', error.stack);
+        // Show error message to user
+        const tenantsTable = document.getElementById('tenantsTable');
+        if (tenantsTable) {
+            tenantsTable.innerHTML = `<p class="no-tenants-message" style="color: #dc2626;">Error loading tenants: ${error.message}</p>`;
+        }
+        // Don't rethrow - we've handled it
+    }
 }
 
 async function loadOrphanContacts(maxContacts, maxBrokers) {
