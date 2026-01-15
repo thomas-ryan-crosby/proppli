@@ -2308,8 +2308,15 @@ function setupEventListeners() {
                 }
                 
                 // Upload all selected files
+                let uploadedCount = 0;
                 for (let i = 0; i < files.length; i++) {
-                    await uploadTenantDocument(currentTenantIdForDetail, files[i]);
+                    try {
+                        await uploadTenantDocument(currentTenantIdForDetail, files[i]);
+                        uploadedCount++;
+                    } catch (uploadError) {
+                        console.error(`Error uploading file ${files[i].name}:`, uploadError);
+                        // Continue with other files
+                    }
                 }
                 
                 // Reload documents
@@ -2318,7 +2325,11 @@ function setupEventListeners() {
                 // Reset file input
                 tenantDocumentInput.value = '';
                 
-                alert(`Successfully uploaded ${files.length} document(s)`);
+                if (uploadedCount > 0) {
+                    alert(`Successfully uploaded ${uploadedCount} document(s)`);
+                } else {
+                    alert('No documents were uploaded. Please try again.');
+                }
             } catch (error) {
                 console.error('Error uploading documents:', error);
                 alert('Error uploading documents: ' + error.message);
@@ -12028,33 +12039,33 @@ function loadTenantDocuments(tenantId) {
             return dateB - dateA;
         });
         
-        sortedDocuments.forEach((document, index) => {
+        sortedDocuments.forEach((docItem, index) => {
             const documentItem = document.createElement('div');
             documentItem.className = 'unit-item';
             documentItem.style.marginBottom = '15px';
             
-            const uploadedDate = document.uploadedAt?.toDate 
-                ? document.uploadedAt.toDate().toLocaleDateString() 
+            const uploadedDate = docItem.uploadedAt?.toDate 
+                ? docItem.uploadedAt.toDate().toLocaleDateString() 
                 : 'Unknown date';
             
-            const fileIcon = getFileIcon(document.fileName);
-            const fileSize = document.fileSize ? formatFileSize(document.fileSize) : '';
+            const fileIcon = getFileIcon(docItem.fileName);
+            const fileSize = docItem.fileSize ? formatFileSize(docItem.fileSize) : '';
             
             documentItem.innerHTML = `
                 <div class="unit-info">
                     <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
                         <span style="font-size: 24px;">${fileIcon}</span>
                         <div style="flex: 1;">
-                            <h4 style="margin: 0;">${escapeHtml(document.fileName)}</h4>
+                            <h4 style="margin: 0;">${escapeHtml(docItem.fileName)}</h4>
                             ${fileSize ? `<p style="margin: 4px 0 0 0; color: #666; font-size: 0.85em;">${fileSize}</p>` : ''}
                         </div>
                     </div>
                     <p style="margin: 8px 0 0 0; color: #999; font-size: 0.85em;">Uploaded: ${uploadedDate}</p>
-                    ${document.description ? `<p style="margin: 8px 0 0 0; color: #666;">${escapeHtml(document.description)}</p>` : ''}
+                    ${docItem.description ? `<p style="margin: 8px 0 0 0; color: #666;">${escapeHtml(docItem.description)}</p>` : ''}
                 </div>
                 <div class="unit-item-actions">
-                    <a href="${document.fileUrl}" target="_blank" class="btn-primary btn-small" style="text-decoration: none; display: inline-block;">View</a>
-                    <a href="${document.fileUrl}" download="${document.fileName}" class="btn-secondary btn-small" style="text-decoration: none; display: inline-block;">Download</a>
+                    <a href="${docItem.fileUrl}" target="_blank" class="btn-primary btn-small" style="text-decoration: none; display: inline-block;">View</a>
+                    <a href="${docItem.fileUrl}" download="${docItem.fileName}" class="btn-secondary btn-small" style="text-decoration: none; display: inline-block;">Download</a>
                     <button class="btn-danger btn-small" onclick="deleteTenantDocument('${tenantId}', ${index})">Delete</button>
                 </div>
             `;
@@ -12726,8 +12737,8 @@ async function loadLeases() {
                         leaseData.status = 'Expiring Soon';
                         db.collection('leases').doc(doc.id).update({ status: 'Expiring Soon' });
                     }
-                } else if (hasAutoRenewal && leaseData.status !== 'Active' && leaseData.status !== 'Expiring Soon') {
-                    // If has auto-renewal and status is not Active/Expiring Soon, set to Active
+                } else if (!isDeprecated && hasAutoRenewal && leaseData.status !== 'Active' && leaseData.status !== 'Expiring Soon') {
+                    // If has auto-renewal and status is not Active/Expiring Soon, set to Active (only if not deprecated)
                     if (leaseData.status === 'Expired') {
                         leaseData.status = 'Active';
                         db.collection('leases').doc(doc.id).update({ status: 'Active' });
@@ -12935,7 +12946,7 @@ function renderLeases(leases, properties, tenants, units) {
         const daysUntilExpiration = lease.daysUntilExpiration !== undefined ? lease.daysUntilExpiration : 'N/A';
         
         // Determine display status - if deprecated, show Deprecated status
-        const displayStatus = lease.isDeprecated === true ? 'Deprecated' : lease.status;
+        const displayStatus = isLeaseDeprecated(lease) ? 'Deprecated' : lease.status;
         const statusClass = displayStatus === 'Active' ? 'status-active' : 
                            displayStatus === 'Expiring Soon' ? 'status-warning' : 
                            displayStatus === 'Expired' ? 'status-expired' :
@@ -13663,7 +13674,7 @@ function populateLeaseForm(lease) {
     // Set status - if deprecated, status should be "Deprecated"
     const leaseStatusField = document.getElementById('leaseStatus');
     if (leaseStatusField) {
-        if (lease.isDeprecated === true) {
+        if (isLeaseDeprecated(lease)) {
             leaseStatusField.value = 'Deprecated';
         } else {
             leaseStatusField.value = lease.status || 'Active';
@@ -14729,7 +14740,7 @@ function calculateCurrentRent(lease, asOfDate = null) {
     const initialRent = lease.monthlyRent;
     
     // If deprecated, calculate rent as of deprecation date instead of today
-    const isDeprecated = lease.isDeprecated === true;
+    const isDeprecated = isLeaseDeprecated(lease);
     const calculationDate = isDeprecated && lease.deprecatedDate 
         ? (lease.deprecatedDate.toDate ? lease.deprecatedDate.toDate() : new Date(lease.deprecatedDate))
         : (asOfDate || new Date());
@@ -14809,7 +14820,7 @@ function formatLeaseSummaries(leases, tenants, units = {}) {
         const currentRentFormatted = currentRent ? `$${currentRent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A';
         
         // Determine display status - if deprecated, show Deprecated status
-        const displayStatus = lease.isDeprecated === true ? 'Deprecated' : lease.status;
+        const displayStatus = isLeaseDeprecated(lease) ? 'Deprecated' : lease.status;
         const statusClass = displayStatus === 'Active' ? 'status-active' : 
                            displayStatus === 'Expiring Soon' ? 'status-warning' : 
                            displayStatus === 'Expired' ? 'status-expired' :
@@ -14832,10 +14843,11 @@ function formatLeaseSummaries(leases, tenants, units = {}) {
             const currentAnnualPPF = currentMonthlyPPF ? (currentMonthlyPPF * 12) : null;
             
             if (hasEscalation && currentRent && currentMonthlyPPF) {
+                const ppfLabel = isLeaseDeprecated(lease) ? 'Deprecated PPF' : 'Current PPF';
                 ppfDisplay = `
                     <div style="font-size: 0.8em; color: #7c3aed; margin-top: 4px;">
                         <div><strong>Initial PPF:</strong> $${initialMonthlyPPF.toFixed(2)}/mo ($${initialAnnualPPF.toFixed(2)}/yr)</div>
-                        <div style="font-weight: 600;"><strong>Current PPF:</strong> $${currentMonthlyPPF.toFixed(2)}/mo ($${currentAnnualPPF.toFixed(2)}/yr)</div>
+                        <div style="font-weight: 600;"><strong>${ppfLabel}:</strong> $${currentMonthlyPPF.toFixed(2)}/mo ($${currentAnnualPPF.toFixed(2)}/yr)</div>
                     </div>
                 `;
             } else {
@@ -15265,7 +15277,7 @@ function renderLeaseDetailList(leases, tenants, container, units = {}) {
         const deposit = lease.securityDeposit !== null && lease.securityDeposit !== undefined ? `$${lease.securityDeposit.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : 'N/A';
         
         // Determine display status - if deprecated, show Deprecated status
-        const displayStatus = lease.isDeprecated === true ? 'Deprecated' : lease.status;
+        const displayStatus = isLeaseDeprecated(lease) ? 'Deprecated' : lease.status;
         const statusClass = displayStatus === 'Active' ? 'status-active' : 
                            displayStatus === 'Expiring Soon' ? 'status-warning' : 
                            displayStatus === 'Expired' ? 'status-expired' :
@@ -15288,6 +15300,7 @@ function renderLeaseDetailList(leases, tenants, container, units = {}) {
             const currentAnnualPPF = currentMonthlyPPF ? (currentMonthlyPPF * 12) : null;
             
             if (hasEscalation && currentRent && currentMonthlyPPF) {
+                const ppfLabel = isLeaseDeprecated(lease) ? 'Deprecated PPF' : 'Current PPF';
                 ppfDisplay = `
                     <div>
                         <div style="color: #64748b; font-size: 0.85em; margin-bottom: 4px;">Initial PPF</div>
@@ -15295,7 +15308,7 @@ function renderLeaseDetailList(leases, tenants, container, units = {}) {
                         <div style="font-size: 0.8em; color: #a78bfa;">$${initialAnnualPPF.toFixed(2)}/yr</div>
                     </div>
                     <div>
-                        <div style="color: #64748b; font-size: 0.85em; margin-bottom: 4px;">Current PPF</div>
+                        <div style="color: #64748b; font-size: 0.85em; margin-bottom: 4px;">${ppfLabel}</div>
                         <div style="font-weight: 600; color: #7c3aed;">$${currentMonthlyPPF.toFixed(2)}/mo</div>
                         <div style="font-size: 0.8em; color: #a78bfa;">$${currentAnnualPPF.toFixed(2)}/yr</div>
                     </div>
@@ -15315,6 +15328,7 @@ function renderLeaseDetailList(leases, tenants, container, units = {}) {
         let rentDisplay = '';
         if (hasEscalation && currentRent) {
             // Always show both initial and current rent when escalations are configured
+            const rentLabel = isLeaseDeprecated(lease) ? 'Deprecated Rent' : 'Current Rent';
             rentDisplay = `
                 <div>
                     <div style="color: #64748b; font-size: 0.85em; margin-bottom: 4px;">Initial Rent</div>
@@ -15322,7 +15336,7 @@ function renderLeaseDetailList(leases, tenants, container, units = {}) {
                     <div style="font-size: 0.8em; color: #999;">${initialAnnualFormatted}/yr</div>
                 </div>
                 <div>
-                    <div style="color: #64748b; font-size: 0.85em; margin-bottom: 4px;">Current Rent</div>
+                    <div style="color: #64748b; font-size: 0.85em; margin-bottom: 4px;">${rentLabel}</div>
                     <div style="font-weight: 600; color: #667eea;">${currentRentFormatted}/mo</div>
                     <div style="font-size: 0.8em; color: #999;">${currentAnnualFormatted}/yr</div>
                 </div>
