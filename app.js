@@ -4754,6 +4754,7 @@ function loadTicketForEdit(ticketId) {
                 });
             } else {
                 document.getElementById('buildingNumber').value = ticket.buildingNumber || '';
+                document.getElementById('unitNumber').value = ticket.unitNumber || '';
                 document.getElementById('floorNumber').value = ticket.floorNumber || '';
                 
                 // Handle tenant
@@ -5046,7 +5047,7 @@ async function loadTenantsForTicketForm(propertyId) {
     }
 }
 
-// Handle tenant selection change - auto-populate floor and unit number
+// Handle tenant selection change - auto-populate floor, unit number, and building number
 async function handleTenantSelectionChange(e) {
     const tenantSelect = e.target;
     const tenantId = tenantSelect.value;
@@ -5054,7 +5055,8 @@ async function handleTenantSelectionChange(e) {
     const ticketTenantIdInput = document.getElementById('ticketTenantId');
     const propertyId = document.getElementById('ticketProperty').value;
     const floorNumberInput = document.getElementById('floorNumber');
-    const buildingNumberInput = document.getElementById('buildingNumber'); // Building number field is used for unit number in commercial fields
+    const unitNumberInput = document.getElementById('unitNumber');
+    const buildingNumberInput = document.getElementById('buildingNumber');
     
     if (tenantSelect.value === '__manual__') {
         // Show manual input
@@ -5097,18 +5099,20 @@ async function handleTenantSelectionChange(e) {
                     floorNumberInput.value = unit.floorNumber;
                 }
                 
-                // Auto-populate unit number (in building number field for commercial)
-                if (unit.unitNumber && buildingNumberInput) {
-                    buildingNumberInput.value = unit.unitNumber;
+                // Auto-populate unit number
+                if (unit.unitNumber && unitNumberInput) {
+                    unitNumberInput.value = unit.unitNumber;
                 }
                 
-                // If unit has a buildingId, try to get building name/number
-                if (unit.buildingId) {
+                // If unit has a buildingId, get building name/number
+                if (unit.buildingId && buildingNumberInput) {
                     const buildingDoc = await db.collection('buildings').doc(unit.buildingId).get();
                     if (buildingDoc.exists) {
                         const building = buildingDoc.data();
-                        // Note: Building number field might be used differently, so we'll just populate unit number
-                        // Users can manually adjust if needed
+                        // Populate building number with building name
+                        if (building.buildingName) {
+                            buildingNumberInput.value = building.buildingName;
+                        }
                     }
                 }
             }
