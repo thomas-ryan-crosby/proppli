@@ -4840,16 +4840,6 @@ function handleStatusChange(e) {
     } else {
         if (monitoringFieldsGroup) monitoringFieldsGroup.style.display = 'none';
     }
-        document.getElementById('completedByGroup').style.display = 'block';
-        document.getElementById('howResolvedGroup').style.display = 'block';
-        document.getElementById('afterPhotoGroup').style.display = 'block';
-        document.getElementById('retroactiveDatesGroup').style.display = 'block';
-    } else {
-        document.getElementById('completedByGroup').style.display = 'none';
-        document.getElementById('howResolvedGroup').style.display = 'none';
-        document.getElementById('afterPhotoGroup').style.display = 'none';
-        document.getElementById('retroactiveDatesGroup').style.display = 'none';
-    }
 }
 
 function handleTicketSubmit(e) {
