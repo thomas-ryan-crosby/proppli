@@ -105,8 +105,15 @@ function startApp() {
     const handleHashRouting = () => {
         const hash = window.location.hash;
         if (hash === '#signup') {
-            // Show auth pages and signup page
-            showAuthPages(false); // Don't force login, let hash routing handle it
+            // User clicked invite link - ensure they're signed out so they can set password
+            if (auth && auth.currentUser) {
+                console.log('🔒 Invite link detected - signing out existing session to require password setup');
+                auth.signOut().then(() => {
+                    showAuthPages(false);
+                });
+            } else {
+                showAuthPages(false); // Don't force login, let hash routing handle it
+            }
         } else if (hash === '#login') {
             // Show auth pages and login
             showAuthPages(false); // Don't force login, let hash routing handle it
@@ -1081,16 +1088,28 @@ async function handleSignup(e) {
         
         // Check if user is active (invited users are active, self-registered are not)
         if (syncedProfile.isActive) {
-            // User is active - set remember me and reload
-            console.log('✅ User is active, allowing access');
+            // User is active - invited user completed signup
+            console.log('✅ Invited user completed signup, allowing access');
             sessionStorage.setItem('rememberMe', 'true');
             localStorage.setItem('rememberMe', 'true');
             await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
             
-            // Reload to show app
+            // Show success message
+            if (successDiv) {
+                successDiv.innerHTML = '<p>Account created successfully! You are now logged in.</p>';
+                successDiv.style.display = 'block';
+            }
+            
+            // Reset form
+            const signupForm = document.getElementById('signupForm');
+            if (signupForm) {
+                signupForm.reset();
+            }
+            
+            // Reload to show app after a brief delay
             setTimeout(() => {
                 window.location.reload();
-            }, 500);
+            }, 1000);
             return;
         } else {
             // User is inactive - sign out and show message
@@ -6279,6 +6298,7 @@ async function loadUsers() {
         });
         
         // Also load pending invitations to show in the list
+        // BUT: Filter out pending users that have already been linked to active users
         try {
             const pendingUsersSnapshot = await db.collection('pendingUsers')
                 .where('status', '==', 'pending_signup')
@@ -6286,21 +6306,41 @@ async function loadUsers() {
             
             pendingUsersSnapshot.forEach((doc) => {
                 const pendingUser = doc.data();
-                // Add pending users to the list with a special flag
-                const tempId = `pending_${doc.id}`;
-                firestoreUsers[tempId] = {
-                    id: tempId,
-                    email: pendingUser.email,
-                    displayName: pendingUser.displayName,
-                    role: pendingUser.role,
-                    isActive: pendingUser.isActive || false,
-                    assignedProperties: pendingUser.assignedProperties || [],
-                    status: 'pending',
-                    isPending: true,
-                    pendingUserId: doc.id,
-                    createdAt: pendingUser.createdAt,
-                    source: 'pending'
-                };
+                const normalizedEmail = (pendingUser.email || '').toLowerCase().trim();
+                
+                // Check if this email already has an active user account
+                const existingUser = Object.values(firestoreUsers).find(u => {
+                    const userEmail = (u.email || '').toLowerCase().trim();
+                    return userEmail === normalizedEmail && u.isActive;
+                });
+                
+                // Only show pending user if no active user exists with this email
+                if (!existingUser) {
+                    const tempId = `pending_${doc.id}`;
+                    firestoreUsers[tempId] = {
+                        id: tempId,
+                        email: pendingUser.email,
+                        displayName: pendingUser.displayName,
+                        role: pendingUser.role,
+                        isActive: pendingUser.isActive || false,
+                        assignedProperties: pendingUser.assignedProperties || [],
+                        status: 'pending',
+                        isPending: true,
+                        pendingUserId: doc.id,
+                        createdAt: pendingUser.createdAt,
+                        source: 'pending'
+                    };
+                } else {
+                    // Pending user already linked - mark it as completed if not already
+                    if (!pendingUser.linkedUserId) {
+                        console.log('🔄 Auto-completing pending user that already has active account:', normalizedEmail);
+                        db.collection('pendingUsers').doc(doc.id).update({
+                            status: 'completed',
+                            linkedUserId: existingUser.id,
+                            linkedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        }).catch(e => console.warn('Could not update pending user:', e));
+                    }
+                }
             });
         } catch (pendingError) {
             console.warn('Could not load pending users:', pendingError);
@@ -6320,6 +6360,7 @@ async function loadUsers() {
                 });
                 
                 // Also load pending users for real-time updates
+                // BUT: Filter out pending users that have already been linked to active users
                 try {
                     const pendingUsersSnapshot = await db.collection('pendingUsers')
                         .where('status', '==', 'pending_signup')
@@ -6327,20 +6368,41 @@ async function loadUsers() {
                     
                     pendingUsersSnapshot.forEach((doc) => {
                         const pendingUser = doc.data();
-                        const tempId = `pending_${doc.id}`;
-                        allUsers[tempId] = {
-                            id: tempId,
-                            email: pendingUser.email,
-                            displayName: pendingUser.displayName,
-                            role: pendingUser.role,
-                            isActive: pendingUser.isActive || false,
-                            assignedProperties: pendingUser.assignedProperties || [],
-                            status: 'pending',
-                            isPending: true,
-                            pendingUserId: doc.id,
-                            createdAt: pendingUser.createdAt,
-                            source: 'pending'
-                        };
+                        const normalizedEmail = (pendingUser.email || '').toLowerCase().trim();
+                        
+                        // Check if this email already has an active user account
+                        const existingUser = Object.values(allUsers).find(u => {
+                            const userEmail = (u.email || '').toLowerCase().trim();
+                            return userEmail === normalizedEmail && u.isActive && !u.isPending;
+                        });
+                        
+                        // Only show pending user if no active user exists with this email
+                        if (!existingUser) {
+                            const tempId = `pending_${doc.id}`;
+                            allUsers[tempId] = {
+                                id: tempId,
+                                email: pendingUser.email,
+                                displayName: pendingUser.displayName,
+                                role: pendingUser.role,
+                                isActive: pendingUser.isActive || false,
+                                assignedProperties: pendingUser.assignedProperties || [],
+                                status: 'pending',
+                                isPending: true,
+                                pendingUserId: doc.id,
+                                createdAt: pendingUser.createdAt,
+                                source: 'pending'
+                            };
+                        } else {
+                            // Pending user already linked - mark it as completed if not already
+                            if (!pendingUser.linkedUserId) {
+                                console.log('🔄 Auto-completing pending user that already has active account:', normalizedEmail);
+                                db.collection('pendingUsers').doc(doc.id).update({
+                                    status: 'completed',
+                                    linkedUserId: existingUser.id,
+                                    linkedAt: firebase.firestore.FieldValue.serverTimestamp()
+                                }).catch(e => console.warn('Could not update pending user:', e));
+                            }
+                        }
                     });
                 } catch (pendingError) {
                     console.warn('Could not load pending users:', pendingError);
