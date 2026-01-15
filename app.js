@@ -39,9 +39,12 @@ function updateFABsVisibility() {
     const tenantDetailModal = document.getElementById('tenantDetailModal');
     const contactsTab = document.getElementById('contactsTab');
     
+    // Hide add buttons for maintenance users (they can't add/edit properties or tenants)
+    const isMaintenance = currentUserProfile && currentUserProfile.role === 'maintenance';
+    
     // Show Add Tenant FAB when on tenants page (visible when scrolling the table)
     if (fabAddTenant) {
-        if (tenantsPage) {
+        if (tenantsPage && !isMaintenance) {
             const isTenantsPageVisible = tenantsPage.style.display !== 'none';
             const isModalVisible = tenantDetailModal && tenantDetailModal.classList.contains('show');
             // Show when tenants page is visible and modal is hidden (i.e., showing the table)
@@ -74,14 +77,14 @@ function updateFABsVisibility() {
     if (fabAddBuilding) {
         const isPropertiesPageVisible = propertiesPage && propertiesPage.style.display !== 'none';
         const isPropertyDetailVisible = propertyDetailView && propertyDetailView.style.display !== 'none';
-        const shouldShow = isPropertiesPageVisible && isPropertyDetailVisible;
+        const shouldShow = isPropertiesPageVisible && isPropertyDetailVisible && !isMaintenance;
         fabAddBuilding.style.display = shouldShow ? 'flex' : 'none';
     }
     
     if (fabAddUnit) {
         const isPropertiesPageVisible = propertiesPage && propertiesPage.style.display !== 'none';
         const isPropertyDetailVisible = propertyDetailView && propertyDetailView.style.display !== 'none';
-        const shouldShow = isPropertiesPageVisible && isPropertyDetailVisible;
+        const shouldShow = isPropertiesPageVisible && isPropertyDetailVisible && !isMaintenance;
         fabAddUnit.style.display = shouldShow ? 'flex' : 'none';
     }
     
@@ -685,6 +688,16 @@ function updateUserMenu() {
             link.style.display = 'inline-block';
         }
     });
+    
+    // Hide Add Property button for maintenance users
+    const addPropertyBtn = document.getElementById('addPropertyBtn');
+    if (addPropertyBtn) {
+        if (currentUserProfile && currentUserProfile.role === 'maintenance') {
+            addPropertyBtn.style.display = 'none';
+        } else {
+            addPropertyBtn.style.display = 'inline-block';
+        }
+    }
 }
 
 // Handle permission errors globally
@@ -2851,15 +2864,27 @@ function renderPropertiesList(properties) {
     list.innerHTML = '';
 
     if (Object.keys(properties).length === 0) {
-        list.innerHTML = '<p style="color: #999; text-align: center; padding: 20px; grid-column: 1 / -1;">No properties yet. Create one above!</p>';
+        const isMaintenance = currentUserProfile && currentUserProfile.role === 'maintenance';
+        const emptyMessage = isMaintenance 
+            ? '<p style="color: #999; text-align: center; padding: 20px; grid-column: 1 / -1;">No properties assigned.</p>'
+            : '<p style="color: #999; text-align: center; padding: 20px; grid-column: 1 / -1;">No properties yet. Create one above!</p>';
+        list.innerHTML = emptyMessage;
         return;
     }
+
+    const isMaintenance = currentUserProfile && currentUserProfile.role === 'maintenance';
 
     Object.keys(properties).forEach(id => {
         const property = properties[id];
         const item = document.createElement('div');
         item.className = 'property-item';
         const statusBadge = property.status ? `<span class="status-badge status-${property.status.toLowerCase().replace(' ', '-')}">${property.status}</span>` : '';
+        const editDeleteButtons = isMaintenance 
+            ? '' 
+            : `
+                <button class="btn-secondary btn-small" onclick="editProperty('${id}')">Edit</button>
+                <button class="btn-danger btn-small" onclick="deleteProperty('${id}')">Delete</button>
+            `;
         item.innerHTML = `
             <div class="property-info">
                 <h4>${escapeHtml(property.name)} ${statusBadge}</h4>
@@ -2871,8 +2896,7 @@ function renderPropertiesList(properties) {
             </div>
             <div class="property-item-actions">
                 <button class="btn-primary btn-small" onclick="viewPropertyDetail('${id}')">View Details</button>
-                <button class="btn-secondary btn-small" onclick="editProperty('${id}')">Edit</button>
-                <button class="btn-danger btn-small" onclick="deleteProperty('${id}')">Delete</button>
+                ${editDeleteButtons}
             </div>
         `;
         list.appendChild(item);
@@ -3523,6 +3547,10 @@ function renderUnitsList(units, propertyId) {
                 
                 const buildingSection = document.createElement('div');
                 buildingSection.className = 'building-units-section';
+                const isMaintenance = currentUserProfile && currentUserProfile.role === 'maintenance';
+                const addUnitButton = isMaintenance 
+                    ? '' 
+                    : `<button class="btn-primary btn-small" onclick="addUnitToBuilding('${propertyId}', '${buildingId}')">+ Add Unit</button>`;
                 buildingSection.innerHTML = `
                     <div class="building-units-header">
                         <div>
@@ -3530,7 +3558,7 @@ function renderUnitsList(units, propertyId) {
                             ${building.buildingAddress ? `<p style="color: #666; font-size: 0.9rem; margin: 5px 0 0 0;">📍 ${escapeHtml(building.buildingAddress)}</p>` : ''}
                             ${buildingUnits.length > 0 ? `<p style="color: #999; font-size: 0.85rem; margin: 5px 0 0 0;">${buildingUnits.length} unit${buildingUnits.length !== 1 ? 's' : ''}</p>` : ''}
                         </div>
-                        <button class="btn-primary btn-small" onclick="addUnitToBuilding('${propertyId}', '${buildingId}')">+ Add Unit</button>
+                        ${addUnitButton}
                     </div>
                     <div class="building-units-list" id="units-building-${buildingId}"></div>
                 `;
@@ -3547,6 +3575,13 @@ function renderUnitsList(units, propertyId) {
                         return aNum.localeCompare(bNum, undefined, { numeric: true, sensitivity: 'base' });
                     });
                     
+                    const editDeleteButtons = isMaintenance 
+                        ? '' 
+                        : `
+                            <button class="btn-secondary btn-small" onclick="editUnit('${unit.id}')">Edit</button>
+                            <button class="btn-danger btn-small" onclick="deleteUnit('${unit.id}')">Delete</button>
+                        `;
+                    
                     sortedUnits.forEach(unit => {
                         const item = document.createElement('div');
                         item.className = 'unit-item';
@@ -3562,8 +3597,7 @@ function renderUnitsList(units, propertyId) {
                                 ${unit.monthlyRent ? `<p><strong>Monthly Rent:</strong> $${unit.monthlyRent.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>` : ''}
                             </div>
                             <div class="unit-item-actions">
-                                <button class="btn-secondary btn-small" onclick="editUnit('${unit.id}')">Edit</button>
-                                <button class="btn-danger btn-small" onclick="deleteUnit('${unit.id}')">Delete</button>
+                                ${editDeleteButtons}
                             </div>
                         `;
                         buildingUnitsList.appendChild(item);
@@ -3580,12 +3614,16 @@ function renderUnitsList(units, propertyId) {
                     return aNum.localeCompare(bNum, undefined, { numeric: true, sensitivity: 'base' });
                 });
                 
+                const isMaintenance = currentUserProfile && currentUserProfile.role === 'maintenance';
+                const addUnitButton = isMaintenance 
+                    ? '' 
+                    : `<button class="btn-primary btn-small" onclick="addUnit('${propertyId}')">+ Add Unit</button>`;
                 const propertyLevelSection = document.createElement('div');
                 propertyLevelSection.className = 'building-units-section';
                 propertyLevelSection.innerHTML = `
                     <div class="building-units-header">
                         <h4>Property-Level Units</h4>
-                        <button class="btn-primary btn-small" onclick="addUnit('${propertyId}')">+ Add Unit</button>
+                        ${addUnitButton}
                     </div>
                     <div class="building-units-list" id="units-property-level"></div>
                 `;
@@ -3596,6 +3634,12 @@ function renderUnitsList(units, propertyId) {
                     const item = document.createElement('div');
                     item.className = 'unit-item';
                     const statusBadge = unit.status ? `<span class="status-badge status-${unit.status.toLowerCase().replace(' ', '-')}">${unit.status}</span>` : '';
+                    const editDeleteButtons = isMaintenance 
+                        ? '' 
+                        : `
+                            <button class="btn-secondary btn-small" onclick="editUnit('${unit.id}')">Edit</button>
+                            <button class="btn-danger btn-small" onclick="deleteUnit('${unit.id}')">Delete</button>
+                        `;
                     item.innerHTML = `
                         <div class="unit-info">
                             <h4>${escapeHtml(unit.unitNumber)} ${statusBadge}</h4>
@@ -3607,8 +3651,7 @@ function renderUnitsList(units, propertyId) {
                             ${unit.monthlyRent ? `<p><strong>Monthly Rent:</strong> $${unit.monthlyRent.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>` : ''}
                         </div>
                         <div class="unit-item-actions">
-                            <button class="btn-secondary btn-small" onclick="editUnit('${unit.id}')">Edit</button>
-                            <button class="btn-danger btn-small" onclick="deleteUnit('${unit.id}')">Delete</button>
+                            ${editDeleteButtons}
                         </div>
                     `;
                     propertyLevelList.appendChild(item);
@@ -8281,8 +8324,10 @@ async function renderTenantsCardView(tenants) {
             </div>
             <div class="tenant-card-actions">
                 <button class="btn-primary btn-small" onclick="viewTenantDetail('${id}')">View Details</button>
-                <button class="btn-secondary btn-small" onclick="editTenant('${id}')">Edit</button>
-                <button class="btn-danger btn-small" onclick="deleteTenant('${id}')">Delete</button>
+                ${(currentUserProfile && currentUserProfile.role === 'maintenance') ? '' : `
+                    <button class="btn-secondary btn-small" onclick="editTenant('${id}')">Edit</button>
+                    <button class="btn-danger btn-small" onclick="deleteTenant('${id}')">Delete</button>
+                `}
             </div>
         `;
         tenantsList.appendChild(card);
@@ -8975,6 +9020,20 @@ async function renderTenantsTableView(tenants) {
                 brokerCells.push(`<td class="tenant-contact-cell" data-contact-index="${i}" data-contact-type="broker" style="vertical-align: top;"></td>`);
             }
             
+            const isMaintenance = currentUserProfile && currentUserProfile.role === 'maintenance';
+            const editDeleteButtons = isMaintenance 
+                ? '' 
+                : `
+                    <button class="btn-action btn-edit" onclick="editTenant('${tenant.id}')" title="Edit">
+                        <span class="btn-icon">✏️</span>
+                    </button>
+                    <button class="btn-action btn-danger" onclick="markTenantAsMovedOut('${tenant.id}')" title="Mark as Moved Out" style="background: #f97316; border-color: #f97316; color: white;">
+                        <span class="btn-icon">🚪</span>
+                    </button>
+                    <button class="btn-action btn-delete" onclick="deleteTenant('${tenant.id}')" title="Delete">
+                        <span class="btn-icon">🗑️</span>
+                    </button>
+                `;
             html += `
                 <tr data-tenant-id="${tenant.id}">
                     <td class="tenant-occupancies-cell" style="vertical-align: top; padding-right: 20px;">${occupanciesHtml}</td>
@@ -8988,15 +9047,7 @@ async function renderTenantsTableView(tenants) {
                                 <button class="btn-action btn-view" onclick="viewTenantDetail('${tenant.id}')" title="View Details">
                                     <span class="btn-icon">👁️</span>
                                 </button>
-                                <button class="btn-action btn-edit" onclick="editTenant('${tenant.id}')" title="Edit">
-                                    <span class="btn-icon">✏️</span>
-                                </button>
-                                <button class="btn-action btn-danger" onclick="markTenantAsMovedOut('${tenant.id}')" title="Mark as Moved Out" style="background: #f97316; border-color: #f97316; color: white;">
-                                    <span class="btn-icon">🚪</span>
-                                </button>
-                                <button class="btn-action btn-delete" onclick="deleteTenant('${tenant.id}')" title="Delete">
-                                    <span class="btn-icon">🗑️</span>
-                                </button>
+                                ${editDeleteButtons}
                             </div>
                         </div>
                     </td>
@@ -10439,6 +10490,21 @@ function rebuildTableWithContactColumns(tenantsByBuilding, tenantsWithoutBuildin
                 brokerCells.push(`<td class="tenant-contact-cell" data-contact-index="${i}" data-contact-type="broker" style="vertical-align: top;"><span style="color: #999;">Loading...</span></td>`);
             }
             
+            const isMaintenance = currentUserProfile && currentUserProfile.role === 'maintenance';
+            const editDeleteButtons = isMaintenance 
+                ? '' 
+                : `
+                    <button class="btn-action btn-edit" onclick="editTenant('${tenant.id}')" title="Edit">
+                        <span class="btn-icon">✏️</span>
+                    </button>
+                    <button class="btn-action btn-danger" onclick="markTenantAsMovedOut('${tenant.id}')" title="Mark as Moved Out" style="background: #f97316; border-color: #f97316; color: white;">
+                        <span class="btn-icon">🚪</span>
+                    </button>
+                    <button class="btn-action btn-delete" onclick="deleteTenant('${tenant.id}')" title="Delete">
+                        <span class="btn-icon">🗑️</span>
+                    </button>
+                `;
+            
             html += `
                 <tr data-tenant-id="${tenant.id}">
                     <td class="tenant-occupancies-cell" style="vertical-align: top;">${occupanciesHtml}</td>
@@ -10452,15 +10518,7 @@ function rebuildTableWithContactColumns(tenantsByBuilding, tenantsWithoutBuildin
                                 <button class="btn-action btn-view" onclick="viewTenantDetail('${tenant.id}')" title="View Details">
                                     <span class="btn-icon">👁️</span>
                                 </button>
-                                <button class="btn-action btn-edit" onclick="editTenant('${tenant.id}')" title="Edit">
-                                    <span class="btn-icon">✏️</span>
-                                </button>
-                                <button class="btn-action btn-danger" onclick="markTenantAsMovedOut('${tenant.id}')" title="Mark as Moved Out" style="background: #f97316; border-color: #f97316; color: white;">
-                                    <span class="btn-icon">🚪</span>
-                                </button>
-                                <button class="btn-action btn-delete" onclick="deleteTenant('${tenant.id}')" title="Delete">
-                                    <span class="btn-icon">🗑️</span>
-                                </button>
+                                ${editDeleteButtons}
                             </div>
                         </div>
                     </td>
