@@ -51,11 +51,14 @@ service cloud.firestore {
       // Security: Users can only create their OWN profile (userId == auth.uid)
       //           and email must match authenticated user's email
       //           Application code ensures pending invitation exists before using non-default values
+      // Note: We allow any role/isActive because invited users need to be able to create profiles
+      //       with admin-assigned roles. The application code validates pending invitations exist.
       allow create: if isAuthenticated() && 
                       request.auth.uid == userId &&
                       request.resource.data.email == request.auth.token.email &&
                       request.resource.data.role != null &&
-                      request.resource.data.isActive != null;
+                      request.resource.data.isActive != null &&
+                      request.resource.data.email != null;
       
       // Users can update their own profile, but NOT role or isActive
       // Admins can update any user

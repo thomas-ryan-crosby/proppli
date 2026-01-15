@@ -324,8 +324,8 @@ async function loadUserProfile(userId) {
                 console.error('❌ Error creating user profile on login:', createError);
                 console.error('Error code:', createError.code);
                 console.error('Error message:', createError.message);
-                showPermissionDeniedModal('Your account has been created but requires admin approval. Please contact a system administrator to activate your account and grant permissions.');
-                await auth.signOut();
+            showPermissionDeniedModal('Your account has been created but requires admin approval. Please contact a system administrator to activate your account and grant permissions.');
+            await auth.signOut();
             }
         }
     } catch (error) {
@@ -624,13 +624,23 @@ function initAuthPages() {
     // Login form
     const loginForm = document.getElementById('loginForm');
     if (loginForm) {
+        // Remove any existing listeners by replacing the form
+        loginForm.onsubmit = null;
         loginForm.addEventListener('submit', handleLogin);
+        console.log('✅ Login form initialized');
+    } else {
+        console.warn('⚠️ Login form not found');
     }
     
     // Signup form
     const signupForm = document.getElementById('signupForm');
     if (signupForm) {
+        // Remove any existing listeners by replacing the form
+        signupForm.onsubmit = null;
         signupForm.addEventListener('submit', handleSignup);
+        console.log('✅ Signup form initialized');
+    } else {
+        console.warn('⚠️ Signup form not found');
     }
     
     // Password reset form
@@ -728,9 +738,9 @@ async function handleLogin(e) {
             try {
                 const userDoc = await db.collection('users').doc(userCredential.user.uid).get();
                 if (userDoc.exists) {
-                    await db.collection('users').doc(userCredential.user.uid).update({
-                        lastLogin: firebase.firestore.FieldValue.serverTimestamp()
-                    });
+            await db.collection('users').doc(userCredential.user.uid).update({
+                lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+            });
                 }
                 // If profile doesn't exist, loadUserProfile will create it
             } catch (updateError) {
@@ -922,55 +932,78 @@ async function handleSignup(e) {
             }
         } else {
             // Regular signup - create profile with isActive: false
-            if (db) {
+        if (db) {
                 try {
-                    await createUserProfile(userCredential.user.uid, {
+            await createUserProfile(userCredential.user.uid, {
                         email: normalizedEmail,
-                        displayName: fullName,
-                        role: 'viewer',
-                        isActive: false, // Requires admin approval
-                        profile: {
-                            phone: phone || null
-                        },
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                        lastLogin: firebase.firestore.FieldValue.serverTimestamp()
-                    });
+                displayName: fullName,
+                role: 'viewer',
+                isActive: false, // Requires admin approval
+                profile: {
+                    phone: phone || null
+                },
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+            });
+                    console.log('✅ User profile created successfully');
                 } catch (profileError) {
                     console.error('❌ Failed to create user profile:', profileError);
                     // Sign out anyway to prevent access without profile
                     await auth.signOut();
-                    throw new Error('Account created, but failed to create profile. Please contact an administrator.');
+                    
+                    // Show user-friendly error message
+                    if (profileError.code === 'permission-denied') {
+                        if (errorDiv) {
+                            errorDiv.textContent = 'Your account has been created but requires admin approval. Please contact a system administrator to activate your account.';
+                            errorDiv.style.display = 'block';
+                        }
+                    } else {
+                        if (errorDiv) {
+                            errorDiv.textContent = 'Account created, but failed to create profile. Please contact an administrator.';
+                            errorDiv.style.display = 'block';
+                        }
+                    }
+                    return; // Don't show success message
                 }
-            }
-            
-            // Sign out (user needs admin approval)
-            await auth.signOut();
         }
         
-        // Show success message
+        // Sign out (user needs admin approval)
+        await auth.signOut();
+        }
+        
+        // Show success message (user needs admin approval)
         if (successDiv) {
+            successDiv.innerHTML = '<p>Account created successfully! Your account is pending admin approval. You\'ll receive an email when it\'s activated.</p>';
             successDiv.style.display = 'block';
         }
         
         // Reset form
-        document.getElementById('signupForm').reset();
+        const signupForm = document.getElementById('signupForm');
+        if (signupForm) {
+            signupForm.reset();
+        }
         
     } catch (error) {
         console.error('Signup error:', error);
         let errorMessage = 'An error occurred during signup.';
         
-        switch (error.code) {
-            case 'auth/email-already-in-use':
-                errorMessage = 'An account with this email already exists.';
-                break;
-            case 'auth/invalid-email':
-                errorMessage = 'Invalid email address.';
-                break;
-            case 'auth/weak-password':
-                errorMessage = 'Password is too weak. Please use a stronger password.';
-                break;
-            default:
-                errorMessage = error.message || 'Failed to create account. Please try again.';
+        // Check if this is a permission error from profile creation
+        if (error.code === 'permission-denied' || error.message.includes('permission') || error.message.includes('Permission')) {
+            errorMessage = 'Your account has been created but requires admin approval. Please contact a system administrator to activate your account.';
+        } else {
+            switch (error.code) {
+                case 'auth/email-already-in-use':
+                    errorMessage = 'An account with this email already exists.';
+                    break;
+                case 'auth/invalid-email':
+                    errorMessage = 'Invalid email address.';
+                    break;
+                case 'auth/weak-password':
+                    errorMessage = 'Password is too weak. Please use a stronger password.';
+                    break;
+                default:
+                    errorMessage = error.message || 'Failed to create account. Please try again.';
+            }
         }
         
         if (errorDiv) {
@@ -1213,7 +1246,7 @@ function setupNavigation() {
         link.addEventListener('click', (e) => {
             const page = e.target.closest('.sidebar-nav-link').getAttribute('data-page');
             if (page) {
-                switchPage(page);
+            switchPage(page);
             }
         });
     });
@@ -4002,7 +4035,7 @@ function createTicketCard(ticket, isDeleted = false) {
 
     // Get assigned to display name
     const assignedToDisplay = ticket.assignedTo || 'Unassigned';
-    
+
     card.innerHTML = `
         <div class="ticket-header">
             <div class="ticket-title">${escapeHtml(ticket.workDescription)}</div>
@@ -4806,7 +4839,7 @@ window.markTicketComplete = function(ticketId) {
         if (currentUserProfile?.id) {
             document.getElementById('completionCompletedBy').value = currentUserProfile.id;
         }
-        document.getElementById('completionCompletedBy').focus();
+    document.getElementById('completionCompletedBy').focus();
     });
 };
 
