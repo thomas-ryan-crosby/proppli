@@ -8259,16 +8259,30 @@ async function renderTenantsCardView(tenants) {
 }
 
 async function renderTenantsTableView(tenants) {
-    const tenantsList = document.getElementById('tenantsList');
-    const tenantsTable = document.getElementById('tenantsTable');
+    console.log('🔍 renderTenantsTableView: START', {
+        tenantCount: Object.keys(tenants).length,
+        userRole: currentUserProfile?.role
+    });
     
-    if (tenantsList) tenantsList.style.display = 'none';
-    if (tenantsTable) tenantsTable.style.display = 'block';
-    
-    if (!tenantsTable) return;
-    
-    // Filter tenants by property if needed
-    const filteredTenants = await filterTenantsByProperty(tenants);
+    try {
+        const tenantsList = document.getElementById('tenantsList');
+        const tenantsTable = document.getElementById('tenantsTable');
+        
+        if (tenantsList) tenantsList.style.display = 'none';
+        if (tenantsTable) tenantsTable.style.display = 'block';
+        
+        if (!tenantsTable) {
+            console.log('⚠️ renderTenantsTableView: tenantsTable not found');
+            return;
+        }
+        
+        // Filter tenants by property if needed
+        console.log('🔍 renderTenantsTableView: Filtering tenants by property');
+        const filteredTenants = await filterTenantsByProperty(tenants).catch(error => {
+            console.error('❌ renderTenantsTableView: Error in filterTenantsByProperty:', error);
+            throw error;
+        });
+        console.log('✅ renderTenantsTableView: Filtered tenants:', Object.keys(filteredTenants).length);
     
     // Load occupancies, buildings, units, and properties to group by building
     // We need to load these even if there are no tenants, to show orphaned units
