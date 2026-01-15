@@ -4869,7 +4869,56 @@ function createTicketCard(ticket, isDeleted = false) {
 // Load users for dropdowns (simpler version than loadUsers for admin page)
 let usersForDropdowns = {};
 async function loadUsersForDropdowns() {
+    console.log('🔍 loadUsersForDropdowns called', {
+        userRole: currentUserProfile?.role
+    });
+    
     try {
+        // For maintenance users, they can only read their own profile and admins/property managers
+        // But for ticket dropdowns, they might need to see property managers/admins
+        // Let's load only users they have permission to see
+        if (currentUserProfile && currentUserProfile.role === 'maintenance') {
+            console.log('🔍 loadUsersForDropdowns: Loading users for maintenance user');
+            usersForDropdowns = {};
+            
+            // Always include current user
+            if (currentUserProfile.id) {
+                usersForDropdowns[currentUserProfile.id] = {
+                    id: currentUserProfile.id,
+                    displayName: currentUserProfile.displayName || currentUserProfile.email || 'Unknown',
+                    email: currentUserProfile.email
+                };
+            }
+            
+            // Try to load admins and property managers (they might have permission)
+            // If not, we'll just use the current user
+            try {
+                // Load users with admin or property_manager roles
+                // Note: This might fail for maintenance users, so we catch it
+                const adminSnapshot = await db.collection('users')
+                    .where('isActive', '==', true)
+                    .where('role', 'in', ['admin', 'super_admin', 'property_manager'])
+                    .get();
+                
+                adminSnapshot.forEach((doc) => {
+                    const userData = doc.data();
+                    usersForDropdowns[doc.id] = {
+                        id: doc.id,
+                        displayName: userData.displayName || userData.email || 'Unknown',
+                        email: userData.email
+                    };
+                });
+                console.log(`✅ loadUsersForDropdowns: Loaded ${Object.keys(usersForDropdowns).length} users for maintenance user`);
+            } catch (adminError) {
+                console.warn('⚠️ loadUsersForDropdowns: Could not load admins/property managers, using current user only:', adminError);
+                // Continue with just current user
+            }
+            
+            return usersForDropdowns;
+        }
+        
+        // For other roles, load all active users
+        console.log('🔍 loadUsersForDropdowns: Loading all active users');
         const snapshot = await db.collection('users')
             .where('isActive', '==', true)
             .get();
@@ -4884,10 +4933,21 @@ async function loadUsersForDropdowns() {
             };
         });
         
+        console.log(`✅ loadUsersForDropdowns: Loaded ${Object.keys(usersForDropdowns).length} users`);
         return usersForDropdowns;
     } catch (error) {
-        console.error('Error loading users for dropdowns:', error);
-        return {};
+        console.error('❌ Error loading users for dropdowns:', error);
+        // Return at least current user if available
+        if (currentUserProfile && currentUserProfile.id) {
+            usersForDropdowns = {
+                [currentUserProfile.id]: {
+                    id: currentUserProfile.id,
+                    displayName: currentUserProfile.displayName || currentUserProfile.email || 'Unknown',
+                    email: currentUserProfile.email
+                }
+            };
+        }
+        return usersForDropdowns;
     }
 }
 
