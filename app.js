@@ -312,6 +312,15 @@ async function loadUserProfile(userId) {
                         await linkPendingUserToAccount(userId, normalizedEmail);
                         console.log('✅ User account linked to pending invitation');
                         
+                        // Set "Remember Me" flag so user stays logged in
+                        sessionStorage.setItem('rememberMe', 'true');
+                        localStorage.setItem('rememberMe', 'true');
+                        
+                        // Set persistence to LOCAL
+                        if (auth && auth.currentUser) {
+                            await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+                        }
+                        
                         // Reload the profile
                         const linkedUserDoc = await db.collection('users').doc(userId).get();
                         if (linkedUserDoc.exists) {
@@ -319,14 +328,19 @@ async function loadUserProfile(userId) {
                             console.log('✅ User profile loaded after linking:', currentUserProfile);
                             updateUserMenu();
                             
-                            // Check if user is active
+                            // Check if user is active - invited users should always be active
                             if (!currentUserProfile.isActive) {
-                                console.warn('⚠️ User account is not active - requires admin approval');
-                                showPermissionDeniedModal('Your account has been created but requires admin approval. Please contact a system administrator to activate your account.');
+                                console.warn('⚠️ User account is not active after linking invitation - this should not happen for invited users');
+                                showPermissionDeniedModal('Your account has been linked but is not active. Please contact a system administrator.');
                                 await auth.signOut();
                                 return;
                             }
-                            // User is active, allow access
+                            
+                            // User is active - reload page to show app
+                            console.log('✅ Invited user is active, reloading to show app...');
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 500);
                             return;
                         } else {
                             throw new Error('Profile not found after linking');
