@@ -986,14 +986,19 @@ async function handleSignup(e) {
             try {
                 await linkPendingUserToAccount(userCredential.user.uid, normalizedEmail);
                 console.log('✅ User account linked to pending invitation');
-                // User is already active, no need to sign out
-                // Show success and reload
-                if (successDiv) {
-                    successDiv.style.display = 'block';
-                }
-                document.getElementById('signupForm').reset();
-                // Reload page to show app
-                window.location.reload();
+                
+                // Set "Remember Me" flag so user stays logged in after reload
+                sessionStorage.setItem('rememberMe', 'true');
+                localStorage.setItem('rememberMe', 'true');
+                
+                // Set persistence to LOCAL so user stays logged in
+                await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+                
+                // Wait a moment for profile to be fully saved, then reload
+                setTimeout(() => {
+                    // Reload page to show app - user will be logged in and active
+                    window.location.reload();
+                }, 500);
                 return;
             } catch (linkError) {
                 console.error('❌ Failed to link pending user account:', linkError);
@@ -6572,18 +6577,19 @@ async function linkPendingUserToAccount(userId, email) {
             console.log('⚠️ User profile already exists:', existingData);
             
             // If profile exists but doesn't match pending invitation, update it
-            if (existingData.role !== pendingUser.role || existingData.isActive !== pendingUser.isActive) {
+            const shouldBeActive = pendingUser.isActive !== false; // Ensure invited users are active
+            if (existingData.role !== pendingUser.role || existingData.isActive !== shouldBeActive) {
                 console.log('🔄 Updating existing profile to match pending invitation...');
                 await db.collection('users').doc(userId).update({
                     email: normalizedEmail,
                     displayName: pendingUser.displayName,
                     role: pendingUser.role,
-                    isActive: pendingUser.isActive,
+                    isActive: shouldBeActive, // Ensure active
                     assignedProperties: pendingUser.assignedProperties || [],
                     profile: pendingUser.profile || {},
                     createdBy: pendingUser.createdBy
                 });
-                console.log('✅ Updated existing profile with pending invitation data');
+                console.log('✅ Updated existing profile with pending invitation data - user is now ACTIVE');
             } else {
                 console.log('✅ Existing profile already matches pending invitation');
             }
@@ -6594,17 +6600,18 @@ async function linkPendingUserToAccount(userId, email) {
                     email: normalizedEmail, // Use normalized email
                     displayName: pendingUser.displayName,
                     role: pendingUser.role,
-                    isActive: pendingUser.isActive,
+                    isActive: pendingUser.isActive !== false, // Ensure invited users are active (default to true)
                     assignedProperties: pendingUser.assignedProperties || [],
                     profile: pendingUser.profile || {},
                     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    lastLogin: null,
+                    lastLogin: firebase.firestore.FieldValue.serverTimestamp(),
                     createdBy: pendingUser.createdBy
                 };
                 
                 console.log('📝 Creating user profile with data:', userData);
+                console.log('🔑 User will be ACTIVE:', userData.isActive);
                 await db.collection('users').doc(userId).set(userData);
-                console.log('✅ User profile created with pending invitation data');
+                console.log('✅ User profile created with pending invitation data - user is ACTIVE');
             } catch (createError) {
                 console.error('❌ Error creating user profile:', createError);
                 // Provide specific error message
