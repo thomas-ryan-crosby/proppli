@@ -111,13 +111,16 @@ function startApp() {
             // Show auth pages and login
             showAuthPages(false); // Don't force login, let hash routing handle it
         }
+        // If no hash, don't do anything - let landing page show
     };
     
-    // Handle hash on initial load - do this after DOM is ready
+    // Handle hash on initial load - only if there's a hash
     // Use setTimeout to ensure it runs after other initialization
-    setTimeout(() => {
-        handleHashRouting();
-    }, 200);
+    if (window.location.hash) {
+        setTimeout(() => {
+            handleHashRouting();
+        }, 200);
+    }
     
     // Listen for hash changes
     window.addEventListener('hashchange', handleHashRouting);
@@ -234,9 +237,24 @@ function initAuth() {
                 currentUser = null;
                 currentUserProfile = null;
                 permissionErrorShown = false;
-                // Show auth pages when user is signed out
-                // This ensures users see the login page after being signed out
-                showAuthPages();
+                // Don't automatically show auth pages - let landing page show
+                // Auth pages will be shown when:
+                // 1. User clicks "Launch Application" button
+                // 2. User is explicitly signed out (handled elsewhere)
+                // 3. Hash routing directs to #signup or #login
+                
+                // Hide app container if it was showing
+                const appContainer = document.getElementById('appContainer');
+                if (appContainer) {
+                    appContainer.style.display = 'none';
+                }
+                
+                // Show landing page if not already showing auth pages
+                const authPages = document.getElementById('authPages');
+                const landingPage = document.getElementById('landingPage');
+                if (authPages && authPages.style.display !== 'block' && landingPage) {
+                    landingPage.style.display = 'block';
+                }
             }
         });
     } else {
