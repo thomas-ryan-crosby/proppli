@@ -949,9 +949,66 @@ async function handleSignup(e) {
         // This prevents the "Remember Me" check from signing them out
         isUserActivelyLoggingIn = true;
         
+        // CRITICAL: Check for pending invitation BEFORE creating account
+        // This allows us to handle "email already exists" error properly
+        console.log('🔍 Checking for pending invitation BEFORE account creation...');
+        let pendingUserBeforeSignup = null;
+        if (db) {
+            try {
+                pendingUserBeforeSignup = await checkPendingInvitation(normalizedEmail);
+                if (pendingUserBeforeSignup) {
+                    console.log('✅ Found pending invitation BEFORE signup - user is invited');
+                } else {
+                    console.log('ℹ️ No pending invitation found - regular signup');
+                }
+            } catch (checkError) {
+                console.warn('⚠️ Could not check pending invitation (non-critical):', checkError.message);
+                // Continue with signup - we'll check again after account creation
+            }
+        }
+        
         // Create user account
-        const userCredential = await auth.createUserWithEmailAndPassword(normalizedEmail, password);
-        console.log('✅ Account created successfully');
+        let userCredential;
+        try {
+            userCredential = await auth.createUserWithEmailAndPassword(normalizedEmail, password);
+            console.log('✅ Account created successfully');
+        } catch (createError) {
+            // Handle "email already exists" error
+            if (createError.code === 'auth/email-already-in-use') {
+                // If we found a pending invitation, guide user to sign in
+                if (pendingUserBeforeSignup) {
+                    if (errorDiv) {
+                        errorDiv.innerHTML = `
+                            <p>An account with this email already exists. Since you have a pending invitation, please sign in to complete your account setup.</p>
+                            <p style="margin-top: 10px;">
+                                <a href="#login" style="color: #667eea; text-decoration: underline; font-weight: 600;">Go to Sign In</a> | 
+                                <a href="#" id="forgotPasswordFromSignup" style="color: #667eea; text-decoration: underline;">Forgot Password?</a>
+                            </p>
+                        `;
+                        errorDiv.style.display = 'block';
+                        
+                        // Add event listener for forgot password link
+                        const forgotPasswordLink = document.getElementById('forgotPasswordFromSignup');
+                        if (forgotPasswordLink) {
+                            forgotPasswordLink.addEventListener('click', (e) => {
+                                e.preventDefault();
+                                showPasswordResetPage();
+                            });
+                        }
+                    }
+                    return;
+                } else {
+                    // No pending invitation - regular account exists
+                    if (errorDiv) {
+                        errorDiv.textContent = 'An account with this email already exists. Please sign in instead.';
+                        errorDiv.style.display = 'block';
+                    }
+                    return;
+                }
+            }
+            // Re-throw other errors
+            throw createError;
+        }
         
         // Update user display name
         await userCredential.user.updateProfile({
