@@ -212,8 +212,11 @@ function initAuth() {
                 if (currentUserProfile && currentUserProfile.isActive) {
                     showApplication();
                     // Load data now that user is authenticated
-                    loadProperties();
-                    loadTickets();
+                    // Use setTimeout to ensure these load after the app is shown
+                    setTimeout(() => {
+                        loadProperties();
+                        loadTickets();
+                    }, 100);
                 } else if (currentUserProfile && !currentUserProfile.isActive) {
                     // User profile exists but is inactive - permission modal already shown by loadUserProfile
                     // User will be signed out by loadUserProfile
