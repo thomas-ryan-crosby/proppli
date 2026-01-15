@@ -8516,9 +8516,26 @@ async function renderTenantsTableView(tenants) {
     
     // First, load contacts to determine max number of contact and broker columns needed
     // If no tenants, use default values so orphaned units can still be displayed
-    const { maxContacts, maxBrokers } = Object.keys(filteredTenants).length > 0 
-        ? await determineMaxContacts(filteredTenants)
-        : { maxContacts: 5, maxBrokers: 2 };
+    // Skip for maintenance users - they don't have access to tenantContacts
+    let maxContacts, maxBrokers;
+    if (currentUserProfile && currentUserProfile.role === 'maintenance') {
+        console.log('⚠️ renderTenantsTableView: Skipping determineMaxContacts for maintenance user - using defaults');
+        maxContacts = 5;
+        maxBrokers = 2;
+    } else if (Object.keys(filteredTenants).length > 0) {
+        console.log('🔍 renderTenantsTableView: Determining max contacts');
+        const result = await determineMaxContacts(filteredTenants).catch(error => {
+            console.error('❌ renderTenantsTableView: Error in determineMaxContacts:', error);
+            // Use defaults if there's an error
+            return { maxContacts: 5, maxBrokers: 2 };
+        });
+        maxContacts = result.maxContacts;
+        maxBrokers = result.maxBrokers;
+    } else {
+        maxContacts = 5;
+        maxBrokers = 2;
+    }
+    console.log('✅ renderTenantsTableView: Using maxContacts:', maxContacts, 'maxBrokers:', maxBrokers);
     
     // Build HTML with dynamic contact and broker columns
     let html = '';
