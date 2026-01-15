@@ -5195,30 +5195,46 @@ async function loadTenantsForTicketForm(propertyId) {
             return Promise.resolve(); // Don't load tenants for unassigned properties
         }
         
-        // Load tenants, occupancies, units, and buildings
-        const [tenantsSnapshot, occupanciesSnapshot, unitsSnapshot, buildingsSnapshot] = await Promise.all([
-            db.collection('tenants').orderBy('tenantName').get(),
+        // Load occupancies first to get tenant IDs, then load only those tenants
+        // This avoids loading all tenants which maintenance users can't do
+        const [occupanciesSnapshot, unitsSnapshot, buildingsSnapshot] = await Promise.all([
             db.collection('occupancies').where('propertyId', '==', propertyId).get(),
             db.collection('units').where('propertyId', '==', propertyId).get(),
             db.collection('buildings').where('propertyId', '==', propertyId).get()
         ]);
         
-        // Build maps
-        const tenantsMap = {};
-        tenantsSnapshot.forEach(doc => {
-            tenantsMap[doc.id] = { id: doc.id, ...doc.data() };
-        });
-        
+        // Extract tenant IDs from occupancies
+        const tenantIds = new Set();
         const occupanciesMap = {};
         occupanciesSnapshot.forEach(doc => {
             const occ = doc.data();
             if (occ.status === 'Active' || !occ.status) {
+                if (occ.tenantId) {
+                    tenantIds.add(occ.tenantId);
+                }
                 if (!occupanciesMap[occ.tenantId]) {
                     occupanciesMap[occ.tenantId] = [];
                 }
                 occupanciesMap[occ.tenantId].push({ ...occ, id: doc.id });
             }
         });
+        
+        // Load only tenants that have occupancies in this property
+        const tenantsMap = {};
+        if (tenantIds.size > 0) {
+            const tenantPromises = Array.from(tenantIds).map(tenantId => 
+                db.collection('tenants').doc(tenantId).get().catch(e => {
+                    console.warn(`Could not load tenant ${tenantId}:`, e);
+                    return null;
+                })
+            );
+            const tenantDocs = await Promise.all(tenantPromises);
+            tenantDocs.forEach(doc => {
+                if (doc && doc.exists) {
+                    tenantsMap[doc.id] = { id: doc.id, ...doc.data() };
+                }
+            });
+        }
         
         const unitsMap = {};
         unitsSnapshot.forEach(doc => {
@@ -12007,7 +12023,8 @@ async function loadLeases() {
         }
         
         // Load related data - filter for maintenance users
-        let propertiesQuery = db.collection('properties');
+        // For maintenance users, load assigned properties individually
+        let propertiesPromise;
         let tenantsQuery = db.collection('tenants');
         let unitsQuery = db.collection('units');
         let buildingsQuery = db.collection('buildings');
@@ -12016,22 +12033,39 @@ async function loadLeases() {
         // For maintenance users, filter by assigned properties
         if (currentUserProfile.role === 'maintenance' && 
             Array.isArray(currentUserProfile.assignedProperties) && 
-            currentUserProfile.assignedProperties.length > 0 &&
-            currentUserProfile.assignedProperties.length <= 10) {
-            unitsQuery = unitsQuery.where('propertyId', 'in', currentUserProfile.assignedProperties);
-            buildingsQuery = buildingsQuery.where('propertyId', 'in', currentUserProfile.assignedProperties);
-            occupanciesQuery = occupanciesQuery.where('propertyId', 'in', currentUserProfile.assignedProperties);
-            // Properties are already filtered by rules, but we can still query them
-            // Tenants need to be filtered via occupancies (handled below)
+            currentUserProfile.assignedProperties.length > 0) {
+            // Load assigned properties individually
+            const propertyPromises = currentUserProfile.assignedProperties.map(propId => 
+                db.collection('properties').doc(propId).get().catch(e => {
+                    console.warn(`Could not load property ${propId}:`, e);
+                    return null;
+                })
+            );
+            propertiesPromise = Promise.all(propertyPromises);
+            
+            if (currentUserProfile.assignedProperties.length <= 10) {
+                unitsQuery = unitsQuery.where('propertyId', 'in', currentUserProfile.assignedProperties);
+                buildingsQuery = buildingsQuery.where('propertyId', 'in', currentUserProfile.assignedProperties);
+                occupanciesQuery = occupanciesQuery.where('propertyId', 'in', currentUserProfile.assignedProperties);
+            }
+            // Tenants will be filtered via occupancies below
+        } else {
+            // For other roles, load all properties
+            propertiesPromise = db.collection('properties').get();
         }
         
-        const [propertiesSnapshot, tenantsSnapshot, unitsSnapshot, buildingsSnapshot, occupanciesSnapshot] = await Promise.all([
-            propertiesQuery.get(),
+        const [propertiesResult, tenantsSnapshot, unitsSnapshot, buildingsSnapshot, occupanciesSnapshot] = await Promise.all([
+            propertiesPromise,
             tenantsQuery.get(),
             unitsQuery.get(),
             buildingsQuery.get(),
             occupanciesQuery.get()
         ]);
+        
+        // Handle properties result (could be snapshot or array of docs)
+        const propertiesSnapshot = Array.isArray(propertiesResult) ? 
+            { forEach: (fn) => propertiesResult.forEach(doc => doc && doc.exists && fn(doc)) } : 
+            propertiesResult;
         
         const properties = {};
         propertiesSnapshot.forEach((doc) => {
