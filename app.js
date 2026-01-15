@@ -1735,6 +1735,36 @@ function setupEventListeners() {
     if (removeBeforePhotoBtn) removeBeforePhotoBtn.addEventListener('click', () => removeFile('before'));
     if (removeAfterPhotoBtn) removeAfterPhotoBtn.addEventListener('click', () => removeFile('after'));
     
+    // Drag and drop handlers for before photo
+    const beforePhotoDropZone = document.getElementById('beforePhotoDropZone');
+    if (beforePhotoDropZone) {
+        setupDragAndDrop(beforePhotoDropZone, beforePhoto, 'before');
+    }
+    
+    // Drag and drop handlers for after photo
+    const afterPhotoDropZone = document.getElementById('afterPhotoDropZone');
+    if (afterPhotoDropZone) {
+        setupDragAndDrop(afterPhotoDropZone, afterPhoto, 'after');
+    }
+    
+    // Time allocation toggle handler
+    const enableTimeAllocationToggle = document.getElementById('enableTimeAllocation');
+    const timeAllocationGroup = document.getElementById('timeAllocationGroup');
+    if (enableTimeAllocationToggle && timeAllocationGroup) {
+        enableTimeAllocationToggle.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                timeAllocationGroup.style.display = 'block';
+            } else {
+                timeAllocationGroup.style.display = 'none';
+                document.getElementById('timeAllocated').value = '';
+            }
+        });
+        // Set initial state
+        if (!enableTimeAllocationToggle.checked) {
+            timeAllocationGroup.style.display = 'none';
+        }
+    }
+    
     // Completion modal file handlers (check if elements exist)
     const completionAfterPhoto = document.getElementById('completionAfterPhoto');
     const removeCompletionAfterPhoto = document.getElementById('removeCompletionAfterPhoto');
@@ -5202,8 +5232,11 @@ function handleTicketSubmit(e) {
         return;
     }
     
-    // Time allocated is optional when creating/editing, but required when marking complete
-    if (status === 'Completed' && (!timeAllocated || isNaN(timeAllocated) || timeAllocated <= 0)) {
+    // Check if time allocation is enabled
+    const enableTimeAllocation = document.getElementById('enableTimeAllocation')?.checked ?? true;
+    
+    // Time allocated is required when marking complete IF time allocation is enabled
+    if (status === 'Completed' && enableTimeAllocation && (!timeAllocated || isNaN(timeAllocated) || timeAllocated <= 0)) {
         alert('Time Allocated is required before marking a ticket as complete');
         return;
     }
@@ -5507,7 +5540,7 @@ function handleTicketCompletion(e) {
         submitBtn.textContent = 'Saving...';
     }
 
-    // Check if timeAllocated is set - required before marking complete
+    // Check if timeAllocated is set - required before marking complete IF time allocation is enabled
     if (!editingTicketId) {
         alert('Error: Ticket ID not found');
         if (submitBtn) {
@@ -5517,12 +5550,13 @@ function handleTicketCompletion(e) {
         return;
     }
     
-    // Get the ticket to check timeAllocated
+    // Get the ticket to check timeAllocated and enableTimeAllocation setting
     db.collection('tickets').doc(editingTicketId).get().then((doc) => {
         const ticket = doc.data();
         const timeAllocated = ticket?.timeAllocated;
+        const enableTimeAllocation = ticket?.enableTimeAllocation !== false; // Default to true for backward compatibility
         
-        if (!timeAllocated || isNaN(timeAllocated) || timeAllocated <= 0) {
+        if (enableTimeAllocation && (!timeAllocated || isNaN(timeAllocated) || timeAllocated <= 0)) {
             alert('Time Allocated is required before marking a ticket as complete. Please edit the ticket and add the time allocated first.');
             if (submitBtn) {
                 submitBtn.disabled = false;

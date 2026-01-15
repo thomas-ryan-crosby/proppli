@@ -333,8 +333,15 @@
                                 <small style="color: #666; font-size: 12px;">Use this field to track progress notes and updates as work is being completed on in-progress items.</small>
                             </div>
                             <div class="form-group">
-                                <label for="timeAllocated">Time Allocated (hours)</label>
-                                <input type="number" id="timeAllocated" min="0" step="0.5" placeholder="Required before marking complete">
+                                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom: 8px;">
+                                    <input type="checkbox" id="enableTimeAllocation" checked style="width: auto; cursor: pointer;">
+                                    <span style="font-weight: 600;">Enable Time Allocation</span>
+                                </label>
+                                <div id="timeAllocationGroup">
+                                    <label for="timeAllocated">Time Allocated (hours)</label>
+                                    <input type="number" id="timeAllocated" min="0" step="0.5" placeholder="Required before marking complete">
+                                    <small style="color: #666; font-size: 12px;">Time allocation must be set before marking ticket as complete</small>
+                                </div>
                             </div>
                             <div class="form-group">
                                 <label>Billing Type</label>
@@ -419,10 +426,11 @@
                             <div class="form-group">
                                 <label>Before Photo (Optional)</label>
                                 <div class="file-upload-section" style="grid-template-columns: 1fr;">
-                                    <div class="file-upload-item">
+                                    <div class="file-upload-item" id="beforePhotoDropZone">
                                         <label for="beforePhoto" class="file-upload-label">
                                             <span class="file-upload-icon">📷</span>
                                             <span>Upload Before Photo</span>
+                                            <span style="display: block; margin-top: 8px; font-size: 12px; color: #666;">or drag and drop files here</span>
                                         </label>
                                         <input type="file" id="beforePhoto" accept="image/*" style="display: none;">
                                         <div id="beforePhotoPreview" class="file-preview"></div>
@@ -446,10 +454,11 @@
                             <div class="form-group" id="afterPhotoGroup" style="display: none;">
                                 <label>After Photo (Optional)</label>
                                 <div class="file-upload-section" style="grid-template-columns: 1fr;">
-                                    <div class="file-upload-item">
+                                    <div class="file-upload-item" id="afterPhotoDropZone">
                                         <label for="afterPhoto" class="file-upload-label">
                                             <span class="file-upload-icon">📷</span>
                                             <span>Upload After Photo</span>
+                                            <span style="display: block; margin-top: 8px; font-size: 12px; color: #666;">or drag and drop files here</span>
                                         </label>
                                         <input type="file" id="afterPhoto" accept="image/*" style="display: none;">
                                         <div id="afterPhotoPreview" class="file-preview"></div>
