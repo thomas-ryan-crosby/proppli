@@ -305,8 +305,13 @@
                                     <input type="text" id="floorNumber" placeholder="e.g., Floor 2">
                                 </div>
                                 <div class="form-group">
-                                    <label for="tenantName">Tenant Name</label>
-                                    <input type="text" id="tenantName" placeholder="e.g., ABC Company">
+                                    <label for="ticketTenantSelect">Tenant</label>
+                                    <select id="ticketTenantSelect">
+                                        <option value="">Select a tenant...</option>
+                                        <option value="__manual__">Enter manually</option>
+                                    </select>
+                                    <input type="text" id="tenantName" placeholder="e.g., ABC Company" style="display: none; margin-top: 8px;">
+                                    <input type="hidden" id="ticketTenantId">
                                 </div>
                             </div>
                             <div class="form-group">

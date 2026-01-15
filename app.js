@@ -2454,7 +2454,10 @@ function loadProperties() {
         
         // Add change listener to ticket property select to show/hide commercial fields
         ticketPropertySelect.addEventListener('change', function(e) {
-            updateCommercialFieldsVisibility(e.target.value);
+            updateCommercialFieldsVisibility(e.target.value).then(() => {
+                // Reload tenants when property changes
+                loadTenantsForTicketForm(e.target.value);
+            });
         });
 
         // Restore selected property
@@ -4577,8 +4580,17 @@ function openTicketModal(ticketId = null) {
     if (selectedPropertyId && ticketPropertySelect) {
         ticketPropertySelect.value = selectedPropertyId;
         // Check property type and show/hide commercial fields
-        updateCommercialFieldsVisibility(selectedPropertyId);
+        updateCommercialFieldsVisibility(selectedPropertyId).then(() => {
+            // Load tenants for the selected property
+            loadTenantsForTicketForm(selectedPropertyId);
+        });
     }
+    
+    // Reset tenant fields
+    document.getElementById('ticketTenantSelect').value = '';
+    document.getElementById('ticketTenantId').value = '';
+    document.getElementById('tenantName').value = '';
+    document.getElementById('tenantName').style.display = 'none';
 
     // Set default status
     document.getElementById('ticketStatus').value = 'Not Started';
