@@ -152,28 +152,40 @@ function initAuth() {
         auth = firebase.auth();
         console.log('✅ Firebase Auth initialized');
         
+        // Track if this is the initial page load
+        let isInitialLoad = true;
+        
         // Listen for auth state changes
         auth.onAuthStateChanged(async (user) => {
             if (user) {
-                // Check if "Remember Me" was set
-                // We check both sessionStorage (clears on tab close) and a flag in the user's metadata
-                // If user logged in without "Remember Me", the flag won't be set
-                const rememberMe = sessionStorage.getItem('rememberMe') === 'true' || localStorage.getItem('rememberMe') === 'true';
-                
-                // If user is authenticated but "Remember Me" was not checked, sign them out
-                // This prevents auto-login when "Remember Me" was unchecked
-                // Note: This check happens on every auth state change, including page load
-                if (!rememberMe) {
-                    console.log('⚠️ User authenticated but "Remember Me" was not checked - signing out');
-                    try {
-                        await auth.signOut();
-                        sessionStorage.removeItem('rememberMe');
-                        localStorage.removeItem('rememberMe');
-                        // Don't show app - user needs to log in again
-                        return;
-                    } catch (signOutError) {
-                        console.error('Error signing out:', signOutError);
+                // Only check "Remember Me" on initial page load, not on every auth state change
+                // This prevents signing out users immediately after they log in
+                if (isInitialLoad) {
+                    isInitialLoad = false;
+                    
+                    // Check if "Remember Me" was set
+                    // We check both sessionStorage (clears on tab close) and localStorage
+                    // If user logged in without "Remember Me", the flag won't be set
+                    const rememberMe = sessionStorage.getItem('rememberMe') === 'true' || localStorage.getItem('rememberMe') === 'true';
+                    
+                    // If user is authenticated on page load but "Remember Me" was not checked, sign them out
+                    // This prevents auto-login when "Remember Me" was unchecked
+                    if (!rememberMe) {
+                        console.log('⚠️ User authenticated on page load but "Remember Me" was not checked - signing out');
+                        try {
+                            await auth.signOut();
+                            sessionStorage.removeItem('rememberMe');
+                            localStorage.removeItem('rememberMe');
+                            // Show auth pages so user can log in again
+                            showAuthPages();
+                            return;
+                        } catch (signOutError) {
+                            console.error('Error signing out:', signOutError);
+                        }
                     }
+                } else {
+                    // Not initial load - this is a fresh login, allow it
+                    isInitialLoad = false;
                 }
                 
                 console.log('👤 User authenticated:', user.email);
@@ -199,13 +211,25 @@ function initAuth() {
                     // Load data now that user is authenticated
                     loadProperties();
                     loadTickets();
+                } else if (currentUserProfile && !currentUserProfile.isActive) {
+                    // User profile exists but is inactive - permission modal already shown by loadUserProfile
+                    // User will be signed out by loadUserProfile
+                    console.log('⚠️ User profile is inactive - access denied');
+                } else {
+                    // User profile doesn't exist - this shouldn't happen after loadUserProfile
+                    // But if it does, show error
+                    console.error('❌ User profile not found after loadUserProfile');
+                    showPermissionDeniedModal('Your user profile could not be loaded. Please contact an administrator.');
+                    await auth.signOut();
                 }
             } else {
                 console.log('👤 No user authenticated');
                 currentUser = null;
                 currentUserProfile = null;
                 permissionErrorShown = false;
-                // Don't automatically show auth pages - let user click launch button
+                // Show auth pages when user is signed out
+                // This ensures users see the login page after being signed out
+                showAuthPages();
             }
         });
     } else {
@@ -733,23 +757,30 @@ async function handleLogin(e) {
         const userCredential = await auth.signInWithEmailAndPassword(email, password);
         console.log('✅ Login successful');
         
-        // Update last login (if profile exists)
+        // Update last login (if profile exists) - do this after auth state change
+        // Don't block login if this fails
         if (userCredential.user && db) {
-            try {
-                const userDoc = await db.collection('users').doc(userCredential.user.uid).get();
-                if (userDoc.exists) {
-            await db.collection('users').doc(userCredential.user.uid).update({
-                lastLogin: firebase.firestore.FieldValue.serverTimestamp()
-            });
+            // Use setTimeout to ensure this happens after auth state change
+            setTimeout(async () => {
+                try {
+                    const userDoc = await db.collection('users').doc(userCredential.user.uid).get();
+                    if (userDoc.exists) {
+                        await db.collection('users').doc(userCredential.user.uid).update({
+                            lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                        console.log('✅ Last login updated');
+                    }
+                    // If profile doesn't exist, loadUserProfile will create it
+                } catch (updateError) {
+                    // Silently fail - this is not critical for login
+                    console.warn('Could not update last login (non-critical):', updateError.message);
+                    // Continue anyway - profile creation will happen in loadUserProfile
                 }
-                // If profile doesn't exist, loadUserProfile will create it
-            } catch (updateError) {
-                console.warn('Could not update last login:', updateError);
-                // Continue anyway - profile creation will happen in loadUserProfile
-            }
+            }, 100);
         }
         
         // Auth state change will handle showing the app
+        // The onAuthStateChanged handler will process the user and show the application
     } catch (error) {
         console.error('Login error:', error);
         let errorMessage = 'An error occurred during login.';
