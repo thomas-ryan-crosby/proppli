@@ -4882,6 +4882,145 @@ function handleStatusChange(e) {
     }
 }
 
+// Load tenants for ticket form, filtered by property
+async function loadTenantsForTicketForm(propertyId) {
+    const tenantSelect = document.getElementById('ticketTenantSelect');
+    if (!tenantSelect) return Promise.resolve();
+    
+    // Clear existing options except first two
+    tenantSelect.innerHTML = '<option value="">Select a tenant...</option><option value="__manual__">Enter manually</option>';
+    
+    if (!propertyId) {
+        return Promise.resolve();
+    }
+    
+    try {
+        // Load tenants, occupancies, units, and buildings
+        const [tenantsSnapshot, occupanciesSnapshot, unitsSnapshot, buildingsSnapshot] = await Promise.all([
+            db.collection('tenants').orderBy('tenantName').get(),
+            db.collection('occupancies').where('propertyId', '==', propertyId).get(),
+            db.collection('units').where('propertyId', '==', propertyId).get(),
+            db.collection('buildings').where('propertyId', '==', propertyId).get()
+        ]);
+        
+        // Build maps
+        const tenantsMap = {};
+        tenantsSnapshot.forEach(doc => {
+            tenantsMap[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        
+        const occupanciesMap = {};
+        occupanciesSnapshot.forEach(doc => {
+            const occ = doc.data();
+            if (occ.status === 'Active' || !occ.status) {
+                if (!occupanciesMap[occ.tenantId]) {
+                    occupanciesMap[occ.tenantId] = [];
+                }
+                occupanciesMap[occ.tenantId].push({ ...occ, id: doc.id });
+            }
+        });
+        
+        const unitsMap = {};
+        unitsSnapshot.forEach(doc => {
+            unitsMap[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        
+        const buildingsMap = {};
+        buildingsSnapshot.forEach(doc => {
+            buildingsMap[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        
+        // Add tenants that have active occupancies for this property
+        Object.keys(occupanciesMap).forEach(tenantId => {
+            if (tenantsMap[tenantId]) {
+                const tenant = tenantsMap[tenantId];
+                const option = document.createElement('option');
+                option.value = tenantId;
+                option.textContent = tenant.tenantName;
+                option.dataset.occupancies = JSON.stringify(occupanciesMap[tenantId]);
+                tenantSelect.appendChild(option);
+            }
+        });
+        
+        return Promise.resolve();
+    } catch (error) {
+        console.error('Error loading tenants for ticket form:', error);
+        return Promise.resolve();
+    }
+}
+
+// Handle tenant selection change - auto-populate floor and unit number
+async function handleTenantSelectionChange(e) {
+    const tenantSelect = e.target;
+    const tenantId = tenantSelect.value;
+    const tenantNameInput = document.getElementById('tenantName');
+    const ticketTenantIdInput = document.getElementById('ticketTenantId');
+    const propertyId = document.getElementById('ticketProperty').value;
+    const floorNumberInput = document.getElementById('floorNumber');
+    const buildingNumberInput = document.getElementById('buildingNumber'); // Building number field is used for unit number in commercial fields
+    
+    if (tenantSelect.value === '__manual__') {
+        // Show manual input
+        tenantNameInput.style.display = 'block';
+        ticketTenantIdInput.value = '';
+        return;
+    }
+    
+    if (tenantSelect.value === '' || !propertyId) {
+        // Clear fields
+        tenantNameInput.style.display = 'none';
+        tenantNameInput.value = '';
+        ticketTenantIdInput.value = '';
+        return;
+    }
+    
+    // Hide manual input
+    tenantNameInput.style.display = 'none';
+    ticketTenantIdInput.value = tenantId;
+    
+    // Get occupancy data from option
+    const selectedOption = tenantSelect.selectedOptions[0];
+    if (!selectedOption || !selectedOption.dataset.occupancies) {
+        return;
+    }
+    
+    try {
+        const occupancies = JSON.parse(selectedOption.dataset.occupancies);
+        // Find the first active occupancy with a unitId
+        const occupancyWithUnit = occupancies.find(occ => occ.unitId);
+        
+        if (occupancyWithUnit && occupancyWithUnit.unitId) {
+            // Load unit data
+            const unitDoc = await db.collection('units').doc(occupancyWithUnit.unitId).get();
+            if (unitDoc.exists) {
+                const unit = unitDoc.data();
+                
+                // Auto-populate floor number
+                if (unit.floorNumber && floorNumberInput) {
+                    floorNumberInput.value = unit.floorNumber;
+                }
+                
+                // Auto-populate unit number (in building number field for commercial)
+                if (unit.unitNumber && buildingNumberInput) {
+                    buildingNumberInput.value = unit.unitNumber;
+                }
+                
+                // If unit has a buildingId, try to get building name/number
+                if (unit.buildingId) {
+                    const buildingDoc = await db.collection('buildings').doc(unit.buildingId).get();
+                    if (buildingDoc.exists) {
+                        const building = buildingDoc.data();
+                        // Note: Building number field might be used differently, so we'll just populate unit number
+                        // Users can manually adjust if needed
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error loading tenant unit data:', error);
+    }
+}
+
 function handleTicketSubmit(e) {
     e.preventDefault();
     
