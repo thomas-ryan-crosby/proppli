@@ -14,6 +14,7 @@ let completionAfterPhotoFile = null;
 let currentUser = null;
 let currentUserProfile = null;
 let auth = null; // Firebase Auth instance
+let isUserActivelyLoggingIn = false; // Flag to track active login (not page load)
 
 // User Management
 let allUsers = {}; // Store all users for filtering
@@ -152,15 +153,15 @@ function initAuth() {
         auth = firebase.auth();
         console.log('✅ Firebase Auth initialized');
         
-        // Track if this is the initial page load
+        // Track if this is the initial page load (first auth state change)
         let isInitialLoad = true;
         
         // Listen for auth state changes
         auth.onAuthStateChanged(async (user) => {
             if (user) {
-                // Only check "Remember Me" on initial page load, not on every auth state change
-                // This prevents signing out users immediately after they log in
-                if (isInitialLoad) {
+                // Only check "Remember Me" on initial page load (when page first loads with existing session)
+                // Skip this check if user is actively logging in (isUserActivelyLoggingIn flag is set)
+                if (isInitialLoad && !isUserActivelyLoggingIn) {
                     isInitialLoad = false;
                     
                     // Check if "Remember Me" was set
@@ -184,8 +185,10 @@ function initAuth() {
                         }
                     }
                 } else {
-                    // Not initial load - this is a fresh login, allow it
+                    // Not initial load OR user is actively logging in - allow it
                     isInitialLoad = false;
+                    // Clear the active login flag after processing
+                    isUserActivelyLoggingIn = false;
                 }
                 
                 console.log('👤 User authenticated:', user.email);
@@ -733,6 +736,10 @@ async function handleLogin(e) {
             throw new Error('Authentication not initialized');
         }
         
+        // Set flag to indicate user is actively logging in (not a page load)
+        // This prevents the "Remember Me" check from running on fresh logins
+        isUserActivelyLoggingIn = true;
+        
         // Set persistence BEFORE sign-in
         // Note: setPersistence must be called before signInWithEmailAndPassword
         const persistence = rememberMe 
@@ -745,6 +752,7 @@ async function handleLogin(e) {
             sessionStorage.setItem('rememberMe', 'true');
             localStorage.setItem('rememberMe', 'true'); // Also store in localStorage for cross-tab consistency
         } else {
+            // Clear the flag so user will be signed out on next page load
             sessionStorage.removeItem('rememberMe');
             localStorage.removeItem('rememberMe');
         }
@@ -756,6 +764,8 @@ async function handleLogin(e) {
         // Sign in
         const userCredential = await auth.signInWithEmailAndPassword(email, password);
         console.log('✅ Login successful');
+        
+        // Note: isUserActivelyLoggingIn flag will be cleared in onAuthStateChanged handler
         
         // Update last login (if profile exists) - do this after auth state change
         // Don't block login if this fails
@@ -1052,6 +1062,9 @@ async function handleGoogleSignIn() {
         }
         
         const provider = new firebase.auth.GoogleAuthProvider();
+        
+        // Set flag to indicate user is actively logging in (not a page load)
+        isUserActivelyLoggingIn = true;
         
         // Set persistence to LOCAL for Google sign-in (users typically want to stay logged in)
         await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
