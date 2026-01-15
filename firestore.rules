@@ -8,8 +8,25 @@ service cloud.firestore {
     }
     
     // Helper function to get user document (returns null if doesn't exist)
+    // Cache the user doc to avoid multiple reads
     function getUserDoc() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+    
+    // Helper function to get user's assigned properties (cached)
+    function getUserAssignedProperties() {
+      let userDoc = getUserDoc();
+      if (userDoc == null || userDoc.data == null) {
+        return [];
+      }
+      let assignedProps = userDoc.data.assignedProperties;
+      return assignedProps != null && assignedProps is list ? assignedProps : [];
+    }
+    
+    // Helper function to check if property is in user's assigned properties
+    function isPropertyAssigned(propertyId) {
+      let assignedProps = getUserAssignedProperties();
+      return propertyId in assignedProps;
     }
     
     // Helper function to get user role (returns null if user doc doesn't exist)
@@ -115,9 +132,9 @@ service cloud.firestore {
       allow read: if isAuthenticated() && isUserActive() && 
                     (isSuperAdmin() || 
                      isAdmin() || 
-                     (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties != null &&
-                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties is list &&
-                      propertyId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties));
+                     getUserRole() == 'property_manager' ||
+                     getUserRole() == 'viewer' ||
+                     (getUserRole() == 'maintenance' && isPropertyAssigned(propertyId)));
       
       // Super admins and admins have full write access, property managers can write
       allow write: if isAuthenticated() && isUserActive() && 
@@ -133,10 +150,11 @@ service cloud.firestore {
       allow read: if isAuthenticated() && isUserActive() && 
                     (isSuperAdmin() ||
                      isAdmin() || 
-                     (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties != null &&
-                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties is list &&
-                      get(/databases/$(database)/documents/buildings/$(buildingId)).data.propertyId in 
-                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties));
+                     getUserRole() == 'property_manager' ||
+                     getUserRole() == 'viewer' ||
+                     (getUserRole() == 'maintenance' && 
+                      get(/databases/$(database)/documents/buildings/$(buildingId)).data.propertyId != null &&
+                      isPropertyAssigned(get(/databases/$(database)/documents/buildings/$(buildingId)).data.propertyId)));
       
       // Only admins and property managers can write
       allow write: if isAuthenticated() && isUserActive() && 
@@ -152,10 +170,11 @@ service cloud.firestore {
       allow read: if isAuthenticated() && isUserActive() && 
                     (isSuperAdmin() ||
                      isAdmin() || 
-                     (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties != null &&
-                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties is list &&
-                      get(/databases/$(database)/documents/units/$(unitId)).data.propertyId in 
-                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties));
+                     getUserRole() == 'property_manager' ||
+                     getUserRole() == 'viewer' ||
+                     (getUserRole() == 'maintenance' && 
+                      get(/databases/$(database)/documents/units/$(unitId)).data.propertyId != null &&
+                      isPropertyAssigned(get(/databases/$(database)/documents/units/$(unitId)).data.propertyId)));
       
       // Only admins and property managers can write
       allow write: if isAuthenticated() && isUserActive() && 
@@ -187,10 +206,11 @@ service cloud.firestore {
       allow read: if isAuthenticated() && isUserActive() && 
                     (isSuperAdmin() ||
                      isAdmin() || 
-                     (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties != null &&
-                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties is list &&
-                      get(/databases/$(database)/documents/leases/$(leaseId)).data.propertyId in 
-                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties));
+                     getUserRole() == 'property_manager' ||
+                     getUserRole() == 'viewer' ||
+                     (getUserRole() == 'maintenance' && 
+                      get(/databases/$(database)/documents/leases/$(leaseId)).data.propertyId != null &&
+                      isPropertyAssigned(get(/databases/$(database)/documents/leases/$(leaseId)).data.propertyId)));
       
       // Only admins and property managers can write
       allow write: if isAuthenticated() && isUserActive() && 
@@ -206,10 +226,11 @@ service cloud.firestore {
       allow read: if isAuthenticated() && isUserActive() && 
                     (isSuperAdmin() ||
                      isAdmin() || 
-                     (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties != null &&
-                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties is list &&
-                      get(/databases/$(database)/documents/tickets/$(ticketId)).data.propertyId in 
-                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties));
+                     getUserRole() == 'property_manager' ||
+                     getUserRole() == 'viewer' ||
+                     (getUserRole() == 'maintenance' && 
+                      get(/databases/$(database)/documents/tickets/$(ticketId)).data.propertyId != null &&
+                      isPropertyAssigned(get(/databases/$(database)/documents/tickets/$(ticketId)).data.propertyId)));
       
       // Admins, property managers, and maintenance staff can write
       // Property managers and maintenance staff can only write tickets for assigned properties
