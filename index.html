@@ -376,8 +376,22 @@
                                 <select id="ticketStatus">
                                     <option value="Not Started">Not Started</option>
                                     <option value="In Progress">In Progress</option>
+                                    <option value="Monitoring">Monitoring</option>
                                     <option value="Completed">Completed</option>
                                 </select>
+                            </div>
+                            <div class="form-group" id="monitoringFieldsGroup" style="display: none;">
+                                <label style="font-weight: 600; color: #2563EB;">Monitoring Information</label>
+                                <small style="display: block; color: #6B7280; margin-bottom: 12px;">Add invoices or proposals for future work on this ticket</small>
+                                <div class="form-group">
+                                    <label for="invoiceUrl">Invoice URL/Link</label>
+                                    <input type="url" id="invoiceUrl" placeholder="https://...">
+                                    <small style="color: #6B7280; font-size: 12px;">Link to invoice or proposal document</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="invoiceNotes">Invoice/Proposal Notes</label>
+                                    <textarea id="invoiceNotes" rows="3" placeholder="Notes about the invoice or proposal, estimated costs, timeline, etc."></textarea>
+                                </div>
                             </div>
                             <div class="form-group" id="retroactiveDatesGroup" style="display: none;">
                                 <label style="font-weight: 600; color: #667eea;">Retroactive Ticket Dates (Optional)</label>
@@ -568,6 +582,7 @@
                     <button id="createTicketBtn" class="btn-primary btn-large">+ Create New Ticket</button>
                     <div class="view-toggle">
                         <button id="viewActiveBtn" class="btn-toggle active">Active Tickets</button>
+                        <button id="viewMonitoringBtn" class="btn-toggle">Monitoring</button>
                         <button id="viewCompletedBtn" class="btn-toggle">Completed Tickets</button>
                         <button id="viewDeletedBtn" class="btn-toggle">Deleted Tickets</button>
                     </div>
@@ -576,6 +591,12 @@
                 <div id="activeTicketsView" class="tickets-view">
                     <h2>Active Tickets</h2>
                     <div id="activeTicketsList" class="tickets-list"></div>
+                </div>
+
+                <div id="monitoringTicketsView" class="tickets-view" style="display: none;">
+                    <h2>Monitoring</h2>
+                    <p style="color: #6B7280; margin-bottom: 20px; font-size: 14px;">Tickets that don't require immediate action but are being monitored. These may contain invoices or proposals for future work.</p>
+                    <div id="monitoringTicketsList" class="tickets-list"></div>
                 </div>
 
                 <div id="completedTicketsView" class="tickets-view" style="display: none;">

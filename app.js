@@ -971,7 +971,7 @@ async function handleSignup(e) {
         let userCredential;
         try {
             userCredential = await auth.createUserWithEmailAndPassword(normalizedEmail, password);
-            console.log('✅ Account created successfully');
+        console.log('✅ Account created successfully');
         } catch (createError) {
             // Handle "email already exists" error
             if (createError.code === 'auth/email-already-in-use') {
@@ -4125,6 +4125,8 @@ function updateMetrics(tickets) {
     let estimatedCost = 0;
     let totalCost = 0;
 
+    let monitoringCount = 0;
+    
     Object.values(tickets).forEach(ticket => {
         // Skip deleted tickets in metrics
         if (ticket.deletedAt) {
@@ -4145,6 +4147,9 @@ function updateMetrics(tickets) {
             completedCount++;
             completedHours += hours;
             totalCost += cost;
+        } else if (ticket.status === 'Monitoring') {
+            monitoringCount++;
+            // Monitoring tickets don't count toward active metrics
         } else {
             activeCount++;
             totalHours += hours;
@@ -4163,14 +4168,17 @@ function updateMetrics(tickets) {
 
 function renderTickets(tickets) {
     const activeList = document.getElementById('activeTicketsList');
+    const monitoringList = document.getElementById('monitoringTicketsList');
     const completedList = document.getElementById('completedTicketsList');
     const deletedList = document.getElementById('deletedTicketsList');
     
     activeList.innerHTML = '';
+    if (monitoringList) monitoringList.innerHTML = '';
     completedList.innerHTML = '';
     if (deletedList) deletedList.innerHTML = '';
 
     let activeTickets = [];
+    let monitoringTickets = [];
     let completedTickets = [];
     let deletedTickets = [];
 
@@ -4204,6 +4212,8 @@ function renderTickets(tickets) {
             deletedTickets.push(ticket);
         } else if (ticket.status === 'Completed') {
             completedTickets.push(ticket);
+        } else if (ticket.status === 'Monitoring') {
+            monitoringTickets.push(ticket);
         } else {
             activeTickets.push(ticket);
         }
@@ -4227,6 +4237,16 @@ function renderTickets(tickets) {
         activeTickets.forEach(ticket => {
             activeList.appendChild(createTicketCard(ticket));
         });
+    }
+
+    if (monitoringList) {
+        if (monitoringTickets.length === 0) {
+            monitoringList.innerHTML = '<div class="empty-state"><div class="empty-state-icon">👁️</div><p>No tickets in monitoring</p></div>';
+        } else {
+            monitoringTickets.forEach(ticket => {
+                monitoringList.appendChild(createTicketCard(ticket));
+            });
+        }
     }
 
     if (completedTickets.length === 0) {
@@ -4756,7 +4776,32 @@ function loadTicketForEdit(ticketId) {
 }
 
 function handleStatusChange(e) {
-    if (e.target.value === 'Completed') {
+    const status = e.target.value;
+    const completedByGroup = document.getElementById('completedByGroup');
+    const howResolvedGroup = document.getElementById('howResolvedGroup');
+    const afterPhotoGroup = document.getElementById('afterPhotoGroup');
+    const retroactiveDatesGroup = document.getElementById('retroactiveDatesGroup');
+    const monitoringFieldsGroup = document.getElementById('monitoringFieldsGroup');
+    
+    // Show/hide completed fields
+    if (status === 'Completed') {
+        if (completedByGroup) completedByGroup.style.display = 'block';
+        if (howResolvedGroup) howResolvedGroup.style.display = 'block';
+        if (afterPhotoGroup) afterPhotoGroup.style.display = 'block';
+        if (retroactiveDatesGroup) retroactiveDatesGroup.style.display = 'block';
+    } else {
+        if (completedByGroup) completedByGroup.style.display = 'none';
+        if (howResolvedGroup) howResolvedGroup.style.display = 'none';
+        if (afterPhotoGroup) afterPhotoGroup.style.display = 'none';
+        if (retroactiveDatesGroup) retroactiveDatesGroup.style.display = 'none';
+    }
+    
+    // Show/hide monitoring fields
+    if (status === 'Monitoring') {
+        if (monitoringFieldsGroup) monitoringFieldsGroup.style.display = 'block';
+    } else {
+        if (monitoringFieldsGroup) monitoringFieldsGroup.style.display = 'none';
+    }
         document.getElementById('completedByGroup').style.display = 'block';
         document.getElementById('howResolvedGroup').style.display = 'block';
         document.getElementById('afterPhotoGroup').style.display = 'block';
