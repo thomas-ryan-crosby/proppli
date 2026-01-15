@@ -1,85 +1,113 @@
 # Proppli Style Guide
 
 **Last Updated:** January 2025  
-**Version:** 1.0
+**Version:** 2.0 (Aligned with Brand Guidelines)
 
 ---
 
 ## Overview
 
-This style guide defines the visual design system for Proppli, ensuring consistency across all interfaces and components.
+This style guide defines the visual design system for Proppli, ensuring consistency across all interfaces and components. This guide aligns with the official Proppli brand guidelines and design principles.
+
+---
+
+## Design Principles
+
+### 1. Calm UI
+- **Whitespace first:** Generous spacing, minimal visual noise
+- **Minimal borders:** Prefer spacing over lines
+- **No visual noise:** Clean, uncluttered interfaces
+
+### 2. Soft Geometry
+- **Rounded corners:** Friendly forms, nothing sharp
+- **Smooth transitions:** Gentle animations and interactions
+
+### 3. Readable Density
+- **Default comfortable spacing:** Easy to scan and read
+- **Future:** "Compact" mode option for power users
+
+### 4. Clear Hierarchy
+- **One primary action per screen:** Clear focus
+- **Secondary actions are quieter:** Less prominent but accessible
+
+### 5. Accessible by Default
+- **4.5:1 contrast minimum:** For body text (WCAG AA)
+- **Clear focus rings:** Always visible keyboard navigation
+- **Form errors:** Include text, not color-only indicators
 
 ---
 
 ## Color Palette
 
-### Primary Colors
+### Core Brand Colors
 
-**Primary Purple**
-- Hex: `#667eea`
+**Proppli Blue**
+- Hex: `#2563EB`
 - Usage: Primary buttons, active states, links, brand elements
-- RGB: `rgb(102, 126, 234)`
+- RGB: `rgb(37, 99, 235)`
+- **This is the primary brand color (replaces previous purple)**
 
-**Secondary Purple**
-- Hex: `#764ba2`
-- Usage: Gradient backgrounds, hover states, accents
-- RGB: `rgb(118, 75, 162)`
+**Deep Slate**
+- Hex: `#1F2937`
+- Usage: Primary text color (never use pure black)
+- RGB: `rgb(31, 41, 55)`
 
-**Primary Gradient**
-- From: `#667eea` (0%)
-- To: `#764ba2` (100%)
-- Direction: `135deg`
-- Usage: Landing page background, primary buttons, hero sections
+**Soft Blue**
+- Hex: `#60A5FA`
+- Usage: Info states, accents, hover effects
+- RGB: `rgb(96, 165, 250)`
 
-### Neutral Colors
+**Cloud White**
+- Hex: `#FFFFFF`
+- Usage: Backgrounds, cards, surfaces
+- RGB: `rgb(255, 255, 255)`
 
-**Background Colors**
-- Light Gray: `#E5E7EB` - Main body background
-- Off-White: `#f5f7fa` - Application container background
-- White: `#ffffff` - Cards, modals, sidebar
+**Mist Gray**
+- Hex: `#E5E7EB`
+- Usage: Borders, subtle dividers
+- RGB: `rgb(229, 231, 235)`
+
+### Extended UI Neutrals
+
+**Backgrounds**
+- Background: `#FFFFFF` - Main surfaces
+- Subtle Background: `#F9FAFB` - Hover states, alternate rows
+- Surface: `#FFFFFF` - Cards, modals
+
+**Borders**
+- Border: `#E5E7EB` - Default borders (Mist Gray)
 
 **Text Colors**
-- Primary Text: `#1F2937` - Main body text
-- Secondary Text: `#64748b` - Secondary text, inactive states
-- Muted Text: `#6b7280` - Placeholders, helper text
+- Primary Text: `#1F2937` - Deep Slate (main body text)
+- Muted Text: `#6B7280` - Secondary text, placeholders
+- Disabled: `#9CA3AF` - Disabled states
 
-**Border Colors**
-- Light Border: `#e2e8f0` - Default borders
-- Medium Border: `#E5E7EB` - Card borders
-- Dark Border: `#d1d5db` - Strong borders
+**Rule:** Keep neutrals in the gray family; avoid introducing new "brand" colors unless for status states.
 
-**Hover/Active States**
-- Hover Background: `#f1f5f9` - Hover states for interactive elements
-- Active Border: `#5568d3` - Active navigation border
-
-### Semantic Colors
+### Status Colors (UI Only)
 
 **Success**
-- Background: `#d1fae5`
-- Border: `#a7f3d0`
-- Text: `#065f46`
+- Hex: `#16A34A`
+- Usage: Success states, positive actions
+- RGB: `rgb(22, 163, 74)`
 
-**Error**
-- Background: `#fee2e2`
-- Border: `#fecaca`
-- Text: `#991b1b`
+**Warning**
+- Hex: `#F59E0B`
+- Usage: Warning states, caution indicators
+- RGB: `rgb(245, 158, 11)`
 
-**Info/Blue**
-- Primary: `#2563EB`
-- Hover: `#1d4ed8`
-- Active: `#1e40af`
+**Danger**
+- Hex: `#DC2626`
+- Usage: Error states, destructive actions
+- RGB: `rgb(220, 38, 38)`
 
-**Warning/Orange**
-- Primary: `#f59e0b`
-- Hover: `#d97706`
+**Info**
+- Hex: `#60A5FA` - Soft Blue
+- Usage: Informational messages, info badges
 
-**Success/Green**
-- Primary: `#22c55e`
-- Hover: `#16a34a`
+### Legacy Colors (To Be Migrated)
 
-**Purple Accent**
-- Primary: `#8b5cf6`
-- Hover: `#7c3aed`
+**Note:** The application currently uses purple gradients (`#667eea` to `#764ba2`) in some areas. These should be migrated to Proppli Blue (`#2563EB`) over time, but functionality should not be broken during migration.
 
 ---
 
@@ -87,299 +115,87 @@ This style guide defines the visual design system for Proppli, ensuring consiste
 
 ### Font Family
 
-**Primary Font:** `Inter`
+**Primary Font:** `Inter` (Google Font)
 - Fallbacks: `-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif`
 - Usage: All text throughout the application
 
-### Font Weights
+**Mono Font (Optional):**
+- For IDs, logs, code: `ui-monospace` stack
 
-- **300:** Light (rarely used)
-- **400:** Regular (body text)
-- **500:** Medium (labels, secondary headings)
-- **600:** Semi-bold (buttons, emphasis)
-- **700:** Bold (headings, strong emphasis)
+### Type Scale
 
-### Font Sizes
+**Display**
+- Size: `32px` (2rem)
+- Line Height: `40px` (2.5rem)
+- Weight: `600`
+- Usage: Hero titles, major headings
 
-**Headings**
-- H1 (Landing Title): `4rem` (64px) - Desktop, `2.5rem` (40px) - Mobile
-- H2 (Page Title): `24px` (1.5rem)
-- H3 (Section Title): `1.3rem` (20.8px)
-- H4 (Card Title): `1.1rem` (17.6px)
+**H1**
+- Size: `24px` (1.5rem)
+- Line Height: `32px` (2rem)
+- Weight: `600`
+- Usage: Page titles, primary headings
 
-**Body Text**
-- Large: `1.1rem` (17.6px)
-- Default: `1rem` (16px)
-- Small: `0.95rem` (15.2px)
-- Extra Small: `0.9rem` (14.4px)
-- Tiny: `0.75rem` (12px) - Table headers
+**H2**
+- Size: `20px` (1.25rem)
+- Line Height: `28px` (1.75rem)
+- Weight: `600`
+- Usage: Section headings
 
-**Special**
-- Tagline: `1.5rem` (24px) - Desktop, `1.2rem` (19.2px) - Mobile
-- Subtitle: `1.1rem` (17.6px) - Desktop, `1rem` (16px) - Mobile
+**H3**
+- Size: `16px` (1rem)
+- Line Height: `24px` (1.5rem)
+- Weight: `600`
+- Usage: Subsection headings
 
-### Line Height
+**Body**
+- Size: `14px` (0.875rem)
+- Line Height: `22px` (1.375rem)
+- Weight: `400`
+- Usage: Default body text, paragraphs
 
-- Default: `1.6` (body text)
-- Tight: `1.4` (headings)
-- Loose: `1.8` (spacious layouts)
+**Small**
+- Size: `12px` (0.75rem)
+- Line Height: `18px` (1.125rem)
+- Weight: `400`
+- Usage: Helper text, captions
 
-### Letter Spacing
+**Label**
+- Size: `12px` (0.75rem)
+- Line Height: `16px` (1rem)
+- Weight: `500`
+- Usage: Form labels, table headers
 
-- Default: `0` (normal)
-- Tight: `-0.02em` (large headings)
-- Wide: `0.5px` (uppercase labels)
+### Text Usage Rules
+
+- **Never use pure black** - Use Deep Slate (`#1F2937`) for primary text
+- **Muted text** uses `#6B7280`
+- **Links** are Proppli Blue (`#2563EB`); hover darkens slightly
+- **Contrast:** Maintain 4.5:1 minimum for body text (WCAG AA)
 
 ---
 
 ## Spacing System
 
-### Padding
+### Base Unit: 4px
 
-**Small:** `8px` - Tight spacing
-**Medium:** `12px`, `14px`, `16px` - Standard spacing
-**Large:** `20px`, `24px`, `30px` - Generous spacing
-**Extra Large:** `40px` - Section spacing
+All spacing uses a 4px base unit for consistency:
 
-### Margin
+- **1** = `4px`
+- **2** = `8px`
+- **3** = `12px`
+- **4** = `16px`
+- **5** = `20px`
+- **6** = `24px`
+- **8** = `32px`
+- **10** = `40px`
+- **12** = `48px`
 
-**Small:** `10px`, `12px` - Element spacing
-**Medium:** `15px`, `20px` - Section spacing
-**Large:** `30px`, `40px`, `60px` - Major section spacing
+### Section Spacing
 
-### Border Radius
-
-**Small:** `6px` - Small elements
-**Medium:** `8px` - Buttons, inputs, cards (default)
-**Large:** `10px` - Large cards
-**Extra Large:** `16px` - Feature cards, landing page elements
-
----
-
-## Components
-
-### Buttons
-
-#### Primary Button
-```css
-background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-color: white;
-padding: 14px 24px;
-border-radius: 8px;
-font-size: 1rem;
-font-weight: 600;
-transition: all 0.3s ease;
-```
-
-**Hover State:**
-```css
-transform: translateY(-2px);
-box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-```
-
-#### Secondary Button
-```css
-background: #f0f0f0;
-color: #333;
-padding: 10px 20px;
-border-radius: 8px;
-font-size: 14px;
-font-weight: 500;
-```
-
-**Hover State:**
-```css
-background: #e0e0e0;
-```
-
-#### Button Sizes
-- **Default:** `padding: 10px 20px`, `font-size: 14px`
-- **Large:** `padding: 15px 30px`, `font-size: 16px`
-- **Small:** `padding: 12px 24px`, `font-size: 16px` (landing page)
-
-### Cards
-
-#### Standard Card
-```css
-background: white;
-border-radius: 10px;
-box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-border: 1px solid #E5E7EB;
-padding: 20px 30px;
-```
-
-#### Feature Card (Landing Page)
-```css
-background: rgba(255, 255, 255, 0.15);
-backdrop-filter: blur(10px);
-border-radius: 16px;
-padding: 30px;
-border: 1px solid rgba(255, 255, 255, 0.2);
-```
-
-**Hover State:**
-```css
-background: rgba(255, 255, 255, 0.25);
-transform: translateY(-5px);
-box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-```
-
-### Forms
-
-#### Input Fields
-```css
-width: 100%;
-padding: 12px;
-border: 1px solid #e2e8f0;
-border-radius: 8px;
-font-size: 1rem;
-font-family: 'Inter', sans-serif;
-background: white;
-color: #1F2937;
-```
-
-**Focus State:**
-```css
-border-color: #667eea;
-outline: none;
-box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-```
-
-#### Labels
-```css
-display: block;
-margin-bottom: 8px;
-font-weight: 500;
-color: #374151;
-font-size: 0.9rem;
-```
-
-#### Form Groups
-```css
-margin-bottom: 20px;
-```
-
-### Navigation
-
-#### Sidebar Navigation
-- **Width:** `260px`
-- **Background:** `white`
-- **Border:** `1px solid #e2e8f0`
-- **Shadow:** `2px 0 8px rgba(0, 0, 0, 0.05)`
-
-#### Navigation Link
-```css
-padding: 14px 20px;
-color: #64748b;
-font-size: 15px;
-font-weight: 500;
-transition: all 0.2s;
-```
-
-**Hover State:**
-```css
-background: #f1f5f9;
-color: #667eea;
-```
-
-**Active State:**
-```css
-background: #667eea;
-color: white;
-border-left: 3px solid #5568d3;
-```
-
-### Modals
-
-#### Modal Overlay
-```css
-background: rgba(0, 0, 0, 0.5);
-backdrop-filter: blur(4px);
-```
-
-#### Modal Content
-```css
-background: white;
-border-radius: 12px;
-box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-max-width: 600px;
-padding: 30px;
-```
-
-### Tables
-
-#### Table Header
-```css
-background: #f8fafc;
-border-bottom: 2px solid #e5e7eb;
-padding: 12px 16px;
-font-weight: 600;
-color: #374151;
-font-size: 0.75rem;
-text-transform: uppercase;
-letter-spacing: 0.5px;
-```
-
-#### Table Row
-```css
-border-bottom: 1px solid #f3f4f6;
-transition: background-color 0.15s ease;
-```
-
-**Hover State:**
-```css
-background-color: #f9fafb;
-```
-
-#### Table Cell
-```css
-padding: 14px 16px;
-color: #1F2937;
-```
-
-### Badges & Status Indicators
-
-#### Status Badge
-```css
-display: inline-block;
-padding: 4px 12px;
-border-radius: 12px;
-font-size: 0.75rem;
-font-weight: 600;
-text-transform: uppercase;
-letter-spacing: 0.5px;
-```
-
-**Status Colors:**
-- Active: `background: #d1fae5`, `color: #065f46`
-- Inactive: `background: #fee2e2`, `color: #991b1b`
-- Pending: `background: #fef3c7`, `color: #92400e`
-
-### Floating Action Buttons (FABs)
-
-#### Primary FAB
-```css
-width: 56px;
-height: 56px;
-border-radius: 50%;
-background: #667eea;
-color: white;
-font-size: 28px;
-box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-transition: all 0.3s ease;
-```
-
-**Hover State:**
-```css
-background: #5568d3;
-box-shadow: 0 6px 16px rgba(102, 126, 234, 0.5);
-transform: scale(1.05);
-```
-
-#### Secondary FABs
-- Green: `#22c55e` (Add Contact)
-- Purple: `#8b5cf6` (Add Building)
-- Orange: `#f59e0b` (Add Unit)
+- **Between page sections:** `24px - 32px` (6-8 units)
+- **Between form groups:** `16px - 24px` (4-6 units)
+- **Within form groups:** `12px - 16px` (3-4 units)
 
 ---
 
@@ -387,109 +203,348 @@ transform: scale(1.05);
 
 ### Grid System
 
-**Landing Page Features**
-```css
-display: grid;
-grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-gap: 30px;
-```
+**App Shell**
+- Left sidebar + top header + content area
+- Sidebar: Fixed width (typically `260px`)
+- Content: Flexible, max-width constrained where appropriate
 
-**Metrics Dashboard**
-```css
-display: grid;
-grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-gap: 20px;
-```
+**Content Max Widths**
+- **Document pages:** `1100px - 1200px` (centered)
+- **Tables/Dashboards:** Full-width allowed
+- **Forms:** `600px - 800px` max width
 
-### Container Widths
+### Spacing Guidelines
 
-- **Max Content Width:** `1400px` (top bar, main content)
-- **Landing Page Max:** `1200px`
-- **Modal Max Width:** `600px`
-
-### Sidebar Layout
-
-- **Sidebar Width:** `260px` (fixed)
-- **Main Content Margin:** `260px` (to account for sidebar)
+- **Whitespace first:** Prefer spacing over borders
+- **Comfortable density:** Default spacing should feel spacious
+- **Consistent rhythm:** Use the 4px base unit consistently
 
 ---
 
-## Shadows
+## Radii, Borders, Shadows
 
-### Elevation Levels
+### Border Radius
 
-**Level 1 (Subtle)**
+**Inputs/Buttons:** `10px`
+- Form inputs, buttons, small interactive elements
+
+**Cards:** `16px`
+- Card containers, feature cards
+
+**Modals:** `18px`
+- Modal dialogs, overlays
+
+**Pills/Badges:** `999px` (fully rounded)
+- Status badges, tags, pills
+
+### Borders
+
+**Default Border:** `1px solid #E5E7EB` (Mist Gray)
+
+**Guidelines:**
+- Avoid heavy dividers
+- Prefer spacing over lines
+- Use borders sparingly for definition
+
+### Shadows (Subtle Only)
+
+**Card Shadow:**
 ```css
 box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 ```
+- Soft shadow, no harsh outlines
+- Use sparingly; prefer borders + subtle shadow
 
-**Level 2 (Medium)**
+**Focus Ring:**
 ```css
-box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+box-shadow: 0 0 0 2px #2563EB;
+outline: none; /* Only if replaced by ring */
 ```
-
-**Level 3 (Elevated)**
-```css
-box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-```
-
-**Level 4 (High)**
-```css
-box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-```
-
-**Level 5 (Modal)**
-```css
-box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-```
-
-### Colored Shadows
-
-**Primary Purple Shadow:**
-```css
-box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-```
-
-**Hover Shadow:**
-```css
-box-shadow: 0 6px 16px rgba(102, 126, 234, 0.5);
-```
+- Always visible for keyboard navigation
+- Proppli Blue color
+- 2px ring with 2px offset
 
 ---
 
-## Animations & Transitions
+## Components
 
-### Transitions
+### Buttons
 
-**Standard:** `transition: all 0.3s ease;`
-**Fast:** `transition: all 0.2s ease;`
-**Slow:** `transition: all 0.5s ease;`
+#### Variants
 
-### Common Animations
-
-**Slide Down:**
+**Primary**
 ```css
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+background: #2563EB; /* Proppli Blue */
+color: white;
+border: none;
+```
+
+**Secondary**
+```css
+background: white;
+color: #1F2937; /* Deep Slate */
+border: 1px solid #E5E7EB; /* Mist Gray */
+```
+
+**Ghost**
+```css
+background: transparent;
+color: #1F2937; /* Deep Slate */
+border: none;
+```
+
+**Destructive**
+```css
+background: #DC2626; /* Danger */
+color: white;
+border: none;
+```
+
+#### Sizes
+
+**Small (sm)**
+- Height: `32px` (h-8)
+- Padding: `12px` (px-3)
+- Font: `12px/16px` (text-12/16)
+
+**Medium (md)** - Default
+- Height: `40px` (h-10)
+- Padding: `16px` (px-4)
+- Font: `14px/20px` (text-14/20)
+
+**Large (lg)**
+- Height: `44px` (h-11)
+- Padding: `20px` (px-5)
+- Font: `14px/20px` (text-14/20)
+
+#### Rules
+
+- **Primary used once per view** (generally)
+- **Loading state:** Shows spinner left; disables click
+- **Hover:** Darken background by ~6-8%
+- **Focus:** Visible ring (Proppli Blue)
+- **Disabled:** Reduce opacity + remove shadow + cursor-not-allowed
+
+### Inputs
+
+**Default (md)**
+- Height: `40px`
+- Border: `1px solid #E5E7EB` (Mist Gray)
+- Border Radius: `10px`
+- Padding: `12px 16px`
+- Font: `14px/22px` (Body)
+
+**Focus State**
+```css
+border-color: #2563EB; /* Proppli Blue */
+box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+outline: none;
+```
+
+**Error State**
+- Border: `1px solid #DC2626` (Danger)
+- Helper text: Small red text below input
+- Include text, not color-only indicator
+
+**Disabled State**
+- Background: `#F9FAFB`
+- Border: `#E5E7EB`
+- Color: `#9CA3AF`
+- Cursor: `not-allowed`
+
+### Cards
+
+**Default**
+```css
+background: white;
+border-radius: 16px;
+border: 1px solid #E5E7EB; /* OR subtle shadow */
+padding: 24px;
+```
+
+**Guidelines:**
+- White background
+- Border OR shadow (pick one; default is border + tiny shadow)
+- Header area optional (title + actions)
+- Hover: Subtle shadow increase OR border darken slightly
+
+### Tables
+
+**Default**
+- Sticky header optional
+- Row hover: `#F9FAFB` (Subtle background)
+- Zebra striping optional for dense datasets
+- Inline actions appear on hover for cleanliness
+
+**Header**
+```css
+background: #F9FAFB;
+border-bottom: 1px solid #E5E7EB;
+padding: 12px 16px;
+font-weight: 600;
+font-size: 12px;
+color: #1F2937;
+```
+
+**Row**
+```css
+border-bottom: 1px solid #E5E7EB;
+transition: background-color 0.15s ease;
+```
+
+**Row Hover**
+```css
+background-color: #F9FAFB;
+```
+
+### Modals / Drawers
+
+**Modal (Default)**
+- Use for: "Confirm/edit small" actions
+- Border Radius: `18px`
+- Max Width: `600px` (small), `800px` (medium)
+- Padding: `24px - 32px`
+
+**Drawer**
+- Use for: "Edit complex entity"
+- Slides in from side
+- Full height or partial
+
+**Rules:**
+- Always trap focus
+- ESC to close
+- Click outside closes (unless destructive flow)
+- Focus ring visible on all interactive elements
+
+### Navigation
+
+**Sidebar Items**
+- Icon + label layout
+- Padding: `14px 20px`
+- Font: `14px/20px`
+
+**Active State**
+```css
+color: #2563EB; /* Proppli Blue */
+background: rgba(37, 99, 235, 0.1); /* Very light blue */
+```
+
+**Hover State**
+```css
+background: #F9FAFB; /* Subtle background */
+color: #2563EB; /* Proppli Blue */
+```
+
+**Collapsed Sidebar**
+- Supports icon-only mode
+- Tooltips on hover
+
+### Badges
+
+**Neutral Badge**
+```css
+background: #F9FAFB;
+color: #6B7280;
+padding: 4px 12px;
+border-radius: 999px;
+font-size: 12px;
+font-weight: 500;
+```
+
+**Status Badges**
+- Success: `#16A34A` background, white text
+- Warning: `#F59E0B` background, white text
+- Danger: `#DC2626` background, white text
+- Info: `#60A5FA` background, white text
+
+**Rules:**
+- Keep text `12px`
+- Padding tight (`4px 12px`)
+- Fully rounded (`999px`)
+
+---
+
+## Interaction States
+
+### Hover
+
+**Buttons**
+- Darken background by ~6-8%
+- Smooth transition (`0.2s ease`)
+
+**Cards**
+- Subtle shadow increase OR border darken slightly
+- Smooth transition (`0.2s ease`)
+
+**Links**
+- Darken Proppli Blue slightly
+- Underline optional (prefer color change)
+
+### Focus (Keyboard)
+
+**Always Visible**
+- Ring: Proppli Blue (`#2563EB`)
+- Width: `2px`
+- Offset: `2px`
+- `outline: none` is NOT allowed unless replaced by ring
+
+**Example:**
+```css
+&:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px #2563EB;
 }
 ```
 
-**Hover Lift:**
-```css
-transform: translateY(-2px);
-```
+### Disabled
 
-**Hover Scale:**
-```css
-transform: scale(1.05);
-```
+**Visual State**
+- Reduce opacity: `0.6`
+- Remove shadow
+- Cursor: `not-allowed`
+- Background: `#F9FAFB` (if applicable)
+
+### Loading
+
+**Buttons**
+- Show spinner left of text
+- Disable click interaction
+- Maintain visual state
+
+---
+
+## Accessibility Requirements
+
+### Text Contrast
+
+- **Body text:** Minimum 4.5:1 contrast ratio (WCAG AA)
+- **Large text (18px+):** Minimum 3:1 contrast ratio
+- **Never use pure black** - Use Deep Slate (`#1F2937`)
+
+### Focus Indicators
+
+- **Always visible:** Focus ring must be clearly visible
+- **Color:** Proppli Blue (`#2563EB`)
+- **Width:** `2px` minimum
+- **Never remove:** `outline: none` only if replaced by visible ring
+
+### Form Errors
+
+- **Include text:** Always provide text description, not color-only
+- **Visual indicator:** Red border + error text below input
+- **ARIA:** Use `aria-describedby` to link error text
+
+### Tap Targets
+
+- **Minimum height:** `40px` for interactive elements
+- **Spacing:** Adequate spacing between targets (`8px` minimum)
+
+### Keyboard Navigation
+
+- **Tab order:** Logical, intuitive flow
+- **Focus trap:** In modals and drawers
+- **ESC key:** Close modals/drawers
+- **Enter/Space:** Activate buttons and links
 
 ---
 
@@ -498,40 +553,101 @@ transform: scale(1.05);
 ### Breakpoints
 
 **Mobile:** `max-width: 768px`
-- Landing title: `2.5rem` (from `4rem`)
-- Tagline: `1.2rem` (from `1.5rem`)
-- Features grid: Single column
-- Padding: Reduced
-
-### Mobile Adjustments
-
 - Reduced font sizes
 - Single column layouts
 - Reduced padding/margins
 - Stacked navigation elements
 
+**Tablet:** `768px - 1024px`
+- Two-column layouts where appropriate
+- Adjusted spacing
+
+**Desktop:** `1024px+`
+- Full layout with sidebar
+- Maximum content width: `1100px - 1200px`
+
+### Mobile Adjustments
+
+- Font sizes scale down proportionally
+- Spacing reduces but maintains rhythm
+- Touch targets remain `40px` minimum
+- Sidebar collapses to icon-only or hidden
+
 ---
 
-## Accessibility
+## CSS Variables (Recommended Implementation)
 
-### Color Contrast
-
-- Text on white: Minimum 4.5:1 ratio
-- Text on colored backgrounds: Minimum 4.5:1 ratio
-- Interactive elements: Clear focus states
-
-### Focus States
+For easier theming and maintenance, consider using CSS variables:
 
 ```css
-outline: none;
-box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+:root {
+    /* Brand Colors */
+    --color-brand-blue: #2563EB;
+    --color-deep-slate: #1F2937;
+    --color-soft-blue: #60A5FA;
+    --color-cloud-white: #FFFFFF;
+    --color-mist-gray: #E5E7EB;
+    
+    /* Neutrals */
+    --color-background: #FFFFFF;
+    --color-background-subtle: #F9FAFB;
+    --color-border: #E5E7EB;
+    --color-text: #1F2937;
+    --color-text-muted: #6B7280;
+    --color-disabled: #9CA3AF;
+    
+    /* Status Colors */
+    --color-success: #16A34A;
+    --color-warning: #F59E0B;
+    --color-danger: #DC2626;
+    --color-info: #60A5FA;
+    
+    /* Spacing (4px base) */
+    --spacing-1: 4px;
+    --spacing-2: 8px;
+    --spacing-3: 12px;
+    --spacing-4: 16px;
+    --spacing-5: 20px;
+    --spacing-6: 24px;
+    --spacing-8: 32px;
+    --spacing-10: 40px;
+    --spacing-12: 48px;
+    
+    /* Border Radius */
+    --radius-input: 10px;
+    --radius-card: 16px;
+    --radius-modal: 18px;
+    --radius-pill: 999px;
+    
+    /* Typography */
+    --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: ui-monospace, monospace;
+}
 ```
 
-### Interactive Elements
+---
 
-- Minimum touch target: `44px × 44px`
-- Clear hover states
-- Visual feedback on interactions
+## Migration Notes
+
+### Current State vs. Brand Guide
+
+**Colors to Migrate:**
+- Purple gradients (`#667eea` to `#764ba2`) → Proppli Blue (`#2563EB`)
+- Some existing colors may differ from brand guide
+- Migration should be gradual to avoid breaking functionality
+
+**Typography Adjustments:**
+- Current font sizes may differ slightly from brand scale
+- Align to brand type scale over time
+
+**Component Updates:**
+- Border radius: `8px` → `10px` (inputs/buttons)
+- Card radius: `10px` → `16px`
+- Modal radius: `12px` → `18px`
+
+**Spacing:**
+- Align to 4px base unit system
+- Update section spacing to match guidelines
 
 ---
 
@@ -539,44 +655,27 @@ box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 
 ### Do's
 
-✅ Use the defined color palette consistently  
-✅ Maintain consistent spacing using the spacing system  
-✅ Use Inter font family for all text  
-✅ Apply appropriate border radius (8px default)  
-✅ Include hover and focus states for interactive elements  
-✅ Use semantic colors for status indicators  
-✅ Maintain consistent shadow elevations  
+✅ Use Proppli Blue (`#2563EB`) as primary brand color  
+✅ Use Deep Slate (`#1F2937`) for text (never pure black)  
+✅ Maintain 4.5:1 contrast ratio for body text  
+✅ Use 4px base unit for all spacing  
+✅ Include visible focus rings on all interactive elements  
+✅ Prefer spacing over borders  
+✅ Use soft, rounded corners (10px+ radius)  
+✅ Keep one primary action per screen  
+✅ Include text with error states (not color-only)  
+✅ Maintain minimum 40px tap targets  
 
 ### Don'ts
 
-❌ Don't use colors outside the defined palette  
-❌ Don't mix different font families  
-❌ Don't use inconsistent spacing  
-❌ Don't skip hover/focus states  
-❌ Don't use hard-coded colors (use CSS variables if possible)  
-❌ Don't create custom components without referencing this guide  
-
----
-
-## CSS Variables (Future Enhancement)
-
-Consider migrating to CSS variables for easier theming:
-
-```css
-:root {
-    --color-primary: #667eea;
-    --color-secondary: #764ba2;
-    --color-background: #f5f7fa;
-    --color-text: #1F2937;
-    --color-border: #e2e8f0;
-    --spacing-sm: 8px;
-    --spacing-md: 16px;
-    --spacing-lg: 24px;
-    --radius-sm: 6px;
-    --radius-md: 8px;
-    --radius-lg: 12px;
-}
-```
+❌ Don't use pure black (`#000000`) for text  
+❌ Don't remove focus indicators without replacement  
+❌ Don't use color-only error indicators  
+❌ Don't introduce new brand colors (use status colors for states)  
+❌ Don't use sharp corners (maintain rounded geometry)  
+❌ Don't create visual noise (keep it calm)  
+❌ Don't skip accessibility requirements  
+❌ Don't use inconsistent spacing (stick to 4px base)  
 
 ---
 
@@ -596,4 +695,5 @@ Consider migrating to CSS variables for easier theming:
 
 ---
 
-*Style Guide maintained by Proppli Development Team*
+*Style Guide maintained by Proppli Development Team*  
+*Aligned with Official Brand Guidelines v2.0*
