@@ -13516,15 +13516,18 @@ async function populateLeaseFormDropdowns() {
             const percentageGroup = document.getElementById('escalationPercentageGroup');
             const frequencyGroup = document.getElementById('escalationFrequencyGroup');
             const firstDateGroup = document.getElementById('firstEscalationDateGroup');
+            const noticeDateGroup = document.getElementById('escalationNoticeDateGroup');
             
             if (type === 'None') {
                 if (amountGroup) amountGroup.style.display = 'none';
                 if (percentageGroup) percentageGroup.style.display = 'none';
                 if (frequencyGroup) frequencyGroup.style.display = 'none';
                 if (firstDateGroup) firstDateGroup.style.display = 'none';
+                if (noticeDateGroup) noticeDateGroup.style.display = 'none';
             } else {
                 if (frequencyGroup) frequencyGroup.style.display = 'block';
                 if (firstDateGroup) firstDateGroup.style.display = 'block';
+                if (noticeDateGroup) noticeDateGroup.style.display = 'block';
                 
                 if (type === 'Fixed Amount') {
                     if (amountGroup) amountGroup.style.display = 'block';
@@ -13831,6 +13834,10 @@ function populateLeaseForm(lease) {
                 const firstEscDate = esc.firstEscalationDate.toDate().toISOString().split('T')[0];
                 document.getElementById('firstEscalationDate').value = firstEscDate;
             }
+            if (esc.noticeDate && document.getElementById('escalationNoticeDate')) {
+                const noticeDate = esc.noticeDate.toDate ? esc.noticeDate.toDate() : new Date(esc.noticeDate);
+                document.getElementById('escalationNoticeDate').value = noticeDate.toISOString().split('T')[0];
+            }
             // Trigger change to show/hide fields
             if (document.getElementById('escalationType')) {
                 document.getElementById('escalationType').dispatchEvent(new Event('change'));
@@ -14077,7 +14084,8 @@ async function handleLeaseSubmit(e) {
                     escalationAmount: document.getElementById('escalationAmount').value ? parseFloat(document.getElementById('escalationAmount').value) : null,
                     escalationPercentage: document.getElementById('escalationPercentage').value ? parseFloat(document.getElementById('escalationPercentage').value) : null,
                     escalationFrequency: document.getElementById('escalationFrequency').value || null,
-                    firstEscalationDate: document.getElementById('firstEscalationDate').value ? firebase.firestore.Timestamp.fromDate(new Date(document.getElementById('firstEscalationDate').value)) : null
+                    firstEscalationDate: document.getElementById('firstEscalationDate').value ? firebase.firestore.Timestamp.fromDate(new Date(document.getElementById('firstEscalationDate').value)) : null,
+                    noticeDate: document.getElementById('escalationNoticeDate').value ? firebase.firestore.Timestamp.fromDate(new Date(document.getElementById('escalationNoticeDate').value)) : null
                 },
                 extensionOptions: {
                     hasExtensionOptions: document.getElementById('hasExtensionOptions').checked || false,
