@@ -2558,16 +2558,74 @@ function loadProperties() {
                 }
             });
             
+            // Populate dropdowns
+            const select = document.getElementById('propertySelect');
+            const ticketPropertySelect = document.getElementById('ticketProperty');
+            
+            if (select) {
+                select.innerHTML = '<option value="">Select a property...</option>';
+                Object.keys(properties).forEach(id => {
+                    const property = properties[id];
+                    const option = new Option(property.name, id);
+                    select.appendChild(option);
+                });
+            }
+            
+            if (ticketPropertySelect) {
+                ticketPropertySelect.innerHTML = '<option value="">Select a property...</option>';
+                Object.keys(properties).forEach(id => {
+                    const property = properties[id];
+                    const ticketOption = new Option(property.name, id);
+                    ticketPropertySelect.appendChild(ticketOption);
+                });
+            }
+            
+            // Restore selected property
+            if (selectedPropertyId && properties[selectedPropertyId]) {
+                if (select) select.value = selectedPropertyId;
+            } else if (Object.keys(properties).length === 1) {
+                // Auto-select if only one property
+                selectedPropertyId = Object.keys(properties)[0];
+                if (select) select.value = selectedPropertyId;
+                localStorage.setItem('selectedPropertyId', selectedPropertyId);
+            }
+            
             // Set up listeners for changes to assigned properties
             const propertiesRef = properties; // Store reference for listeners
             currentUserProfile.assignedProperties.forEach(propId => {
                 db.collection('properties').doc(propId).onSnapshot((doc) => {
                     if (doc.exists) {
                         propertiesRef[doc.id] = { id: doc.id, ...doc.data() };
+                        // Update dropdowns
+                        if (select) {
+                            const existingOption = Array.from(select.options).find(opt => opt.value === doc.id);
+                            if (existingOption) {
+                                existingOption.textContent = doc.data().name;
+                            } else {
+                                select.appendChild(new Option(doc.data().name, doc.id));
+                            }
+                        }
+                        if (ticketPropertySelect) {
+                            const existingOption = Array.from(ticketPropertySelect.options).find(opt => opt.value === doc.id);
+                            if (existingOption) {
+                                existingOption.textContent = doc.data().name;
+                            } else {
+                                ticketPropertySelect.appendChild(new Option(doc.data().name, doc.id));
+                            }
+                        }
                         renderPropertiesList(propertiesRef);
                     } else {
                         // Property was deleted, remove from list
                         delete propertiesRef[doc.id];
+                        // Remove from dropdowns
+                        if (select) {
+                            const option = Array.from(select.options).find(opt => opt.value === doc.id);
+                            if (option) option.remove();
+                        }
+                        if (ticketPropertySelect) {
+                            const option = Array.from(ticketPropertySelect.options).find(opt => opt.value === doc.id);
+                            if (option) option.remove();
+                        }
                         renderPropertiesList(propertiesRef);
                     }
                 }, (error) => {
@@ -2576,7 +2634,7 @@ function loadProperties() {
             });
             
             renderPropertiesList(properties);
-            // loadTickets will be called separately after properties are loaded
+            loadTickets(); // Load tickets after properties are loaded
         }).catch((error) => {
             console.error('Error loading properties:', error);
             if (error.code === 'permission-denied') {
