@@ -10402,9 +10402,9 @@ async function loadContactsForTableView(tenants, maxContacts, maxBrokers) {
         } else {
             console.log('✅ loadContactsForTableView: Using cached contacts');
         }
-    
-    // Update table with contact info in individual columns - show ALL contacts and brokers
-    Object.keys(tenants).forEach(tenantId => {
+        
+        // Update table with contact info in individual columns - show ALL contacts and brokers
+        Object.keys(tenants).forEach(tenantId => {
         const contacts = allContacts[tenantId] || [];
         const separated = filterContactsForTableView(contacts, false);
         const sortedContacts = separated.contacts;
@@ -10507,10 +10507,16 @@ async function loadContactsForTableView(tenants, maxContacts, maxBrokers) {
                 }
             }
         }
-    });
-    
-    // Clear cached contacts
-    delete window._cachedContacts;
+        });
+        
+        // Clear cached contacts
+        delete window._cachedContacts;
+        console.log('✅ loadContactsForTableView: Completed successfully');
+    } catch (error) {
+        console.error('❌ loadContactsForTableView: Fatal error:', error);
+        // Don't throw - just log and return
+        return Promise.resolve();
+    }
 }
 
 function filterContactsForTableView(contacts, showLeasing) {
