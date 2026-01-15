@@ -8974,10 +8974,29 @@ async function loadOrphanContacts(maxContacts, maxBrokers) {
         // Get all contacts
         const allContactsSnapshot = await db.collection('tenantContacts').get();
         
-        // Get all tenant IDs
-        const allTenantsSnapshot = await db.collection('tenants').get();
+        // Get tenant IDs - filter for maintenance users
         const tenantIds = new Set();
-        allTenantsSnapshot.forEach(doc => tenantIds.add(doc.id));
+        if (currentUserProfile && currentUserProfile.role === 'maintenance' && 
+            Array.isArray(currentUserProfile.assignedProperties) && 
+            currentUserProfile.assignedProperties.length > 0) {
+            // For maintenance users, only get tenants from assigned properties via occupancies
+            if (currentUserProfile.assignedProperties.length <= 10) {
+                const occupanciesSnapshot = await db.collection('occupancies')
+                    .where('propertyId', 'in', currentUserProfile.assignedProperties)
+                    .get();
+                occupanciesSnapshot.forEach(doc => {
+                    const occ = doc.data();
+                    if (occ.tenantId) {
+                        tenantIds.add(occ.tenantId);
+                    }
+                });
+            }
+            // If more than 10 properties, skip orphan contacts check for maintenance users
+        } else {
+            // For other roles, get all tenant IDs
+            const allTenantsSnapshot = await db.collection('tenants').get();
+            allTenantsSnapshot.forEach(doc => tenantIds.add(doc.id));
+        }
         
         // Find orphan contacts (contacts whose tenantId is null, undefined, or doesn't exist)
         const orphanContacts = [];
