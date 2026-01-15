@@ -1202,6 +1202,11 @@ body {
     color: #2e7d32;
 }
 
+.status-monitoring {
+    background: #FEF3C7;
+    color: #92400E;
+}
+
 .status-badge {
     display: inline-block;
     padding: 4px 12px;
