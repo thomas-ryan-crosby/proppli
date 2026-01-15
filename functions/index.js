@@ -143,6 +143,43 @@ const emailTemplates = {
   })
 };
 
+// Check if email has pending invitation (for signup flow)
+exports.checkPendingInvitation = functions.https.onCall(async (data, context) => {
+  // This function can be called by unauthenticated users during signup
+  // No authentication required - we're just checking if an email has a pending invitation
+  
+  if (!data || !data.email) {
+    throw new functions.https.HttpsError('invalid-argument', 'Email is required');
+  }
+  
+  try {
+    const normalizedEmail = (data.email || '').toLowerCase().trim();
+    
+    // Check pendingUsers collection
+    const pendingUsersSnapshot = await admin.firestore()
+      .collection('pendingUsers')
+      .where('email', '==', normalizedEmail)
+      .where('status', '==', 'pending_signup')
+      .limit(1)
+      .get();
+    
+    if (!pendingUsersSnapshot.empty) {
+      const pendingUser = pendingUsersSnapshot.docs[0].data();
+      // Don't return sensitive data, just indicate invitation exists
+      return {
+        hasInvitation: true,
+        displayName: pendingUser.displayName,
+        role: pendingUser.role
+      };
+    }
+    
+    return { hasInvitation: false };
+  } catch (error) {
+    console.error('Error checking pending invitation:', error);
+    throw new functions.https.HttpsError('internal', 'Failed to check pending invitation');
+  }
+});
+
 // Send invitation email
 exports.sendInvitationEmail = functions.https.onCall(async (data, context) => {
   // Verify user is authenticated and is admin
