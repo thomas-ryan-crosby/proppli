@@ -4874,14 +4874,13 @@ async function loadUsersForDropdowns() {
     });
     
     try {
-        // For maintenance users, they can only read their own profile and admins/property managers
-        // But for ticket dropdowns, they might need to see property managers/admins
-        // Let's load only users they have permission to see
+        // For maintenance users, they can only read their own profile per Firestore rules
+        // So we'll just include the current user and allow "Other" option for manual entry
         if (currentUserProfile && currentUserProfile.role === 'maintenance') {
-            console.log('🔍 loadUsersForDropdowns: Loading users for maintenance user');
+            console.log('🔍 loadUsersForDropdowns: Loading users for maintenance user (current user only)');
             usersForDropdowns = {};
             
-            // Always include current user
+            // Only include current user (they can read their own profile)
             if (currentUserProfile.id) {
                 usersForDropdowns[currentUserProfile.id] = {
                     id: currentUserProfile.id,
@@ -4890,30 +4889,7 @@ async function loadUsersForDropdowns() {
                 };
             }
             
-            // Try to load admins and property managers (they might have permission)
-            // If not, we'll just use the current user
-            try {
-                // Load users with admin or property_manager roles
-                // Note: This might fail for maintenance users, so we catch it
-                const adminSnapshot = await db.collection('users')
-                    .where('isActive', '==', true)
-                    .where('role', 'in', ['admin', 'super_admin', 'property_manager'])
-                    .get();
-                
-                adminSnapshot.forEach((doc) => {
-                    const userData = doc.data();
-                    usersForDropdowns[doc.id] = {
-                        id: doc.id,
-                        displayName: userData.displayName || userData.email || 'Unknown',
-                        email: userData.email
-                    };
-                });
-                console.log(`✅ loadUsersForDropdowns: Loaded ${Object.keys(usersForDropdowns).length} users for maintenance user`);
-            } catch (adminError) {
-                console.warn('⚠️ loadUsersForDropdowns: Could not load admins/property managers, using current user only:', adminError);
-                // Continue with just current user
-            }
-            
+            console.log(`✅ loadUsersForDropdowns: Loaded ${Object.keys(usersForDropdowns).length} user(s) for maintenance user`);
             return usersForDropdowns;
         }
         
