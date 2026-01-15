@@ -2267,9 +2267,69 @@ function setupEventListeners() {
                 tabContent.style.display = 'block';
             }
             
+            // Load documents if documents tab is clicked
+            if (tabName === 'documents' && currentTenantIdForDetail) {
+                loadTenantDocuments(currentTenantIdForDetail);
+            }
+            
             updateFABsVisibility();
         });
     });
+    
+    // Tenant document upload
+    const uploadDocumentBtn = document.getElementById('uploadDocumentBtn');
+    const tenantDocumentInput = document.getElementById('tenantDocumentInput');
+    
+    if (uploadDocumentBtn) {
+        uploadDocumentBtn.addEventListener('click', () => {
+            if (tenantDocumentInput) {
+                tenantDocumentInput.click();
+            }
+        });
+    }
+    
+    if (tenantDocumentInput) {
+        tenantDocumentInput.addEventListener('change', async function(e) {
+            const files = e.target.files;
+            if (!files || files.length === 0) return;
+            
+            if (!currentTenantIdForDetail) {
+                alert('Error: No tenant selected');
+                return;
+            }
+            
+            const uploadBtn = document.getElementById('uploadDocumentBtn');
+            const originalText = uploadBtn ? uploadBtn.textContent : 'Upload Document';
+            
+            try {
+                if (uploadBtn) {
+                    uploadBtn.disabled = true;
+                    uploadBtn.textContent = 'Uploading...';
+                }
+                
+                // Upload all selected files
+                for (let i = 0; i < files.length; i++) {
+                    await uploadTenantDocument(currentTenantIdForDetail, files[i]);
+                }
+                
+                // Reload documents
+                loadTenantDocuments(currentTenantIdForDetail);
+                
+                // Reset file input
+                tenantDocumentInput.value = '';
+                
+                alert(`Successfully uploaded ${files.length} document(s)`);
+            } catch (error) {
+                console.error('Error uploading documents:', error);
+                alert('Error uploading documents: ' + error.message);
+            } finally {
+                if (uploadBtn) {
+                    uploadBtn.disabled = false;
+                    uploadBtn.textContent = originalText;
+                }
+            }
+        });
+    }
     
     // Close tenant detail modal
     const closeTenantDetailModalBtn = document.getElementById('closeTenantDetailModal');
