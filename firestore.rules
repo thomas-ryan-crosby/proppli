@@ -188,19 +188,25 @@ service cloud.firestore {
     
     // Maintenance tickets collection
     match /tickets/{ticketId} {
-      // Users can read if they're admin OR have access to the ticket's property OR are maintenance staff
+      // Users can read if they're admin OR have access to the ticket's property
+      // Maintenance staff can only read tickets for assigned properties
       allow read: if isAuthenticated() && isUserActive() && 
                     (isSuperAdmin() ||
                      isAdmin() || 
-                     getUserRole() == 'maintenance' ||
                      get(/databases/$(database)/documents/tickets/$(ticketId)).data.propertyId in 
                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties);
       
       // Admins, property managers, and maintenance staff can write
+      // Property managers and maintenance staff can only write tickets for assigned properties
       allow write: if isAuthenticated() && isUserActive() && 
                      (isSuperAdmin() ||
                       isAdmin() || 
-                      getUserRole() in ['property_manager', 'maintenance']);
+                      (getUserRole() == 'property_manager' && 
+                       request.resource.data.propertyId in 
+                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties) ||
+                      (getUserRole() == 'maintenance' && 
+                       request.resource.data.propertyId in 
+                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties));
     }
     
     // Occupancies collection
