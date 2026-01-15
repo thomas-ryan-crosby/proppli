@@ -8321,6 +8321,9 @@ async function renderTenantsTableView(tenants) {
             return {
                 forEach: (fn) => docs.forEach(doc => doc && doc.exists && fn(doc))
             };
+        }).catch(error => {
+            console.error('❌ renderTenantsTableView: Error in propertiesPromise.then():', error);
+            throw error;
         });
     } else {
         // For other roles, load all
