@@ -1025,10 +1025,16 @@ async function handleSignup(e) {
         }
         
         // Check if user profile already exists (prevent duplicates)
+        // Note: This check happens after Auth account creation, but loadUserProfile might have
+        // already created a profile. If profile exists, use it instead of creating a new one.
         const existingProfile = await db.collection('users').doc(userCredential.user.uid).get();
         if (existingProfile.exists) {
-            console.log('⚠️ User profile already exists, skipping creation');
+            console.log('⚠️ User profile already exists, using existing profile');
             const existingData = existingProfile.data();
+            
+            // Reload the profile to ensure we have the latest data
+            await loadUserProfile(userCredential.user.uid);
+            
             // If user is already active, let them in
             if (existingData.isActive) {
                 console.log('✅ Existing user is active, allowing access');
@@ -1041,10 +1047,8 @@ async function handleSignup(e) {
                 window.location.reload();
                 return;
             } else {
-                // User exists but inactive
-                await auth.signOut();
-                // Show modal instead of text error
-                showPermissionDeniedModal('An account with this email already exists and is pending admin approval. Please contact a system administrator to activate your account.');
+                // User exists but inactive - loadUserProfile will handle showing the modal
+                console.log('⚠️ Existing user is inactive - loadUserProfile will handle signout');
                 return;
             }
         }
