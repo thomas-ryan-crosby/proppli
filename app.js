@@ -5293,6 +5293,7 @@ function handleTicketSubmit(e) {
                     workDescription,
                     detailedDescription: detailedDescription || null,
                     workUpdates: workUpdates || null,
+                    enableTimeAllocation: enableTimeAllocation,
                     timeAllocated: timeAllocated && !isNaN(timeAllocated) ? timeAllocated : null,
                     billingRate: billingRate || null,
                     billingType: billingRate ? billingType : null,
