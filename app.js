@@ -10139,6 +10139,12 @@ async function loadContactsForTableView(tenants, maxContacts, maxBrokers) {
     const tenantIds = Object.keys(tenants);
     if (tenantIds.length === 0) return;
     
+    // Skip loading contacts for maintenance users - they don't have access to tenantContacts collection
+    if (currentUserProfile && currentUserProfile.role === 'maintenance') {
+        console.log('⚠️ Skipping contact loading for maintenance user');
+        return; // Maintenance users can't access tenantContacts
+    }
+    
     // Use cached contacts if available, otherwise load them
     let allContacts = window._cachedContacts;
     if (!allContacts) {
@@ -10147,17 +10153,22 @@ async function loadContactsForTableView(tenants, maxContacts, maxBrokers) {
         
         for (let i = 0; i < tenantIds.length; i += batchSize) {
             const batch = tenantIds.slice(i, i + batchSize);
-            const contactsSnapshot = await db.collection('tenantContacts')
-                .where('tenantId', 'in', batch)
-                .get();
-            
-            contactsSnapshot.forEach(doc => {
-                const contact = { id: doc.id, ...doc.data() };
-                if (!allContacts[contact.tenantId]) {
-                    allContacts[contact.tenantId] = [];
-                }
-                allContacts[contact.tenantId].push(contact);
-            });
+            try {
+                const contactsSnapshot = await db.collection('tenantContacts')
+                    .where('tenantId', 'in', batch)
+                    .get();
+                
+                contactsSnapshot.forEach(doc => {
+                    const contact = { id: doc.id, ...doc.data() };
+                    if (!allContacts[contact.tenantId]) {
+                        allContacts[contact.tenantId] = [];
+                    }
+                    allContacts[contact.tenantId].push(contact);
+                });
+            } catch (error) {
+                console.warn('Error loading contacts batch:', error);
+                // Continue with other batches
+            }
         }
     }
     
