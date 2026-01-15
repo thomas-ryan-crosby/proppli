@@ -1759,10 +1759,8 @@ function setupEventListeners() {
                 document.getElementById('timeAllocated').value = '';
             }
         });
-        // Set initial state
-        if (!enableTimeAllocationToggle.checked) {
-            timeAllocationGroup.style.display = 'none';
-        }
+        // Set initial state (default to hidden since toggle defaults to unchecked)
+        timeAllocationGroup.style.display = enableTimeAllocationToggle.checked ? 'block' : 'none';
     }
     
     // Completion modal file handlers (check if elements exist)
@@ -4172,7 +4170,7 @@ function updateMetrics(tickets) {
     let totalCost = 0;
 
     let monitoringCount = 0;
-    
+
     Object.values(tickets).forEach(ticket => {
         // Skip deleted tickets in metrics
         if (ticket.deletedAt) {
@@ -4810,7 +4808,7 @@ function loadTicketForEdit(ticketId) {
             document.getElementById('workDescription').value = ticket.workDescription || '';
             document.getElementById('detailedDescription').value = ticket.detailedDescription || '';
             document.getElementById('workUpdates').value = ticket.workUpdates || '';
-            const enableTimeAllocation = ticket.enableTimeAllocation !== false; // Default to true for backward compatibility
+            const enableTimeAllocation = ticket.enableTimeAllocation === true; // Default to false - must be explicitly enabled
             document.getElementById('enableTimeAllocation').checked = enableTimeAllocation;
             document.getElementById('timeAllocated').value = ticket.timeAllocated || '';
             // Update time allocation group visibility
@@ -5240,7 +5238,7 @@ function handleTicketSubmit(e) {
     }
     
     // Check if time allocation is enabled
-    const enableTimeAllocation = document.getElementById('enableTimeAllocation')?.checked ?? true;
+    const enableTimeAllocation = document.getElementById('enableTimeAllocation')?.checked ?? false;
     
     // Time allocated is required when marking complete IF time allocation is enabled
     if (status === 'Completed' && enableTimeAllocation && (!timeAllocated || isNaN(timeAllocated) || timeAllocated <= 0)) {
@@ -5563,7 +5561,7 @@ function handleTicketCompletion(e) {
     db.collection('tickets').doc(editingTicketId).get().then((doc) => {
         const ticket = doc.data();
         const timeAllocated = ticket?.timeAllocated;
-        const enableTimeAllocation = ticket?.enableTimeAllocation !== false; // Default to true for backward compatibility
+        const enableTimeAllocation = ticket?.enableTimeAllocation === true; // Default to false - must be explicitly enabled
         
         if (enableTimeAllocation && (!timeAllocated || isNaN(timeAllocated) || timeAllocated <= 0)) {
             alert('Time Allocated is required before marking a ticket as complete. Please edit the ticket and add the time allocated first.');
@@ -5848,6 +5846,67 @@ function removeCompletionFile() {
     document.getElementById('completionAfterPhoto').value = '';
     document.getElementById('completionAfterPhotoPreview').innerHTML = '';
     document.getElementById('removeCompletionAfterPhoto').style.display = 'none';
+}
+
+// Setup drag and drop for ticket photo uploads
+function setupDragAndDrop(dropZone, fileInput, type) {
+    if (!dropZone || !fileInput) return;
+    
+    // Prevent default drag behaviors
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, preventDefaults, false);
+        document.body.addEventListener(eventName, preventDefaults, false);
+    });
+    
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    
+    // Highlight drop zone when item is dragged over it
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+            dropZone.style.borderColor = '#2563EB';
+            dropZone.style.backgroundColor = '#EBF5FF';
+        }, false);
+    });
+    
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+            dropZone.style.borderColor = '';
+            dropZone.style.backgroundColor = '';
+        }, false);
+    });
+    
+    // Handle dropped files
+    dropZone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        
+        if (files.length > 0) {
+            const file = files[0];
+            
+            // Validate file type
+            if (!file.type.startsWith('image/')) {
+                alert('Please drop an image file');
+                return;
+            }
+            
+            // Validate file size (max 20MB)
+            if (file.size > 20 * 1024 * 1024) {
+                alert('File size must be less than 20MB');
+                return;
+            }
+            
+            // Set the file to the input
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(file);
+            fileInput.files = dataTransfer.files;
+            
+            // Trigger the file select handler
+            handleFileSelect({ target: fileInput }, type);
+        }
+    }, false);
 }
 
 function uploadPhoto(file, ticketId, type) {
