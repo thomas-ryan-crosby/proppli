@@ -357,6 +357,11 @@ body {
     margin-left: 80px;
 }
 
+/* Ensure sidebar toggle is visible */
+.sidebar-brand .sidebar-toggle {
+    flex-shrink: 0;
+}
+
 /* Main Content Wrapper */
 .main-content-wrapper {
     flex: 1;
