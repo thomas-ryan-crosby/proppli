@@ -1757,6 +1757,10 @@ function setupEventListeners() {
             } else {
                 timeAllocationGroup.style.display = 'none';
                 document.getElementById('timeAllocated').value = '';
+                document.getElementById('billingRate').value = '';
+                // Reset billing type to hourly
+                const billingTypeHourly = document.getElementById('billingTypeHourly');
+                if (billingTypeHourly) billingTypeHourly.checked = true;
             }
         });
         // Set initial state (default to hidden since toggle defaults to unchecked)
@@ -4463,8 +4467,21 @@ function createTicketCard(ticket, isDeleted = false) {
         </div>
         <div class="ticket-actions">
             ${!isDeleted ? `
-                ${!isCompleted ? `
-                    <button class="btn-primary btn-small" onclick="markTicketComplete('${ticket.id}')">Mark as Complete</button>
+                ${!isCompleted && ticket.status !== 'Monitoring' ? `
+                    <div class="btn-group" style="position: relative; display: inline-block;">
+                        <button class="btn-primary btn-small" onclick="openAdvanceWorkflowDropdown('${ticket.id}')" style="position: relative;">
+                            Advance Workflow
+                            <span style="margin-left: 5px;">▼</span>
+                        </button>
+                        <div id="workflowDropdown-${ticket.id}" class="workflow-dropdown" style="display: none; position: absolute; top: 100%; left: 0; background: white; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 1000; margin-top: 4px; min-width: 180px;">
+                            <button class="workflow-option" onclick="advanceWorkflow('${ticket.id}', 'Completed')" style="display: block; width: 100%; padding: 10px 15px; text-align: left; border: none; background: none; cursor: pointer; border-radius: 8px 8px 0 0;">
+                                Complete
+                            </button>
+                            <button class="workflow-option" onclick="advanceWorkflow('${ticket.id}', 'Monitoring')" style="display: block; width: 100%; padding: 10px 15px; text-align: left; border: none; background: none; cursor: pointer; border-top: 1px solid #eee; border-radius: 0 0 8px 8px;">
+                                Monitoring
+                            </button>
+                        </div>
+                    </div>
                 ` : ''}
                 <button class="btn-secondary btn-small" onclick="editTicket('${ticket.id}')">Edit</button>
                 <button class="btn-secondary btn-small" onclick="toggleTicketDetails('${ticket.id}')">
@@ -5506,9 +5523,53 @@ function handleTicketSubmit(e) {
     });
 }
 
-window.markTicketComplete = function(ticketId) {
+// Open advance workflow dropdown
+window.openAdvanceWorkflowDropdown = function(ticketId) {
+    // Close any other open dropdowns
+    document.querySelectorAll('.workflow-dropdown').forEach(dropdown => {
+        if (dropdown.id !== `workflowDropdown-${ticketId}`) {
+            dropdown.style.display = 'none';
+        }
+    });
+    
+    // Toggle the dropdown
+    const dropdown = document.getElementById(`workflowDropdown-${ticketId}`);
+    if (dropdown) {
+        dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+    }
+    
+    // Close dropdown when clicking outside
+    setTimeout(() => {
+        document.addEventListener('click', function closeDropdown(e) {
+            if (!e.target.closest(`#workflowDropdown-${ticketId}`) && !e.target.closest(`button[onclick="openAdvanceWorkflowDropdown('${ticketId}')"]`)) {
+                dropdown.style.display = 'none';
+                document.removeEventListener('click', closeDropdown);
+            }
+        });
+    }, 0);
+};
+
+// Advance workflow (Complete or Monitoring)
+window.advanceWorkflow = function(ticketId, targetStatus) {
     editingTicketId = ticketId;
-    document.getElementById('completionModal').classList.add('show');
+    document.getElementById('workflowTargetStatus').value = targetStatus;
+    
+    // Update modal title and button text
+    const modalTitle = document.getElementById('workflowModalTitle');
+    const submitBtn = document.getElementById('workflowSubmitBtn');
+    
+    if (targetStatus === 'Completed') {
+        modalTitle.textContent = 'Mark Ticket as Complete';
+        submitBtn.textContent = 'Mark as Complete';
+    } else if (targetStatus === 'Monitoring') {
+        modalTitle.textContent = 'Move Ticket to Monitoring';
+        submitBtn.textContent = 'Move to Monitoring';
+    }
+    
+    // Close dropdown
+    document.getElementById(`workflowDropdown-${ticketId}`).style.display = 'none';
+    
+    // Reset form
     document.getElementById('completionHowResolved').value = '';
     document.getElementById('completionAfterPhoto').value = '';
     document.getElementById('completionAfterPhotoPreview').innerHTML = '';
@@ -5522,8 +5583,11 @@ window.markTicketComplete = function(ticketId) {
         if (currentUserProfile?.id) {
             document.getElementById('completionCompletedBy').value = currentUserProfile.id;
         }
-    document.getElementById('completionCompletedBy').focus();
+        document.getElementById('completionCompletedBy').focus();
     });
+    
+    // Show modal
+    document.getElementById('completionModal').classList.add('show');
 };
 
 function closeCompletionModal() {
@@ -5533,6 +5597,7 @@ function closeCompletionModal() {
 
 function handleTicketCompletion(e) {
     e.preventDefault();
+    const targetStatus = document.getElementById('workflowTargetStatus').value || 'Completed';
     const completedBySelect = document.getElementById('completionCompletedBy');
     const completedByOther = document.getElementById('completionCompletedByOther');
     const completedBy = completedBySelect?.value === '__other__' 
@@ -5548,6 +5613,7 @@ function handleTicketCompletion(e) {
 
     // Disable submit button
     const submitBtn = e.target.querySelector('button[type="submit"]');
+    const submitBtnText = submitBtn ? submitBtn.textContent : 'Saving...';
     if (submitBtn) {
         submitBtn.disabled = true;
         submitBtn.textContent = 'Saving...';
@@ -5558,7 +5624,7 @@ function handleTicketCompletion(e) {
         alert('Error: Ticket ID not found');
         if (submitBtn) {
             submitBtn.disabled = false;
-            submitBtn.textContent = 'Mark as Complete';
+            submitBtn.textContent = submitBtnText;
         }
         return;
     }
@@ -5569,16 +5635,16 @@ function handleTicketCompletion(e) {
         const timeAllocated = ticket?.timeAllocated;
         const enableTimeAllocation = ticket?.enableTimeAllocation === true; // Default to false - must be explicitly enabled
         
-        if (enableTimeAllocation && (!timeAllocated || isNaN(timeAllocated) || timeAllocated <= 0)) {
+        // Only require time allocation for Completed status, not Monitoring
+        if (targetStatus === 'Completed' && enableTimeAllocation && (!timeAllocated || isNaN(timeAllocated) || timeAllocated <= 0)) {
             alert('Time Allocated is required before marking a ticket as complete. Please edit the ticket and add the time allocated first.');
             if (submitBtn) {
                 submitBtn.disabled = false;
-                submitBtn.textContent = 'Mark as Complete';
+                submitBtn.textContent = submitBtnText;
             }
             return;
         }
         
-        // Continue with completion if timeAllocated is set
         // Upload after photo if provided
         const uploadPromise = completionAfterPhotoFile 
             ? uploadPhoto(completionAfterPhotoFile, editingTicketId, 'after')
@@ -5586,14 +5652,18 @@ function handleTicketCompletion(e) {
 
         uploadPromise.then((afterPhotoUrl) => {
             const updateData = {
-                status: 'Completed',
+                status: targetStatus,
                 completedBy: completedBy,
                 completedByUserId: completedByUserId || null,
                 howResolved: howResolved || null,
-                dateCompleted: firebase.firestore.FieldValue.serverTimestamp(),
                 lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             };
+
+            // Only set dateCompleted for Completed status
+            if (targetStatus === 'Completed') {
+                updateData.dateCompleted = firebase.firestore.FieldValue.serverTimestamp();
+            }
 
             if (afterPhotoUrl) {
                 updateData.afterPhotoUrl = afterPhotoUrl;
@@ -5603,11 +5673,11 @@ function handleTicketCompletion(e) {
         }).then(() => {
             closeCompletionModal();
         }).catch((error) => {
-            console.error('Error completing ticket:', error);
-            alert('Error completing ticket: ' + error.message);
+            console.error(`Error updating ticket to ${targetStatus}:`, error);
+            alert(`Error updating ticket: ${error.message}`);
             if (submitBtn) {
                 submitBtn.disabled = false;
-                submitBtn.textContent = 'Mark as Complete';
+                submitBtn.textContent = submitBtnText;
             }
         });
     }).catch((error) => {
@@ -5615,7 +5685,7 @@ function handleTicketCompletion(e) {
         alert('Error checking ticket: ' + error.message);
         if (submitBtn) {
             submitBtn.disabled = false;
-            submitBtn.textContent = 'Mark as Complete';
+            submitBtn.textContent = submitBtnText;
         }
     });
 }
