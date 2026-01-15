@@ -4720,11 +4720,18 @@ function closeTicketModal() {
 }
 
 function loadTicketForEdit(ticketId) {
-    db.collection('tickets').doc(ticketId).get().then((doc) => {
+    // Ensure ticketId is a string
+    const ticketIdStr = String(ticketId).trim();
+    if (!ticketIdStr) {
+        console.error('Invalid ticket ID');
+        return;
+    }
+    
+    db.collection('tickets').doc(ticketIdStr).get().then((doc) => {
         const ticket = doc.data();
         if (ticket) {
-            editingTicketId = ticketId;
-            document.getElementById('ticketId').value = ticketId;
+            editingTicketId = ticketIdStr;
+            document.getElementById('ticketId').value = ticketIdStr;
             document.getElementById('ticketProperty').value = ticket.propertyId || '';
             // Check property type and show/hide commercial fields, then set values
             if (ticket.propertyId) {
