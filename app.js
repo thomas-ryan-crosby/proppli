@@ -262,6 +262,142 @@ function initAuth() {
     }
 }
 
+// Comprehensive sync function to ensure all user data is in sync
+async function syncUserData(userId, email) {
+    const normalizedEmail = (email || '').toLowerCase().trim();
+    console.log('🔄 Syncing user data:', { userId, email: normalizedEmail });
+    
+    if (!db) {
+        throw new Error('Database not initialized');
+    }
+    
+    // Step 1: Check users collection
+    const userDoc = await db.collection('users').doc(userId).get();
+    const userExists = userDoc.exists;
+    const userData = userExists ? userDoc.data() : null;
+    
+    // Step 2: Check pendingUsers collection
+    let pendingUser = null;
+    try {
+        const pendingSnapshot = await db.collection('pendingUsers')
+            .where('email', '==', normalizedEmail)
+            .where('status', '==', 'pending_signup')
+            .limit(1)
+            .get();
+        if (!pendingSnapshot.empty) {
+            pendingUser = pendingSnapshot.docs[0].data();
+            pendingUser.pendingId = pendingSnapshot.docs[0].id;
+        }
+    } catch (e) {
+        console.warn('Could not check pendingUsers:', e);
+    }
+    
+    // Step 3: Check userInvitations collection
+    let invitation = null;
+    try {
+        const inviteSnapshot = await db.collection('userInvitations')
+            .where('email', '==', normalizedEmail)
+            .where('status', '==', 'pending')
+            .limit(1)
+            .get();
+        if (!inviteSnapshot.empty) {
+            invitation = inviteSnapshot.docs[0].data();
+            invitation.invitationId = inviteSnapshot.docs[0].id;
+        }
+    } catch (e) {
+        console.warn('Could not check userInvitations:', e);
+    }
+    
+    // Step 4: Determine what to do based on state
+    if (pendingUser) {
+        // There's a pending invitation - link it
+        console.log('✅ Found pending invitation, linking...');
+        
+        // Create or update user document with pending data
+        // Ensure assignedProperties is always an array
+        const assignedProps = Array.isArray(pendingUser.assignedProperties) 
+            ? pendingUser.assignedProperties 
+            : (pendingUser.assignedProperties ? [pendingUser.assignedProperties] : []);
+        
+        const userProfileData = {
+            email: normalizedEmail,
+            displayName: pendingUser.displayName,
+            role: pendingUser.role,
+            isActive: pendingUser.isActive !== false, // Ensure active
+            assignedProperties: assignedProps,
+            profile: pendingUser.profile || {},
+            createdAt: userData?.createdAt || firebase.firestore.FieldValue.serverTimestamp(),
+            lastLogin: firebase.firestore.FieldValue.serverTimestamp(),
+            createdBy: pendingUser.createdBy
+        };
+        
+        if (userExists) {
+            // Update existing user
+            await db.collection('users').doc(userId).update(userProfileData);
+            console.log('✅ Updated existing user with pending invitation data');
+        } else {
+            // Create new user
+            await db.collection('users').doc(userId).set(userProfileData);
+            console.log('✅ Created user with pending invitation data');
+        }
+        
+        // Mark pendingUser as completed
+        if (pendingUser.pendingId) {
+            try {
+                await db.collection('pendingUsers').doc(pendingUser.pendingId).update({
+                    status: 'completed',
+                    linkedUserId: userId,
+                    linkedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                console.log('✅ Marked pending user as completed');
+            } catch (e) {
+                console.warn('Could not update pendingUser:', e);
+            }
+        }
+        
+        // Mark invitation as accepted
+        if (invitation?.invitationId) {
+            try {
+                await db.collection('userInvitations').doc(invitation.invitationId).update({
+                    status: 'accepted',
+                    acceptedBy: userId,
+                    acceptedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                console.log('✅ Marked invitation as accepted');
+            } catch (e) {
+                console.warn('Could not update invitation:', e);
+            }
+        }
+        
+        // Return the synced user data
+        const syncedDoc = await db.collection('users').doc(userId).get();
+        return { id: syncedDoc.id, ...syncedDoc.data() };
+    } else if (userExists) {
+        // User exists, no pending invitation - return existing data
+        console.log('✅ User exists, no pending invitation');
+        return { id: userDoc.id, ...userData };
+    } else {
+        // No user, no pending invitation - create default profile
+        console.log('⚠️ No user found, creating default profile');
+        const defaultProfile = {
+            email: normalizedEmail,
+            displayName: auth?.currentUser?.displayName || normalizedEmail.split('@')[0] || 'User',
+            role: 'viewer',
+            isActive: false,
+            assignedProperties: [],
+            profile: {},
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            lastLogin: null
+        };
+        
+        await db.collection('users').doc(userId).set(defaultProfile);
+        console.log('✅ Created default user profile');
+        
+        const newDoc = await db.collection('users').doc(userId).get();
+        return { id: newDoc.id, ...newDoc.data() };
+    }
+}
+
 // Load user profile from Firestore
 async function loadUserProfile(userId) {
     try {
@@ -270,22 +406,38 @@ async function loadUserProfile(userId) {
             return;
         }
         
-        const userDoc = await db.collection('users').doc(userId).get();
-        if (userDoc.exists) {
-            currentUserProfile = { id: userDoc.id, ...userDoc.data() };
-            console.log('✅ User profile loaded:', currentUserProfile);
-            
-            // Update user menu with name
-            updateUserMenu();
-            
-            // Check if user is active
-            if (!currentUserProfile.isActive) {
-                console.warn('⚠️ User account is not active');
-                showPermissionDeniedModal('Your account is pending admin approval. Please contact a system administrator to activate your account.');
-                await auth.signOut();
-                return;
-            }
+        const authUser = currentUser || auth?.currentUser;
+        if (!authUser || !authUser.email) {
+            throw new Error('No authenticated user found');
+        }
+        
+        const normalizedEmail = (authUser.email || '').toLowerCase().trim();
+        
+        // Use sync function to ensure everything is in sync
+        currentUserProfile = await syncUserData(userId, normalizedEmail);
+        console.log('✅ User profile loaded:', currentUserProfile);
+        
+        // Update user menu with name
+        updateUserMenu();
+        
+        // Check if user is active
+        if (!currentUserProfile.isActive) {
+            console.warn('⚠️ User account is not active');
+            showPermissionDeniedModal('Your account is pending admin approval. Please contact a system administrator to activate your account.');
+            await auth.signOut();
+            return;
+        }
+    } catch (error) {
+        console.error('Error loading user profile:', error);
+        if (error.code === 'permission-denied') {
+            showPermissionDeniedModal('You do not have permission to access this system. Please contact a system administrator for assistance.');
+            await auth.signOut();
         } else {
+            showPermissionDeniedModal('Error loading your account. Please contact an administrator.');
+            await auth.signOut();
+        }
+    }
+}
             console.warn('⚠️ User profile not found in Firestore');
             // User signed up but profile doesn't exist yet
             // FIRST: Check if there's a pending invitation that should be linked
@@ -1024,120 +1176,50 @@ async function handleSignup(e) {
             // Don't fail signup if verification email fails
         }
         
-        // Check if user profile already exists (prevent duplicates)
-        // Note: This check happens after Auth account creation, but loadUserProfile might have
-        // already created a profile. If profile exists, use it instead of creating a new one.
-        const existingProfile = await db.collection('users').doc(userCredential.user.uid).get();
-        if (existingProfile.exists) {
-            console.log('⚠️ User profile already exists, using existing profile');
-            const existingData = existingProfile.data();
+        // Use sync function to ensure everything is in sync and prevent duplicates
+        console.log('🔄 Syncing user data after account creation...');
+        let syncedProfile;
+        try {
+            syncedProfile = await syncUserData(userCredential.user.uid, normalizedEmail);
+            console.log('✅ User data synced:', syncedProfile);
+        } catch (syncError) {
+            console.error('❌ Failed to sync user data:', syncError);
+            await auth.signOut();
+            if (errorDiv) {
+                errorDiv.textContent = `Account created but failed to sync data: ${syncError.message}. Please contact an administrator.`;
+                errorDiv.style.display = 'block';
+            }
+            return;
+        }
+        
+        // Check if user is active (invited users are active, self-registered are not)
+        if (syncedProfile.isActive) {
+            // User is active - set remember me and reload
+            console.log('✅ User is active, allowing access');
+            sessionStorage.setItem('rememberMe', 'true');
+            localStorage.setItem('rememberMe', 'true');
+            await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
             
-            // Reload the profile to ensure we have the latest data
-            await loadUserProfile(userCredential.user.uid);
-            
-            // If user is already active, let them in
-            if (existingData.isActive) {
-                console.log('✅ Existing user is active, allowing access');
-                // Show success and reload
-                if (successDiv) {
-                    successDiv.style.display = 'block';
-                }
-                document.getElementById('signupForm').reset();
-                // Reload page to show app
+            // Reload to show app
+            setTimeout(() => {
                 window.location.reload();
-                return;
-            } else {
-                // User exists but inactive - loadUserProfile will handle showing the modal
-                console.log('⚠️ Existing user is inactive - loadUserProfile will handle signout');
-                return;
-            }
-        }
-        
-        // Check if there's a pending invitation for this email
-        console.log('🔍 Checking for pending invitation...');
-        const pendingUser = await checkPendingInvitation(normalizedEmail);
-        
-        if (pendingUser) {
-            // Link to pending invitation (admin-invited user)
-            console.log('🔗 Pending invitation found, linking account...');
-            try {
-                await linkPendingUserToAccount(userCredential.user.uid, normalizedEmail);
-                console.log('✅ User account linked to pending invitation');
-                
-                // Set "Remember Me" flag so user stays logged in after reload
-                sessionStorage.setItem('rememberMe', 'true');
-                localStorage.setItem('rememberMe', 'true');
-                
-                // Set persistence to LOCAL so user stays logged in
-                await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-                
-                // Wait a moment for profile to be fully saved, then reload
-                setTimeout(() => {
-                    // Reload page to show app - user will be logged in and active
-                    window.location.reload();
-                }, 500);
-                return;
-            } catch (linkError) {
-                console.error('❌ Failed to link pending user account:', linkError);
-                // Sign out and show error - DO NOT create fallback profile
-                await auth.signOut();
-                if (errorDiv) {
-                    errorDiv.textContent = `Failed to link your invitation: ${linkError.message}. Please contact an administrator.`;
-                    errorDiv.style.display = 'block';
-                }
-                throw linkError; // Re-throw to prevent continuing
-            }
+            }, 500);
+            return;
         } else {
-            // Regular signup - create profile with isActive: false
-        if (db) {
-                try {
-            await createUserProfile(userCredential.user.uid, {
-                        email: normalizedEmail,
-                displayName: fullName,
-                role: 'viewer',
-                isActive: false, // Requires admin approval
-                profile: {
-                    phone: phone || null
-                },
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                lastLogin: firebase.firestore.FieldValue.serverTimestamp()
-            });
-                    console.log('✅ User profile created successfully');
-                } catch (profileError) {
-                    console.error('❌ Failed to create user profile:', profileError);
-                    // Sign out anyway to prevent access without profile
-                    await auth.signOut();
-                    
-                    // Show user-friendly error message
-                    if (profileError.code === 'permission-denied') {
-                        if (errorDiv) {
-                            errorDiv.textContent = 'Your account has been created but requires admin approval. Please contact a system administrator to activate your account.';
-                            errorDiv.style.display = 'block';
-                        }
-                    } else {
-                        if (errorDiv) {
-                            errorDiv.textContent = 'Account created, but failed to create profile. Please contact an administrator.';
-                            errorDiv.style.display = 'block';
-                        }
-                    }
-                    return; // Don't show success message
-                }
-        }
-        
-        // Sign out (user needs admin approval)
-        await auth.signOut();
-        }
-        
-        // Show success message (user needs admin approval)
-        if (successDiv) {
-            successDiv.innerHTML = '<p>Account created successfully! Your account is pending admin approval. You\'ll receive an email when it\'s activated.</p>';
-            successDiv.style.display = 'block';
-        }
-        
-        // Reset form
-        const signupForm = document.getElementById('signupForm');
-        if (signupForm) {
-            signupForm.reset();
+            // User is inactive - sign out and show message
+            console.log('⚠️ User is inactive, signing out');
+            await auth.signOut();
+            
+            if (successDiv) {
+                successDiv.innerHTML = '<p>Account created successfully! Your account is pending admin approval. You\'ll receive an email when it\'s activated.</p>';
+                successDiv.style.display = 'block';
+            }
+            
+            // Reset form
+            const signupForm = document.getElementById('signupForm');
+            if (signupForm) {
+                signupForm.reset();
+            }
         }
         
     } catch (error) {
