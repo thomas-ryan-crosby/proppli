@@ -12662,6 +12662,7 @@ function renderLeases(leases, properties, tenants, units) {
                     <th>Tenant</th>
                     <th>Property</th>
                     <th>Unit</th>
+                    <th>Square Footage</th>
                     <th>Start Date</th>
                     <th>End Date</th>
                     <th>Monthly Rent</th>
@@ -12686,12 +12687,17 @@ function renderLeases(leases, properties, tenants, units) {
                            lease.status === 'Expiring Soon' ? 'status-warning' : 
                            lease.status === 'Expired' ? 'status-expired' : 'status-inactive';
         
+        const squareFootageDisplay = lease.squareFootage 
+            ? `${lease.squareFootage.toLocaleString('en-US', { maximumFractionDigits: 0 })} sq ft`
+            : 'N/A';
+        
         html += `
             <tr>
                 <td>${lease.leaseNumber || lease.id.substring(0, 8)}</td>
                 <td>${tenant?.tenantName || 'N/A'}</td>
                 <td>${property?.name || 'N/A'}</td>
                 <td>${unit?.unitNumber || 'N/A'}</td>
+                <td>${squareFootageDisplay}</td>
                 <td>${startDate}</td>
                 <td>${endDate}</td>
                 <td>$${lease.monthlyRent?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}</td>
@@ -13476,6 +13482,7 @@ function populateLeaseForm(lease) {
         }
     }
     
+    if (document.getElementById('leaseSquareFootage')) document.getElementById('leaseSquareFootage').value = lease.squareFootage || '';
     if (document.getElementById('monthlyRent')) document.getElementById('monthlyRent').value = lease.monthlyRent || '';
     if (document.getElementById('securityDeposit')) document.getElementById('securityDeposit').value = lease.securityDeposit || '';
     
@@ -13766,6 +13773,7 @@ async function handleLeaseSubmit(e) {
                 return null;
             })(),
             autoRenewalTermUnit: document.getElementById('autoRenewal').checked ? (document.getElementById('autoRenewalTermUnit')?.value || 'months') : null,
+            squareFootage: document.getElementById('leaseSquareFootage').value ? parseFloat(document.getElementById('leaseSquareFootage').value) : null,
             monthlyRent: parseFloat(document.getElementById('monthlyRent').value) || 0,
             securityDeposit: parseFloat(document.getElementById('securityDeposit').value) || 0,
             additionalMonthlyCharges: {
