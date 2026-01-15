@@ -77,7 +77,14 @@ This document describes all user workflow paths, the data that should be created
 
 **Process:**
 1. **Set active login flag:** `isUserActivelyLoggingIn = true` (prevents "Remember Me" check from signing out)
-2. **Create Firebase Auth account:** `auth.createUserWithEmailAndPassword(email, password)`
+2. **Try to create Firebase Auth account:** `auth.createUserWithEmailAndPassword(email, password)`
+   - **If `auth/email-already-in-use` error:**
+     - Check for pending invitation: `checkPendingInvitation(email)`
+     - If pending invitation exists → Show message: "An account with this email already exists. Please sign in to complete your account setup."
+     - Provide links to sign in and forgot password
+     - User should sign in instead (see Step 3B below)
+   - **If successful:**
+     - Continue with steps below
 3. **Update display name:** `user.updateProfile({ displayName })`
 4. **Send email verification:** `user.sendEmailVerification()`
 5. **Check for pending invitation:** `checkPendingInvitation(email)`
@@ -130,6 +137,55 @@ This document describes all user workflow paths, the data that should be created
 - User profile created in Firestore with `isActive: true`
 - User is logged in immediately
 - Page reloads and shows application (user is active)
+- User can access the system immediately
+
+---
+
+### Step 3B: User Signs In (If Auth Account Already Exists)
+**Trigger:** User tries to sign up but gets "email already exists" error, then signs in
+
+**Process:**
+1. **User signs in:** `auth.signInWithEmailAndPassword(email, password)`
+2. **Auth state change fires:** `onAuthStateChanged` handler
+3. **Load user profile:** `loadUserProfile(userId)`
+4. **Profile not found:** Firestore profile doesn't exist
+5. **Check for pending invitation:** `checkPendingInvitation(email)` → Returns pending user
+6. **Link to pending invitation:** `linkPendingUserToAccount(userId, email)`
+7. **Set session:** Set "Remember Me" flag and LOCAL persistence
+8. **Reload page:** Page reloads, user is logged in and active
+
+**Data Created/Updated in Firebase:**
+
+1. **`users/{userId}`** document (created by `linkPendingUserToAccount`):
+   ```javascript
+   {
+     email: "user@example.com" (normalized),
+     displayName: "John Doe",
+     role: "property_manager", // From pendingUser.role
+     isActive: true, // CRITICAL: Must be true for invited users
+     assignedProperties: ["propertyId1", "propertyId2"],
+     profile: { ... },
+     createdAt: serverTimestamp(),
+     lastLogin: serverTimestamp(),
+     createdBy: "adminUserId"
+   }
+   ```
+
+2. **`pendingUsers/{pendingUserId}`** document (updated):
+   ```javascript
+   {
+     ...existing fields...,
+     status: "completed",
+     linkedUserId: "userId",
+     linkedAt: serverTimestamp()
+   }
+   ```
+
+**Expected Behavior:**
+- User signs in successfully
+- Profile is automatically linked to pending invitation
+- User is logged in and active
+- Page reloads and shows application
 - User can access the system immediately
 
 ---
