@@ -9154,13 +9154,36 @@ async function renderTenantsTableView(tenants) {
             allTenantsForContacts[tenantId] = filteredTenants[tenantId];
         }
     });
-    loadContactsForTableView(allTenantsForContacts, maxContacts, maxBrokers);
+    console.log('🔍 renderTenantsTableView: Loading contacts for all tenants');
+    try {
+        await loadContactsForTableView(allTenantsForContacts, maxContacts, maxBrokers);
+        console.log('✅ renderTenantsTableView: Contacts loaded successfully');
+    } catch (error) {
+        console.error('❌ renderTenantsTableView: Error loading contacts:', error);
+        // Don't throw - continue with rendering
+    }
     
     // Load and display orphan contacts (contacts without tenants)
-    await loadOrphanContacts(maxContacts, maxBrokers);
+    console.log('🔍 renderTenantsTableView: Loading orphan contacts');
+    try {
+        await loadOrphanContacts(maxContacts, maxBrokers);
+        console.log('✅ renderTenantsTableView: Orphan contacts loaded successfully');
+    } catch (error) {
+        console.error('❌ renderTenantsTableView: Error loading orphan contacts:', error);
+        // Don't throw - continue with rendering
+    }
     
     // Load and display moved out tenants section
-    await loadMovedOutTenantsSection(movedOutTenants, occupanciesMap, unitsMap, maxContacts, maxBrokers);
+    console.log('🔍 renderTenantsTableView: Loading moved out tenants section');
+    try {
+        await loadMovedOutTenantsSection(movedOutTenants, occupanciesMap, unitsMap, maxContacts, maxBrokers);
+        console.log('✅ renderTenantsTableView: Moved out tenants section loaded successfully');
+    } catch (error) {
+        console.error('❌ renderTenantsTableView: Error loading moved out tenants section:', error);
+        // Don't throw - continue with rendering
+    }
+    
+    console.log('✅ renderTenantsTableView: Completed successfully');
 }
 
 async function loadOrphanContacts(maxContacts, maxBrokers) {
@@ -9468,7 +9491,14 @@ async function loadMovedOutTenantsSection(movedOutTenants, occupanciesMap, units
         movedOutTenantsMap[tenant.id] = tenant;
     });
     if (Object.keys(movedOutTenantsMap).length > 0) {
-        loadContactsForTableView(movedOutTenantsMap, maxContacts, maxBrokers);
+        console.log('🔍 loadMovedOutTenantsSection: Loading contacts for moved out tenants');
+        try {
+            await loadContactsForTableView(movedOutTenantsMap, maxContacts, maxBrokers);
+            console.log('✅ loadMovedOutTenantsSection: Contacts loaded successfully');
+        } catch (error) {
+            console.error('❌ loadMovedOutTenantsSection: Error loading contacts:', error);
+            // Don't throw - just log the error
+        }
     }
     
     // Apply broker visibility toggle to moved out tenants section (default to hidden)
