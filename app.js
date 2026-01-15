@@ -5551,44 +5551,82 @@ window.openAdvanceWorkflowDropdown = function(ticketId) {
 
 // Advance workflow (Complete or Monitoring)
 window.advanceWorkflow = function(ticketId, targetStatus) {
+    // Close dropdown
+    const dropdown = document.getElementById(`workflowDropdown-${ticketId}`);
+    if (dropdown) dropdown.style.display = 'none';
+    
+    // For "Completed" status, check if time allocation is required
+    if (targetStatus === 'Completed') {
+        db.collection('tickets').doc(ticketId).get().then((doc) => {
+            const ticket = doc.data();
+            const enableTimeAllocation = ticket?.enableTimeAllocation === true;
+            const timeAllocated = ticket?.timeAllocated;
+            
+            // If time allocation is enabled but not set, open edit modal instead
+            if (enableTimeAllocation && (!timeAllocated || isNaN(timeAllocated) || timeAllocated <= 0)) {
+                alert('Time allocation is required before marking this ticket as complete. Please set the time allocation in the ticket edit form first.');
+                openTicketModal(ticketId);
+                return;
+            }
+            
+            // Time allocation is set or not required, proceed with completion modal
+            openWorkflowModal(ticketId, targetStatus);
+        }).catch((error) => {
+            console.error('Error checking ticket:', error);
+            alert('Error checking ticket: ' + error.message);
+        });
+    } else {
+        // For Monitoring status, open modal directly
+        openWorkflowModal(ticketId, targetStatus);
+    }
+};
+
+function openWorkflowModal(ticketId, targetStatus) {
     editingTicketId = ticketId;
-    document.getElementById('workflowTargetStatus').value = targetStatus;
+    const workflowTargetStatus = document.getElementById('workflowTargetStatus');
+    if (workflowTargetStatus) {
+        workflowTargetStatus.value = targetStatus;
+    }
     
     // Update modal title and button text
     const modalTitle = document.getElementById('workflowModalTitle');
     const submitBtn = document.getElementById('workflowSubmitBtn');
     
     if (targetStatus === 'Completed') {
-        modalTitle.textContent = 'Mark Ticket as Complete';
-        submitBtn.textContent = 'Mark as Complete';
+        if (modalTitle) modalTitle.textContent = 'Mark Ticket as Complete';
+        if (submitBtn) submitBtn.textContent = 'Mark as Complete';
     } else if (targetStatus === 'Monitoring') {
-        modalTitle.textContent = 'Move Ticket to Monitoring';
-        submitBtn.textContent = 'Move to Monitoring';
+        if (modalTitle) modalTitle.textContent = 'Move Ticket to Monitoring';
+        if (submitBtn) submitBtn.textContent = 'Move to Monitoring';
     }
     
-    // Close dropdown
-    document.getElementById(`workflowDropdown-${ticketId}`).style.display = 'none';
-    
     // Reset form
-    document.getElementById('completionHowResolved').value = '';
-    document.getElementById('completionAfterPhoto').value = '';
-    document.getElementById('completionAfterPhotoPreview').innerHTML = '';
-    document.getElementById('removeCompletionAfterPhoto').style.display = 'none';
+    const completionHowResolved = document.getElementById('completionHowResolved');
+    const completionAfterPhoto = document.getElementById('completionAfterPhoto');
+    const completionAfterPhotoPreview = document.getElementById('completionAfterPhotoPreview');
+    const removeCompletionAfterPhoto = document.getElementById('removeCompletionAfterPhoto');
+    
+    if (completionHowResolved) completionHowResolved.value = '';
+    if (completionAfterPhoto) completionAfterPhoto.value = '';
+    if (completionAfterPhotoPreview) completionAfterPhotoPreview.innerHTML = '';
+    if (removeCompletionAfterPhoto) removeCompletionAfterPhoto.style.display = 'none';
     completionAfterPhotoFile = null;
     
     // Load and populate completion dropdown, default to current user
     loadUsersForDropdowns().then(() => {
         populateUserDropdown('completionCompletedBy', currentUserProfile?.id || '');
         // Set default to current user if available
-        if (currentUserProfile?.id) {
-            document.getElementById('completionCompletedBy').value = currentUserProfile.id;
+        const completionCompletedBy = document.getElementById('completionCompletedBy');
+        if (completionCompletedBy && currentUserProfile?.id) {
+            completionCompletedBy.value = currentUserProfile.id;
         }
-        document.getElementById('completionCompletedBy').focus();
+        if (completionCompletedBy) completionCompletedBy.focus();
     });
     
     // Show modal
-    document.getElementById('completionModal').classList.add('show');
-};
+    const completionModal = document.getElementById('completionModal');
+    if (completionModal) completionModal.classList.add('show');
+}
 
 function closeCompletionModal() {
     document.getElementById('completionModal').classList.remove('show');
