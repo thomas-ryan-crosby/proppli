@@ -1725,6 +1725,8 @@ function showPage(page) {
         loadProperties();
     } else if (page === 'tenants') {
         loadTenants();
+        // Reload property filter dropdown when showing tenants page
+        loadPropertiesForTenantFilter();
     } else if (page === 'maintenance') {
         loadTickets();
     } else if (page === 'leases') {
@@ -8091,7 +8093,15 @@ async function linkPendingUserToAccount(userId, email) {
 
 function loadPropertiesForTenantFilter() {
     const propertyFilter = document.getElementById('tenantPropertyFilter');
-    if (!propertyFilter) return;
+    if (!propertyFilter) {
+        console.warn('⚠️ loadPropertiesForTenantFilter: tenantPropertyFilter not found');
+        return;
+    }
+    
+    console.log('🔍 loadPropertiesForTenantFilter called', {
+        userRole: currentUserProfile?.role,
+        assignedProperties: currentUserProfile?.assignedProperties
+    });
     
     propertyFilter.innerHTML = '<option value="">All Properties</option>';
     
@@ -8099,6 +8109,7 @@ function loadPropertiesForTenantFilter() {
     if (currentUserProfile && currentUserProfile.role === 'maintenance' && 
         Array.isArray(currentUserProfile.assignedProperties) && 
         currentUserProfile.assignedProperties.length > 0) {
+        console.log('🔍 loadPropertiesForTenantFilter: Loading assigned properties for maintenance user');
         // Load assigned properties individually
         const propertyPromises = currentUserProfile.assignedProperties.map(propId => 
             db.collection('properties').doc(propId).get().catch(e => {
@@ -8108,14 +8119,15 @@ function loadPropertiesForTenantFilter() {
         );
         
         Promise.all(propertyPromises).then((propertyDocs) => {
-            propertyDocs.forEach(doc => {
-                if (doc && doc.exists) {
-                    const property = doc.data();
-                    const option = document.createElement('option');
-                    option.value = doc.id;
-                    option.textContent = property.name || 'Unnamed Property';
-                    propertyFilter.appendChild(option);
-                }
+            const loadedProperties = propertyDocs.filter(doc => doc && doc.exists);
+            console.log(`✅ loadPropertiesForTenantFilter: Loaded ${loadedProperties.length} properties for maintenance user`);
+            
+            loadedProperties.forEach(doc => {
+                const property = doc.data();
+                const option = document.createElement('option');
+                option.value = doc.id;
+                option.textContent = property.name || 'Unnamed Property';
+                propertyFilter.appendChild(option);
             });
             
             // Restore selected property from localStorage
@@ -8123,13 +8135,18 @@ function loadPropertiesForTenantFilter() {
             if (savedProperty && Array.from(propertyFilter.options).some(opt => opt.value === savedProperty)) {
                 propertyFilter.value = savedProperty;
                 selectedPropertyForTenants = savedProperty;
+                console.log('✅ loadPropertiesForTenantFilter: Restored saved property:', savedProperty);
             }
+        }).catch((error) => {
+            console.error('❌ loadPropertiesForTenantFilter: Error loading properties:', error);
         });
         return; // Exit early for maintenance users
     }
     
     // For other roles, load all properties
+    console.log('🔍 loadPropertiesForTenantFilter: Loading all properties for non-maintenance user');
     db.collection('properties').get().then((querySnapshot) => {
+        console.log(`✅ loadPropertiesForTenantFilter: Loaded ${querySnapshot.size} properties`);
         querySnapshot.forEach((doc) => {
             const property = doc.data();
             const option = document.createElement('option');
@@ -8145,7 +8162,7 @@ function loadPropertiesForTenantFilter() {
             selectedPropertyForTenants = savedProperty;
         }
     }).catch((error) => {
-        console.error('Error loading properties for filter:', error);
+        console.error('❌ loadPropertiesForTenantFilter: Error loading properties:', error);
     });
 }
 
