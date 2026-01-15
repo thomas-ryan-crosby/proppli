@@ -4831,15 +4831,32 @@ function loadTicketForEdit(ticketId) {
             document.getElementById('workDescription').value = ticket.workDescription || '';
             document.getElementById('detailedDescription').value = ticket.detailedDescription || '';
             document.getElementById('workUpdates').value = ticket.workUpdates || '';
-            const enableTimeAllocation = ticket.enableTimeAllocation === true; // Default to false - must be explicitly enabled
-            document.getElementById('enableTimeAllocation').checked = enableTimeAllocation;
-            document.getElementById('timeAllocated').value = ticket.timeAllocated || '';
+            
+            // Check if time allocation should be enabled (either explicitly enabled OR if fields are populated)
+            const timeAllocated = ticket.timeAllocated;
+            const billingRate = ticket.billingRate;
+            const enableTimeAllocation = ticket.enableTimeAllocation === true || (timeAllocated && timeAllocated > 0) || (billingRate && billingRate > 0);
+            
+            const enableTimeAllocationToggle = document.getElementById('enableTimeAllocation');
+            if (enableTimeAllocationToggle) {
+                enableTimeAllocationToggle.checked = enableTimeAllocation;
+            }
+            
+            const timeAllocatedInput = document.getElementById('timeAllocated');
+            if (timeAllocatedInput) {
+                timeAllocatedInput.value = ticket.timeAllocated || '';
+            }
+            
             // Update time allocation group visibility
             const timeAllocationGroup = document.getElementById('timeAllocationGroup');
             if (timeAllocationGroup) {
                 timeAllocationGroup.style.display = enableTimeAllocation ? 'block' : 'none';
             }
-            document.getElementById('billingRate').value = ticket.billingRate || '';
+            
+            const billingRateInput = document.getElementById('billingRate');
+            if (billingRateInput) {
+                billingRateInput.value = ticket.billingRate || '';
+            }
             // Set billing type (default to hourly if not set for backward compatibility)
             const billingType = ticket.billingType || 'hourly';
             if (billingType === 'flat') {
