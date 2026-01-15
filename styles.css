@@ -209,9 +209,9 @@ body {
 
 /* Left Sidebar Navigation */
 .sidebar-nav {
-    width: 260px;
+    width: 280px;
     background: white;
-    border-right: 1px solid #e2e8f0;
+    border-right: 1px solid #E5E7EB;
     display: flex;
     flex-direction: column;
     position: fixed;
@@ -220,20 +220,23 @@ body {
     top: 0;
     z-index: 100;
     box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
+    transition: width 0.3s ease;
 }
 
 .sidebar-brand {
-    padding: 20px;
-    border-bottom: 1px solid #e2e8f0;
+    padding: 24px 20px;
+    border-bottom: 1px solid #E5E7EB;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: 16px;
+    min-height: 80px;
 }
 
 .sidebar-logo {
-    height: 32px;
+    height: 48px;
     width: auto;
+    transition: opacity 0.3s ease;
 }
 
 .sidebar-nav-links {
@@ -286,33 +289,40 @@ body {
 .sidebar-toggle {
     background: #F9FAFB;
     border: 1px solid #E5E7EB;
-    border-radius: 6px;
-    width: 32px;
-    height: 32px;
+    border-radius: 8px;
+    width: 36px;
+    height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.2s ease;
     color: #6B7280;
-    font-size: 14px;
+    font-size: 16px;
     padding: 0;
+    flex-shrink: 0;
 }
 
 .sidebar-toggle:hover {
     background: #F3F4F6;
     color: #2563EB;
     border-color: #2563EB;
+    transform: scale(1.05);
+}
+
+.sidebar-toggle:active {
+    transform: scale(0.95);
 }
 
 .sidebar-toggle:focus {
     outline: none;
-    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
 }
 
 .sidebar-toggle-icon {
-    transition: transform 0.2s;
+    transition: transform 0.3s ease;
     display: inline-block;
+    font-weight: 600;
 }
 
 /* Collapsed Sidebar Styles */
@@ -322,11 +332,17 @@ body {
 
 .sidebar-nav.collapsed .sidebar-brand {
     justify-content: center;
-    padding: 20px 12px;
+    padding: 24px 12px;
+    gap: 0;
 }
 
 .sidebar-nav.collapsed .sidebar-logo {
     display: none;
+}
+
+.sidebar-nav.collapsed .sidebar-toggle {
+    width: 100%;
+    margin: 0 auto;
 }
 
 .sidebar-nav.collapsed .sidebar-toggle-icon {
@@ -337,22 +353,52 @@ body {
     opacity: 0;
     width: 0;
     overflow: hidden;
+    position: absolute;
 }
 
 .sidebar-nav.collapsed .sidebar-nav-link {
     justify-content: center;
-    padding: 14px;
+    padding: 12px;
+    margin: 4px 8px;
+    position: relative;
 }
 
-.sidebar-nav.collapsed .nav-icon {
+.sidebar-nav.collapsed .sidebar-nav-link .nav-icon {
     margin: 0;
+    font-size: 24px;
+}
+
+.sidebar-nav.collapsed .sidebar-nav-link.active::before {
+    left: 0;
+    width: 3px;
+    height: 32px;
+}
+
+/* Tooltip for collapsed sidebar items */
+.sidebar-nav.collapsed .sidebar-nav-link::after {
+    content: attr(title);
+    position: absolute;
+    left: calc(100% + 12px);
+    top: 50%;
+    transform: translateY(-50%);
+    background: #1F2937;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.sidebar-nav.collapsed .sidebar-nav-link:hover::after {
+    opacity: 1;
 }
 
 /* Update main content margin when sidebar is collapsed */
-.main-content-wrapper {
-    transition: margin-left 0.3s ease;
-}
-
 .sidebar-nav.collapsed ~ .main-content-wrapper,
 .main-content-wrapper.sidebar-collapsed {
     margin-left: 80px;
@@ -363,13 +409,32 @@ body {
     flex-shrink: 0;
 }
 
+/* Scrollbar styling for sidebar */
+.sidebar-nav-links::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar-nav-links::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sidebar-nav-links::-webkit-scrollbar-thumb {
+    background: #E5E7EB;
+    border-radius: 3px;
+}
+
+.sidebar-nav-links::-webkit-scrollbar-thumb:hover {
+    background: #D1D5DB;
+}
+
 /* Main Content Wrapper */
 .main-content-wrapper {
     flex: 1;
-    margin-left: 260px;
+    margin-left: 280px;
     display: flex;
     flex-direction: column;
     min-height: 100vh;
+    transition: margin-left 0.3s ease;
 }
 
 /* Top Bar */

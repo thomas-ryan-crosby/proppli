@@ -1460,7 +1460,8 @@ function setupNavigation() {
             }
         }
         
-        sidebarToggle.addEventListener('click', () => {
+        sidebarToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
             sidebarNav.classList.toggle('collapsed');
             if (mainContentWrapper) {
                 mainContentWrapper.classList.toggle('sidebar-collapsed');
@@ -1469,6 +1470,27 @@ function setupNavigation() {
             // Save state to localStorage
             const isNowCollapsed = sidebarNav.classList.contains('collapsed');
             localStorage.setItem('sidebarCollapsed', isNowCollapsed.toString());
+            
+            // Update toggle button aria label
+            sidebarToggle.setAttribute('aria-label', isNowCollapsed ? 'Expand sidebar' : 'Collapse sidebar');
+            sidebarToggle.setAttribute('title', isNowCollapsed ? 'Expand sidebar' : 'Collapse sidebar');
+        });
+        
+        // Update tooltips for navigation links when collapsed
+        const navLinks = document.querySelectorAll('.sidebar-nav-link');
+        navLinks.forEach(link => {
+            const page = link.getAttribute('data-page');
+            if (page && !link.getAttribute('title')) {
+                const pageTitles = {
+                    'maintenance': 'Maintenance',
+                    'properties': 'Properties',
+                    'tenants': 'Tenants',
+                    'leases': 'Leases',
+                    'finance': 'Finance',
+                    'users': 'Users'
+                };
+                link.setAttribute('title', pageTitles[page] || page);
+            }
         });
     }
 }
