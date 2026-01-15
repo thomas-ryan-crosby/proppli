@@ -218,8 +218,8 @@ function initAuth() {
                     // Load data now that user is authenticated
                     // Use setTimeout to ensure these load after the app is shown
                     setTimeout(() => {
-                        loadProperties();
-                        loadTickets();
+                    loadProperties();
+                    loadTickets();
                     }, 100);
                 } else if (currentUserProfile && !currentUserProfile.isActive) {
                     // User profile exists but is inactive - permission modal already shown by loadUserProfile
@@ -809,9 +809,9 @@ async function handleLogin(e) {
                 try {
                     const userDoc = await db.collection('users').doc(userCredential.user.uid).get();
                     if (userDoc.exists) {
-                        await db.collection('users').doc(userCredential.user.uid).update({
-                            lastLogin: firebase.firestore.FieldValue.serverTimestamp()
-                        });
+            await db.collection('users').doc(userCredential.user.uid).update({
+                lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+            });
                         console.log('✅ Last login updated');
                     }
                     // If profile doesn't exist, loadUserProfile will create it
@@ -1074,24 +1074,58 @@ async function handleSignup(e) {
         // Check if this is a permission error from profile creation
         if (error.code === 'permission-denied' || error.message.includes('permission') || error.message.includes('Permission')) {
             errorMessage = 'Your account has been created but requires admin approval. Please contact a system administrator to activate your account.';
+        } else if (error.code === 'auth/email-already-in-use') {
+            // Email already exists in Firebase Auth
+            // Check if there's a pending invitation for this email
+            const normalizedEmail = (email || '').toLowerCase().trim();
+            const pendingUser = await checkPendingInvitation(normalizedEmail);
+            
+            if (pendingUser) {
+                // There's a pending invitation - user should sign in instead
+                errorMessage = 'An account with this email already exists. Please sign in to complete your account setup. If you don\'t remember your password, use the "Forgot Password" link.';
+                // Show link to login page
+                if (errorDiv) {
+                    errorDiv.innerHTML = `
+                        <p>${errorMessage}</p>
+                        <p style="margin-top: 10px;">
+                            <a href="#login" style="color: #667eea; text-decoration: underline;">Go to Sign In</a> | 
+                            <a href="#" id="forgotPasswordFromSignup" style="color: #667eea; text-decoration: underline;">Forgot Password?</a>
+                        </p>
+                    `;
+                    errorDiv.style.display = 'block';
+                    
+                    // Add event listener for forgot password link
+                    const forgotPasswordLink = document.getElementById('forgotPasswordFromSignup');
+                    if (forgotPasswordLink) {
+                        forgotPasswordLink.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            showPasswordResetPage();
+                        });
+                    }
+                }
+                return;
+            } else {
+                // No pending invitation - regular account exists
+                errorMessage = 'An account with this email already exists. Please sign in instead.';
+            }
         } else {
-            switch (error.code) {
-                case 'auth/email-already-in-use':
-                    errorMessage = 'An account with this email already exists.';
-                    break;
-                case 'auth/invalid-email':
-                    errorMessage = 'Invalid email address.';
-                    break;
-                case 'auth/weak-password':
-                    errorMessage = 'Password is too weak. Please use a stronger password.';
-                    break;
-                default:
-                    errorMessage = error.message || 'Failed to create account. Please try again.';
+        switch (error.code) {
+            case 'auth/invalid-email':
+                errorMessage = 'Invalid email address.';
+                break;
+            case 'auth/weak-password':
+                errorMessage = 'Password is too weak. Please use a stronger password.';
+                break;
+            default:
+                errorMessage = error.message || 'Failed to create account. Please try again.';
             }
         }
         
         if (errorDiv) {
+            // Only set text if we haven't already set HTML content
+            if (!errorDiv.innerHTML || errorDiv.innerHTML === errorDiv.textContent) {
             errorDiv.textContent = errorMessage;
+            }
             errorDiv.style.display = 'block';
         }
     }
