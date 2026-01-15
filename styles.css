@@ -267,9 +267,21 @@ body {
 }
 
 .sidebar-nav-link.active {
+    background: rgba(37, 99, 235, 0.1);
+    color: #2563EB;
+    font-weight: 600;
+}
+
+.sidebar-nav-link.active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 24px;
     background: #2563EB;
-    color: white;
-    border-left: 3px solid #1d4ed8;
+    border-radius: 0 2px 2px 0;
 }
 
 .sidebar-nav-link .nav-icon {
