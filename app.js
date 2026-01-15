@@ -6712,17 +6712,39 @@ async function linkPendingUserToAccount(userId, email) {
         const normalizedEmail = (email || '').toLowerCase().trim();
         console.log('🔗 Linking pending user to account:', { userId, email: normalizedEmail });
         
-        const pendingUser = await checkPendingInvitation(normalizedEmail);
+        // Get full pending user data from Firestore (user is authenticated now)
+        // Query directly to ensure we get all fields including assignedProperties
+        let pendingUser = null;
+        if (db) {
+            try {
+                const pendingUsersSnapshot = await db.collection('pendingUsers')
+                    .where('email', '==', normalizedEmail)
+                    .where('status', '==', 'pending_signup')
+                    .limit(1)
+                    .get();
+                
+                if (!pendingUsersSnapshot.empty) {
+                    pendingUser = pendingUsersSnapshot.docs[0].data();
+                    console.log('✅ Got full pending user data for linking:', {
+                        role: pendingUser.role,
+                        isActive: pendingUser.isActive,
+                        displayName: pendingUser.displayName,
+                        assignedPropertiesCount: (pendingUser.assignedProperties || []).length
+                    });
+                }
+            } catch (queryError) {
+                console.warn('⚠️ Could not query Firestore for pending user:', queryError.message);
+                // Fallback to checkPendingInvitation
+                pendingUser = await checkPendingInvitation(normalizedEmail);
+            }
+        } else {
+            pendingUser = await checkPendingInvitation(normalizedEmail);
+        }
+        
         if (!pendingUser) {
             console.log('❌ No pending invitation found for:', normalizedEmail);
             return false;
         }
-        
-        console.log('✅ Found pending user data:', {
-            role: pendingUser.role,
-            isActive: pendingUser.isActive,
-            displayName: pendingUser.displayName
-        });
         
         // Check if user profile already exists - prevent duplicates
         const existingProfile = await db.collection('users').doc(userId).get();
