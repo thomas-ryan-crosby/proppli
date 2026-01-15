@@ -5635,14 +5635,16 @@ function closeCompletionModal() {
 
 function handleTicketCompletion(e) {
     e.preventDefault();
-    const targetStatus = document.getElementById('workflowTargetStatus').value || 'Completed';
+    const workflowTargetStatusEl = document.getElementById('workflowTargetStatus');
+    const targetStatus = workflowTargetStatusEl?.value || 'Completed';
     const completedBySelect = document.getElementById('completionCompletedBy');
     const completedByOther = document.getElementById('completionCompletedByOther');
     const completedBy = completedBySelect?.value === '__other__' 
         ? (completedByOther?.value.trim() || '') 
         : (completedBySelect?.value ? (usersForDropdowns[completedBySelect.value]?.displayName || completedBySelect.value) : '');
     const completedByUserId = completedBySelect?.value && completedBySelect.value !== '__other__' ? completedBySelect.value : null;
-    const howResolved = document.getElementById('completionHowResolved').value.trim();
+    const howResolvedEl = document.getElementById('completionHowResolved');
+    const howResolved = howResolvedEl?.value.trim() || '';
 
     if (!completedBy) {
         alert('Please enter who completed the work');
