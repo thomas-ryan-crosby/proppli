@@ -8806,15 +8806,17 @@ async function renderTenantsTableView(tenants) {
                                 <button class="btn-action btn-view" onclick="viewTenantDetail('${tenant.id}')" title="View Details">
                                     <span class="btn-icon">👁️</span>
                                 </button>
-                                <button class="btn-action btn-edit" onclick="editTenant('${tenant.id}')" title="Edit">
-                                    <span class="btn-icon">✏️</span>
-                                </button>
-                                <button class="btn-action btn-danger" onclick="markTenantAsMovedOut('${tenant.id}')" title="Mark as Moved Out" style="background: #f97316; border-color: #f97316; color: white;">
-                                    <span class="btn-icon">🚪</span>
-                                </button>
-                                <button class="btn-action btn-delete" onclick="deleteTenant('${tenant.id}')" title="Delete">
-                                    <span class="btn-icon">🗑️</span>
-                                </button>
+                                ${(currentUserProfile && currentUserProfile.role === 'maintenance') ? '' : `
+                                    <button class="btn-action btn-edit" onclick="editTenant('${tenant.id}')" title="Edit">
+                                        <span class="btn-icon">✏️</span>
+                                    </button>
+                                    <button class="btn-action btn-danger" onclick="markTenantAsMovedOut('${tenant.id}')" title="Mark as Moved Out" style="background: #f97316; border-color: #f97316; color: white;">
+                                        <span class="btn-icon">🚪</span>
+                                    </button>
+                                    <button class="btn-action btn-delete" onclick="deleteTenant('${tenant.id}')" title="Delete">
+                                        <span class="btn-icon">🗑️</span>
+                                    </button>
+                                `}
                             </div>
                         </div>
                     </td>
@@ -9185,15 +9187,17 @@ async function renderTenantsTableView(tenants) {
                                 <button class="btn-action btn-view" onclick="viewTenantDetail('${tenant.id}')" title="View Details">
                                     <span class="btn-icon">👁️</span>
                                 </button>
-                                <button class="btn-action btn-edit" onclick="editTenant('${tenant.id}')" title="Edit">
-                                    <span class="btn-icon">✏️</span>
-                                </button>
-                                <button class="btn-action btn-danger" onclick="markTenantAsMovedOut('${tenant.id}')" title="Mark as Moved Out" style="background: #f97316; border-color: #f97316; color: white;">
-                                    <span class="btn-icon">🚪</span>
-                                </button>
-                                <button class="btn-action btn-delete" onclick="deleteTenant('${tenant.id}')" title="Delete">
-                                    <span class="btn-icon">🗑️</span>
-                                </button>
+                                ${(currentUserProfile && currentUserProfile.role === 'maintenance') ? '' : `
+                                    <button class="btn-action btn-edit" onclick="editTenant('${tenant.id}')" title="Edit">
+                                        <span class="btn-icon">✏️</span>
+                                    </button>
+                                    <button class="btn-action btn-danger" onclick="markTenantAsMovedOut('${tenant.id}')" title="Mark as Moved Out" style="background: #f97316; border-color: #f97316; color: white;">
+                                        <span class="btn-icon">🚪</span>
+                                    </button>
+                                    <button class="btn-action btn-delete" onclick="deleteTenant('${tenant.id}')" title="Delete">
+                                        <span class="btn-icon">🗑️</span>
+                                    </button>
+                                `}
                             </div>
                         </div>
                     </td>
@@ -10391,15 +10395,17 @@ function rebuildTableWithContactColumns(tenantsByBuilding, tenantsWithoutBuildin
                                 <button class="btn-action btn-view" onclick="viewTenantDetail('${tenant.id}')" title="View Details">
                                     <span class="btn-icon">👁️</span>
                                 </button>
-                                <button class="btn-action btn-edit" onclick="editTenant('${tenant.id}')" title="Edit">
-                                    <span class="btn-icon">✏️</span>
-                                </button>
-                                <button class="btn-action btn-danger" onclick="markTenantAsMovedOut('${tenant.id}')" title="Mark as Moved Out" style="background: #f97316; border-color: #f97316; color: white;">
-                                    <span class="btn-icon">🚪</span>
-                                </button>
-                                <button class="btn-action btn-delete" onclick="deleteTenant('${tenant.id}')" title="Delete">
-                                    <span class="btn-icon">🗑️</span>
-                                </button>
+                                ${(currentUserProfile && currentUserProfile.role === 'maintenance') ? '' : `
+                                    <button class="btn-action btn-edit" onclick="editTenant('${tenant.id}')" title="Edit">
+                                        <span class="btn-icon">✏️</span>
+                                    </button>
+                                    <button class="btn-action btn-danger" onclick="markTenantAsMovedOut('${tenant.id}')" title="Mark as Moved Out" style="background: #f97316; border-color: #f97316; color: white;">
+                                        <span class="btn-icon">🚪</span>
+                                    </button>
+                                    <button class="btn-action btn-delete" onclick="deleteTenant('${tenant.id}')" title="Delete">
+                                        <span class="btn-icon">🗑️</span>
+                                    </button>
+                                `}
                             </div>
                         </div>
                     </td>
