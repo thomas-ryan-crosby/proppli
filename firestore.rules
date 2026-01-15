@@ -55,8 +55,15 @@ service cloud.firestore {
     // Users collection
     match /users/{userId} {
       // Users can read their own profile
+      // Admins can read all profiles
+      // Maintenance users can read all profiles (needed for assignment dropdowns in tickets)
+      // Property managers and viewers can read all profiles (needed for various dropdowns)
       allow read: if isAuthenticated() && 
-                    (request.auth.uid == userId || isAdmin());
+                    (request.auth.uid == userId || 
+                     isAdmin() || 
+                     getUserRole() == 'maintenance' ||
+                     getUserRole() == 'property_manager' ||
+                     getUserRole() == 'viewer');
       
       // Users can create their own profile during signup
       // This allows:

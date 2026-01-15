@@ -4874,24 +4874,8 @@ async function loadUsersForDropdowns() {
     });
     
     try {
-        // For maintenance users, they can only read their own profile per Firestore rules
-        // So we'll just include the current user and allow "Other" option for manual entry
-        if (currentUserProfile && currentUserProfile.role === 'maintenance') {
-            console.log('🔍 loadUsersForDropdowns: Loading users for maintenance user (current user only)');
-            usersForDropdowns = {};
-            
-            // Only include current user (they can read their own profile)
-            if (currentUserProfile.id) {
-                usersForDropdowns[currentUserProfile.id] = {
-                    id: currentUserProfile.id,
-                    displayName: currentUserProfile.displayName || currentUserProfile.email || 'Unknown',
-                    email: currentUserProfile.email
-                };
-            }
-            
-            console.log(`✅ loadUsersForDropdowns: Loaded ${Object.keys(usersForDropdowns).length} user(s) for maintenance user`);
-            return usersForDropdowns;
-        }
+        // All authenticated users can now read other users' profiles (per Firestore rules)
+        // So maintenance users can see all users for assignment purposes
         
         // For other roles, load all active users
         console.log('🔍 loadUsersForDropdowns: Loading all active users');
