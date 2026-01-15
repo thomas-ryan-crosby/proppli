@@ -14840,9 +14840,8 @@ function formatLeaseSummaries(leases, tenants, units = {}) {
         const initialAnnualFormatted = initialAnnualRent ? `$${initialAnnualRent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A';
         const currentAnnualFormatted = currentAnnualRent ? `$${currentAnnualRent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A';
         
-        // Calculate price per square foot (PPF)
-        const unit = lease.unitId ? units[lease.unitId] : null;
-        const squareFootage = unit?.squareFootage || null;
+        // Calculate price per square foot (PPF) - use lease squareFootage, not unit squareFootage
+        const squareFootage = lease.squareFootage || null;
         let ppfDisplay = '';
         if (squareFootage && squareFootage > 0) {
             const initialMonthlyPPF = initialRent / squareFootage;
@@ -15297,9 +15296,8 @@ function renderLeaseDetailList(leases, tenants, container, units = {}) {
         const initialAnnualFormatted = initialAnnualRent ? `$${initialAnnualRent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A';
         const currentAnnualFormatted = currentAnnualRent ? `$${currentAnnualRent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A';
         
-        // Calculate price per square foot (PPF)
-        const unit = lease.unitId ? units[lease.unitId] : null;
-        const squareFootage = unit?.squareFootage || null;
+        // Calculate price per square foot (PPF) - use lease squareFootage, not unit squareFootage
+        const squareFootage = lease.squareFootage || null;
         let ppfDisplay = '';
         if (squareFootage && squareFootage > 0) {
             const initialMonthlyPPF = initialRent / squareFootage;
