@@ -4352,6 +4352,12 @@ function createTicketCard(ticket, isDeleted = false) {
                     <span class="ticket-detail-value">${escapeHtml(ticket.buildingNumber)}</span>
                 </div>
             ` : ''}
+            ${ticket.unitNumber ? `
+                <div class="ticket-detail">
+                    <span class="ticket-detail-label">Unit #</span>
+                    <span class="ticket-detail-value">${escapeHtml(ticket.unitNumber)}</span>
+                </div>
+            ` : ''}
             ${ticket.floorNumber ? `
                 <div class="ticket-detail">
                     <span class="ticket-detail-label">Floor #</span>
@@ -4696,9 +4702,11 @@ function updateCommercialFieldsVisibility(propertyId) {
                 }
                 // Clear the fields when hiding
                 const buildingNumber = document.getElementById('buildingNumber');
+                const unitNumber = document.getElementById('unitNumber');
                 const floorNumber = document.getElementById('floorNumber');
                 const tenantName = document.getElementById('tenantName');
                 if (buildingNumber) buildingNumber.value = '';
+                if (unitNumber) unitNumber.value = '';
                 if (floorNumber) floorNumber.value = '';
                 if (tenantName) tenantName.value = '';
             }
@@ -4737,6 +4745,7 @@ function loadTicketForEdit(ticketId) {
             if (ticket.propertyId) {
                 updateCommercialFieldsVisibility(ticket.propertyId).then(() => {
                     document.getElementById('buildingNumber').value = ticket.buildingNumber || '';
+                    document.getElementById('unitNumber').value = ticket.unitNumber || '';
                     document.getElementById('floorNumber').value = ticket.floorNumber || '';
                     
                     // Load tenants and set selected tenant
