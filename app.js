@@ -6639,17 +6639,62 @@ async function checkPendingInvitation(email) {
         
         console.log('🔍 Checking for pending invitation with email:', normalizedEmail);
         
-        // Check pendingUsers collection
-        const pendingUsersSnapshot = await db.collection('pendingUsers')
-            .where('email', '==', normalizedEmail)
-            .where('status', '==', 'pending_signup')
-            .limit(1)
-            .get();
+        // Try to use Cloud Function first (works for unauthenticated users)
+        if (firebase && firebase.functions) {
+            try {
+                const checkInvitation = firebase.functions().httpsCallable('checkPendingInvitation');
+                const result = await checkInvitation({ email: normalizedEmail });
+                
+                if (result.data && result.data.hasInvitation) {
+                    console.log('✅ Found pending invitation via Cloud Function');
+                    // We need the full pending user data for linking, so try to get it from Firestore
+                    // But if we can't, return what we have
+                    if (db && auth && auth.currentUser) {
+                        // User is authenticated, get full data
+                        const pendingUsersSnapshot = await db.collection('pendingUsers')
+                            .where('email', '==', normalizedEmail)
+                            .where('status', '==', 'pending_signup')
+                            .limit(1)
+                            .get();
+                        
+                        if (!pendingUsersSnapshot.empty) {
+                            const pendingUser = pendingUsersSnapshot.docs[0].data();
+                            console.log('✅ Got full pending user data from Firestore');
+                            return pendingUser;
+                        }
+                    }
+                    
+                    // Return simplified data (we'll get full data during linking)
+                    return {
+                        displayName: result.data.displayName,
+                        role: result.data.role,
+                        isActive: true,
+                        email: normalizedEmail,
+                        assignedProperties: [] // Will be filled during linking
+                    };
+                } else {
+                    console.log('ℹ️ No pending invitation found via Cloud Function');
+                    return null;
+                }
+            } catch (cfError) {
+                console.warn('⚠️ Cloud Function check failed, trying direct Firestore query:', cfError.message);
+                // Fall through to direct Firestore query if authenticated
+            }
+        }
         
-        if (!pendingUsersSnapshot.empty) {
-            const pendingUser = pendingUsersSnapshot.docs[0].data();
-            console.log('✅ Found pending invitation:', pendingUser);
-            return pendingUser;
+        // Fallback: Try direct Firestore query (requires authentication)
+        if (db && auth && auth.currentUser) {
+            const pendingUsersSnapshot = await db.collection('pendingUsers')
+                .where('email', '==', normalizedEmail)
+                .where('status', '==', 'pending_signup')
+                .limit(1)
+                .get();
+            
+            if (!pendingUsersSnapshot.empty) {
+                const pendingUser = pendingUsersSnapshot.docs[0].data();
+                console.log('✅ Found pending invitation via Firestore:', pendingUser);
+                return pendingUser;
+            }
         }
         
         console.log('ℹ️ No pending invitation found for:', normalizedEmail);
