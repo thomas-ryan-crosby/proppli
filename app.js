@@ -5588,16 +5588,20 @@ function openWorkflowModal(ticketId, targetStatus) {
         workflowTargetStatus.value = targetStatus;
     }
     
+    // Reset submit button state first
+    const submitBtn = document.getElementById('workflowSubmitBtn');
+    if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = targetStatus === 'Completed' ? 'Mark as Complete' : 'Move to Monitoring';
+    }
+    
     // Update modal title and button text
     const modalTitle = document.getElementById('workflowModalTitle');
-    const submitBtn = document.getElementById('workflowSubmitBtn');
     
     if (targetStatus === 'Completed') {
         if (modalTitle) modalTitle.textContent = 'Mark Ticket as Complete';
-        if (submitBtn) submitBtn.textContent = 'Mark as Complete';
     } else if (targetStatus === 'Monitoring') {
         if (modalTitle) modalTitle.textContent = 'Move Ticket to Monitoring';
-        if (submitBtn) submitBtn.textContent = 'Move to Monitoring';
     }
     
     // Reset form
@@ -5612,8 +5616,54 @@ function openWorkflowModal(ticketId, targetStatus) {
     if (removeCompletionAfterPhoto) removeCompletionAfterPhoto.style.display = 'none';
     completionAfterPhotoFile = null;
     
-    // Load and populate completion dropdown, default to current user
-    loadUsersForDropdowns().then(() => {
+    // Load ticket data to check time allocation settings
+    db.collection('tickets').doc(ticketId).get().then((doc) => {
+        const ticket = doc.data();
+        const enableTimeAllocation = ticket?.enableTimeAllocation === true;
+        const timeAllocated = ticket?.timeAllocated;
+        const billingRate = ticket?.billingRate;
+        
+        // Show time allocation group if enabled or if fields are populated
+        const workflowTimeAllocationGroup = document.getElementById('workflowTimeAllocationGroup');
+        const workflowEnableTimeAllocation = document.getElementById('workflowEnableTimeAllocation');
+        const workflowTimeAllocationFields = document.getElementById('workflowTimeAllocationFields');
+        
+        if (workflowTimeAllocationGroup) {
+            // Show group if time allocation is enabled OR if fields are populated
+            const shouldShow = enableTimeAllocation || (timeAllocated && timeAllocated > 0) || (billingRate && billingRate > 0);
+            workflowTimeAllocationGroup.style.display = shouldShow ? 'block' : 'none';
+            
+            if (workflowEnableTimeAllocation) {
+                // Set toggle based on enableTimeAllocation OR if fields are populated
+                workflowEnableTimeAllocation.checked = enableTimeAllocation || (timeAllocated && timeAllocated > 0) || (billingRate && billingRate > 0);
+            }
+            
+            if (workflowTimeAllocationFields) {
+                workflowTimeAllocationFields.style.display = workflowEnableTimeAllocation?.checked ? 'block' : 'none';
+            }
+            
+            // Populate fields if they exist
+            const workflowTimeAllocated = document.getElementById('workflowTimeAllocated');
+            const workflowBillingRate = document.getElementById('workflowBillingRate');
+            const workflowBillingTypeHourly = document.getElementById('workflowBillingTypeHourly');
+            const workflowBillingTypeFlat = document.getElementById('workflowBillingTypeFlat');
+            
+            if (workflowTimeAllocated && timeAllocated) {
+                workflowTimeAllocated.value = timeAllocated;
+            }
+            if (workflowBillingRate && billingRate) {
+                workflowBillingRate.value = billingRate;
+            }
+            if (ticket?.billingType === 'hourly' && workflowBillingTypeHourly) {
+                workflowBillingTypeHourly.checked = true;
+            } else if (ticket?.billingType === 'flat' && workflowBillingTypeFlat) {
+                workflowBillingTypeFlat.checked = true;
+            }
+        }
+        
+        // Load and populate completion dropdown, default to current user
+        return loadUsersForDropdowns();
+    }).then(() => {
         populateUserDropdown('completionCompletedBy', currentUserProfile?.id || '');
         // Set default to current user if available
         const completionCompletedBy = document.getElementById('completionCompletedBy');
@@ -5621,6 +5671,17 @@ function openWorkflowModal(ticketId, targetStatus) {
             completionCompletedBy.value = currentUserProfile.id;
         }
         if (completionCompletedBy) completionCompletedBy.focus();
+    }).catch((error) => {
+        console.error('Error loading ticket data:', error);
+        // Still show modal even if ticket load fails
+        loadUsersForDropdowns().then(() => {
+            populateUserDropdown('completionCompletedBy', currentUserProfile?.id || '');
+            const completionCompletedBy = document.getElementById('completionCompletedBy');
+            if (completionCompletedBy && currentUserProfile?.id) {
+                completionCompletedBy.value = currentUserProfile.id;
+            }
+            if (completionCompletedBy) completionCompletedBy.focus();
+        });
     });
     
     // Show modal
