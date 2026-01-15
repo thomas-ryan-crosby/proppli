@@ -2147,14 +2147,8 @@ function setupEventListeners() {
         tenantPropertyFilter.addEventListener('change', function() {
             selectedPropertyForTenants = this.value || null;
             localStorage.setItem('selectedPropertyForTenants', selectedPropertyForTenants || '');
-            // Reload tenants with filter
-            db.collection('tenants').get().then((snapshot) => {
-                const tenants = {};
-                snapshot.forEach((doc) => {
-                    tenants[doc.id] = { id: doc.id, ...doc.data() };
-                });
-                renderTenantsList(tenants);
-            });
+            // Reload tenants with filter - use loadTenants() which properly filters for maintenance users
+            loadTenants();
         });
     }
     
