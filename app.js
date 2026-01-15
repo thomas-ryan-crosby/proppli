@@ -5803,9 +5803,22 @@ function handleTicketCompletion(e) {
         const timeAllocated = ticket?.timeAllocated;
         const enableTimeAllocation = ticket?.enableTimeAllocation === true; // Default to false - must be explicitly enabled
         
+        // Check workflow modal time allocation if it exists (for editing during workflow)
+        const workflowEnableTimeAllocation = document.getElementById('workflowEnableTimeAllocation');
+        const workflowTimeAllocated = document.getElementById('workflowTimeAllocated');
+        let finalEnableTimeAllocation = enableTimeAllocation;
+        let finalTimeAllocated = timeAllocated;
+        
+        if (workflowEnableTimeAllocation && workflowEnableTimeAllocation.checked) {
+            finalEnableTimeAllocation = true;
+            if (workflowTimeAllocated && workflowTimeAllocated.value) {
+                finalTimeAllocated = parseFloat(workflowTimeAllocated.value);
+            }
+        }
+        
         // Only require time allocation for Completed status, not Monitoring
-        if (targetStatus === 'Completed' && enableTimeAllocation && (!timeAllocated || isNaN(timeAllocated) || timeAllocated <= 0)) {
-            alert('Time Allocated is required before marking a ticket as complete. Please edit the ticket and add the time allocated first.');
+        if (targetStatus === 'Completed' && finalEnableTimeAllocation && (!finalTimeAllocated || isNaN(finalTimeAllocated) || finalTimeAllocated <= 0)) {
+            alert('Time Allocated is required before marking a ticket as complete. Please set the time allocation in the form above.');
             if (submitBtn) {
                 submitBtn.disabled = false;
                 submitBtn.textContent = submitBtnText;
@@ -5819,6 +5832,12 @@ function handleTicketCompletion(e) {
             : Promise.resolve(null);
 
         uploadPromise.then((afterPhotoUrl) => {
+            // Get workflow modal time allocation data if it exists
+            const workflowEnableTimeAllocation = document.getElementById('workflowEnableTimeAllocation');
+            const workflowTimeAllocated = document.getElementById('workflowTimeAllocated');
+            const workflowBillingRate = document.getElementById('workflowBillingRate');
+            const workflowBillingTypeHourly = document.getElementById('workflowBillingTypeHourly');
+            
             const updateData = {
                 status: targetStatus,
                 completedBy: completedBy,
@@ -5827,6 +5846,26 @@ function handleTicketCompletion(e) {
                 lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             };
+
+            // Update time allocation if it was edited in the workflow modal
+            if (workflowEnableTimeAllocation) {
+                updateData.enableTimeAllocation = workflowEnableTimeAllocation.checked;
+                
+                if (workflowEnableTimeAllocation.checked) {
+                    if (workflowTimeAllocated && workflowTimeAllocated.value) {
+                        updateData.timeAllocated = parseFloat(workflowTimeAllocated.value);
+                    }
+                    if (workflowBillingRate && workflowBillingRate.value) {
+                        updateData.billingRate = parseFloat(workflowBillingRate.value);
+                        updateData.billingType = workflowBillingTypeHourly?.checked ? 'hourly' : 'flat';
+                    }
+                } else {
+                    // If toggle is off, clear the fields
+                    updateData.timeAllocated = null;
+                    updateData.billingRate = null;
+                    updateData.billingType = null;
+                }
+            }
 
             // Only set dateCompleted for Completed status
             if (targetStatus === 'Completed') {
