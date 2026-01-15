@@ -5690,7 +5690,16 @@ function openWorkflowModal(ticketId, targetStatus) {
 }
 
 function closeCompletionModal() {
-    document.getElementById('completionModal').classList.remove('show');
+    const completionModal = document.getElementById('completionModal');
+    if (completionModal) completionModal.classList.remove('show');
+    
+    // Reset submit button state
+    const submitBtn = document.getElementById('workflowSubmitBtn');
+    if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Advance Workflow';
+    }
+    
     editingTicketId = null;
 }
 
