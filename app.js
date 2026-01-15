@@ -12130,7 +12130,7 @@ async function uploadTenantDocument(tenantId, file) {
             fileName: file.name,
             fileUrl: fileUrl,
             fileSize: file.size,
-            uploadedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            uploadedAt: firebase.firestore.Timestamp.now(),
             description: null
         });
         
@@ -12934,13 +12934,19 @@ function renderLeases(leases, properties, tenants, units) {
         const endDate = lease.leaseEndDate ? lease.leaseEndDate.toDate().toLocaleDateString() : 'N/A';
         const daysUntilExpiration = lease.daysUntilExpiration !== undefined ? lease.daysUntilExpiration : 'N/A';
         
-        const statusClass = lease.status === 'Active' ? 'status-active' : 
-                           lease.status === 'Expiring Soon' ? 'status-warning' : 
-                           lease.status === 'Expired' ? 'status-expired' : 'status-inactive';
+        // Determine display status - if deprecated, show Deprecated status
+        const displayStatus = lease.isDeprecated === true ? 'Deprecated' : lease.status;
+        const statusClass = displayStatus === 'Active' ? 'status-active' : 
+                           displayStatus === 'Expiring Soon' ? 'status-warning' : 
+                           displayStatus === 'Expired' ? 'status-expired' :
+                           displayStatus === 'Deprecated' ? 'status-inactive' : 'status-inactive';
         
         const squareFootageDisplay = lease.squareFootage 
             ? `${lease.squareFootage.toLocaleString('en-US', { maximumFractionDigits: 0 })} sq ft`
             : 'N/A';
+        
+        // Calculate rent to display - calculateCurrentRent automatically uses deprecatedDate if lease is deprecated
+        const rentToDisplay = calculateCurrentRent(lease) ?? lease.monthlyRent;
         
         html += `
             <tr>
@@ -12951,8 +12957,8 @@ function renderLeases(leases, properties, tenants, units) {
                 <td>${squareFootageDisplay}</td>
                 <td>${startDate}</td>
                 <td>${endDate}</td>
-                <td>$${lease.monthlyRent?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}</td>
-                <td><span class="status-badge ${statusClass}">${lease.status}</span></td>
+                <td>$${rentToDisplay?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}</td>
+                <td><span class="status-badge ${statusClass}">${displayStatus}</span></td>
                 <td>${daysUntilExpiration !== 'N/A' ? (daysUntilExpiration < 0 ? `Expired ${Math.abs(daysUntilExpiration)} days ago` : `${daysUntilExpiration} days`) : 'N/A'}</td>
                 <td>
                     <button class="btn-sm btn-primary" onclick="window.openLeaseModal('${lease.id}')">View</button>
@@ -14795,15 +14801,19 @@ function formatLeaseSummaries(leases, tenants, units = {}) {
         const endDate = lease.leaseEndDate ? lease.leaseEndDate.toDate().toLocaleDateString() : 'N/A';
         
         const initialRent = lease.monthlyRent ? lease.monthlyRent : 0;
+        // If deprecated, calculate rent as of deprecation date
         const currentRent = calculateCurrentRent(lease);
         const hasEscalation = lease.rentEscalation && lease.rentEscalation.escalationType && lease.rentEscalation.escalationType !== 'None';
         
         const initialRentFormatted = initialRent ? `$${initialRent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A';
         const currentRentFormatted = currentRent ? `$${currentRent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A';
         
-        const statusClass = lease.status === 'Active' ? 'status-active' : 
-                           lease.status === 'Expiring Soon' ? 'status-warning' : 
-                           lease.status === 'Expired' ? 'status-expired' : 'status-inactive';
+        // Determine display status - if deprecated, show Deprecated status
+        const displayStatus = lease.isDeprecated === true ? 'Deprecated' : lease.status;
+        const statusClass = displayStatus === 'Active' ? 'status-active' : 
+                           displayStatus === 'Expiring Soon' ? 'status-warning' : 
+                           displayStatus === 'Expired' ? 'status-expired' :
+                           displayStatus === 'Deprecated' ? 'status-inactive' : 'status-inactive';
         
         // Calculate annual rent (PPF - Per Year)
         const initialAnnualRent = initialRent ? (initialRent * 12) : 0;
@@ -15252,10 +15262,14 @@ function renderLeaseDetailList(leases, tenants, container, units = {}) {
         
         const initialRentFormatted = initialRent ? `$${initialRent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A';
         const currentRentFormatted = currentRent ? `$${currentRent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A';
-        const deposit = lease.securityDeposit ? `$${lease.securityDeposit.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : 'N/A';
-        const statusClass = lease.status === 'Active' ? 'status-active' : 
-                           lease.status === 'Expiring Soon' ? 'status-warning' : 
-                           lease.status === 'Expired' ? 'status-expired' : 'status-inactive';
+        const deposit = lease.securityDeposit !== null && lease.securityDeposit !== undefined ? `$${lease.securityDeposit.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : 'N/A';
+        
+        // Determine display status - if deprecated, show Deprecated status
+        const displayStatus = lease.isDeprecated === true ? 'Deprecated' : lease.status;
+        const statusClass = displayStatus === 'Active' ? 'status-active' : 
+                           displayStatus === 'Expiring Soon' ? 'status-warning' : 
+                           displayStatus === 'Expired' ? 'status-expired' :
+                           displayStatus === 'Deprecated' ? 'status-inactive' : 'status-inactive';
         
         // Calculate annual rent (PPF - Per Year)
         const initialAnnualRent = initialRent ? (initialRent * 12) : 0;
@@ -15334,7 +15348,7 @@ function renderLeaseDetailList(leases, tenants, container, units = {}) {
                             <span style="font-size: 0.7em; font-weight: 400; color: #999; margin-left: 6px;">ID: ${lease.id.substring(0, 8)}</span>
                         </h4>
                         <div style="color: #64748b; font-size: 0.9em;">
-                            <span class="status-badge ${statusClass}">${lease.status}</span>
+                            <span class="status-badge ${statusClass}">${displayStatus}</span>
                             <span style="margin-left: 10px;">Lease #: ${escapeHtml(lease.leaseNumber || lease.id.substring(0, 8))}</span>
                         </div>
                     </div>
@@ -15494,6 +15508,7 @@ window.handleDeprecatedLeaseSubmit = async function(e) {
         
         await db.collection('leases').doc(leaseId).update({
             isDeprecated: true,
+            status: 'Deprecated',
             deprecatedDate: deprecatedDate,
             deprecatedReason: deprecatedReason || null,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
