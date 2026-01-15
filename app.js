@@ -1782,6 +1782,47 @@ function setupEventListeners() {
     if (removeCompletionAfterPhoto) {
         removeCompletionAfterPhoto.addEventListener('click', () => removeCompletionFile());
     }
+    
+    // Workflow modal time allocation toggle handler
+    const workflowEnableTimeAllocationToggle = document.getElementById('workflowEnableTimeAllocation');
+    const workflowTimeAllocationFields = document.getElementById('workflowTimeAllocationFields');
+    if (workflowEnableTimeAllocationToggle && workflowTimeAllocationFields) {
+        workflowEnableTimeAllocationToggle.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                workflowTimeAllocationFields.style.display = 'block';
+            } else {
+                workflowTimeAllocationFields.style.display = 'none';
+                const workflowTimeAllocated = document.getElementById('workflowTimeAllocated');
+                const workflowBillingRate = document.getElementById('workflowBillingRate');
+                if (workflowTimeAllocated) workflowTimeAllocated.value = '';
+                if (workflowBillingRate) workflowBillingRate.value = '';
+                // Reset billing type to hourly
+                const workflowBillingTypeHourly = document.getElementById('workflowBillingTypeHourly');
+                if (workflowBillingTypeHourly) workflowBillingTypeHourly.checked = true;
+            }
+        });
+    }
+    
+    // Update billing rate label based on billing type in workflow modal
+    const workflowBillingTypeHourly = document.getElementById('workflowBillingTypeHourly');
+    const workflowBillingTypeFlat = document.getElementById('workflowBillingTypeFlat');
+    const workflowBillingRateLabel = document.getElementById('workflowBillingRateLabel');
+    const workflowBillingRateInput = document.getElementById('workflowBillingRate');
+    
+    if (workflowBillingTypeHourly && workflowBillingTypeFlat && workflowBillingRateLabel && workflowBillingRateInput) {
+        function updateWorkflowBillingRateLabel() {
+            if (workflowBillingTypeHourly.checked) {
+                workflowBillingRateLabel.textContent = 'Billing Rate ($/hour)';
+                workflowBillingRateInput.placeholder = 'e.g., 75.00';
+            } else if (workflowBillingTypeFlat.checked) {
+                workflowBillingRateLabel.textContent = 'Flat Rate Amount ($)';
+                workflowBillingRateInput.placeholder = 'e.g., 500.00';
+            }
+        }
+        
+        workflowBillingTypeHourly.addEventListener('change', updateWorkflowBillingRateLabel);
+        workflowBillingTypeFlat.addEventListener('change', updateWorkflowBillingRateLabel);
+    }
 
     // View toggles
     const viewActiveBtn = document.getElementById('viewActiveBtn');
