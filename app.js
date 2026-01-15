@@ -105,18 +105,19 @@ function startApp() {
     const handleHashRouting = () => {
         const hash = window.location.hash;
         if (hash === '#signup') {
-            // Show auth pages and signup modal
-            showAuthPages();
-            showSignupPage();
+            // Show auth pages and signup page
+            showAuthPages(false); // Don't force login, let hash routing handle it
         } else if (hash === '#login') {
             // Show auth pages and login
-            showAuthPages();
-            showLoginPage();
+            showAuthPages(false); // Don't force login, let hash routing handle it
         }
     };
     
-    // Handle hash on load
-    handleHashRouting();
+    // Handle hash on initial load - do this after DOM is ready
+    // Use setTimeout to ensure it runs after other initialization
+    setTimeout(() => {
+        handleHashRouting();
+    }, 200);
     
     // Listen for hash changes
     window.addEventListener('hashchange', handleHashRouting);
@@ -565,7 +566,7 @@ window.closeNoAccountModal = function() {
 };
 
 // Show authentication pages
-function showAuthPages() {
+function showAuthPages(forceLogin = false) {
     const landingPage = document.getElementById('landingPage');
     const authPages = document.getElementById('authPages');
     const appContainer = document.getElementById('appContainer');
@@ -574,6 +575,18 @@ function showAuthPages() {
     if (appContainer) appContainer.style.display = 'none';
     if (authPages) {
         authPages.style.display = 'block';
+        // Check hash routing first, unless forced to show login
+        if (!forceLogin) {
+            const hash = window.location.hash;
+            if (hash === '#signup') {
+                showSignupPage();
+                return;
+            } else if (hash === '#login') {
+                showLoginPage();
+                return;
+            }
+        }
+        // Default to login page
         showLoginPage();
     }
 }
