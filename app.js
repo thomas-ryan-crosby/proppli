@@ -8516,13 +8516,9 @@ async function renderTenantsTableView(tenants) {
     
     // First, load contacts to determine max number of contact and broker columns needed
     // If no tenants, use default values so orphaned units can still be displayed
-    // Skip for maintenance users - they don't have access to tenantContacts
+    // Maintenance users CAN access tenantContacts for tenants in assigned properties
     let maxContacts, maxBrokers;
-    if (currentUserProfile && currentUserProfile.role === 'maintenance') {
-        console.log('⚠️ renderTenantsTableView: Skipping determineMaxContacts for maintenance user - using defaults');
-        maxContacts = 5;
-        maxBrokers = 2;
-    } else if (Object.keys(filteredTenants).length > 0) {
+    if (Object.keys(filteredTenants).length > 0) {
         console.log('🔍 renderTenantsTableView: Determining max contacts');
         const result = await determineMaxContacts(filteredTenants).catch(error => {
             console.error('❌ renderTenantsTableView: Error in determineMaxContacts:', error);
@@ -9232,14 +9228,60 @@ async function renderTenantsTableView(tenants) {
 
 async function loadOrphanContacts(maxContacts, maxBrokers) {
     try {
-        // Skip orphan contacts for maintenance users - they don't have access to tenantContacts collection
-        if (currentUserProfile && currentUserProfile.role === 'maintenance') {
-            console.log('⚠️ Skipping orphan contacts for maintenance user');
-            return; // Maintenance users can't access tenantContacts
+        console.log('🔍 loadOrphanContacts: Starting', {
+            userRole: currentUserProfile?.role
+        });
+        
+        // For maintenance users, we need to filter contacts by assigned properties
+        // Get tenantIds for assigned properties first
+        let tenantIdsForContacts = new Set();
+        if (currentUserProfile && currentUserProfile.role === 'maintenance' && 
+            Array.isArray(currentUserProfile.assignedProperties) && 
+            currentUserProfile.assignedProperties.length > 0) {
+            console.log('🔍 loadOrphanContacts: Filtering for maintenance user');
+            // Load occupancies for assigned properties to get tenantIds
+            if (currentUserProfile.assignedProperties.length <= 10) {
+                const occupanciesSnapshot = await db.collection('occupancies')
+                    .where('propertyId', 'in', currentUserProfile.assignedProperties)
+                    .get();
+                occupanciesSnapshot.forEach(doc => {
+                    const occ = doc.data();
+                    if (occ.tenantId) {
+                        tenantIdsForContacts.add(occ.tenantId);
+                    }
+                });
+                console.log(`✅ loadOrphanContacts: Found ${tenantIdsForContacts.size} tenantIds for assigned properties`);
+            }
         }
         
-        // Get all contacts
-        const allContactsSnapshot = await db.collection('tenantContacts').get();
+        // Get all contacts (or filtered for maintenance users)
+        let allContactsSnapshot;
+        if (currentUserProfile && currentUserProfile.role === 'maintenance' && tenantIdsForContacts.size > 0) {
+            // For maintenance users, only get contacts for tenants in assigned properties
+            // Batch queries if needed (Firestore 'in' limit is 10)
+            const tenantIdsArray = Array.from(tenantIdsForContacts);
+            const allContacts = [];
+            const batchSize = 10;
+            
+            for (let i = 0; i < tenantIdsArray.length; i += batchSize) {
+                const batch = tenantIdsArray.slice(i, i + batchSize);
+                const batchSnapshot = await db.collection('tenantContacts')
+                    .where('tenantId', 'in', batch)
+                    .get();
+                batchSnapshot.forEach(doc => {
+                    allContacts.push(doc);
+                });
+            }
+            
+            // Convert to snapshot-like object
+            allContactsSnapshot = {
+                forEach: (fn) => allContacts.forEach(fn),
+                size: allContacts.length
+            };
+        } else {
+            // For other roles, get all contacts
+            allContactsSnapshot = await db.collection('tenantContacts').get();
+        }
         
         // Get tenant IDs
         const allTenantsSnapshot = await db.collection('tenants').get();
@@ -10138,23 +10180,35 @@ async function determineMaxContacts(tenants) {
     const tenantIds = Object.keys(tenants);
     if (tenantIds.length === 0) return { maxContacts: 0, maxBrokers: 0 };
     
+    console.log('🔍 determineMaxContacts: Starting', {
+        tenantCount: tenantIds.length,
+        userRole: currentUserProfile?.role
+    });
+    
     // Firestore 'in' query limit is 10, so we need to batch
     const allContacts = {};
     const batchSize = 10;
     
     for (let i = 0; i < tenantIds.length; i += batchSize) {
         const batch = tenantIds.slice(i, i + batchSize);
-        const contactsSnapshot = await db.collection('tenantContacts')
-            .where('tenantId', 'in', batch)
-            .get();
-        
-        contactsSnapshot.forEach(doc => {
-            const contact = { id: doc.id, ...doc.data() };
-            if (!allContacts[contact.tenantId]) {
-                allContacts[contact.tenantId] = [];
-            }
-            allContacts[contact.tenantId].push(contact);
-        });
+        try {
+            console.log(`🔍 determineMaxContacts: Loading batch ${i / batchSize + 1} (${batch.length} tenants)`);
+            const contactsSnapshot = await db.collection('tenantContacts')
+                .where('tenantId', 'in', batch)
+                .get();
+            
+            console.log(`✅ determineMaxContacts: Loaded ${contactsSnapshot.size} contacts for batch`);
+            contactsSnapshot.forEach(doc => {
+                const contact = { id: doc.id, ...doc.data() };
+                if (!allContacts[contact.tenantId]) {
+                    allContacts[contact.tenantId] = [];
+                }
+                allContacts[contact.tenantId].push(contact);
+            });
+        } catch (error) {
+            console.error(`❌ determineMaxContacts: Error loading batch ${i / batchSize + 1}:`, error);
+            // Continue with other batches
+        }
     }
     
     // Find maximum number of contacts and brokers across all tenants
@@ -10407,12 +10461,8 @@ async function loadContactsForTableView(tenants, maxContacts, maxBrokers) {
         return;
     }
     
-    // Skip loading contacts for maintenance users - they don't have access to tenantContacts collection
-    if (currentUserProfile && currentUserProfile.role === 'maintenance') {
-        console.log('⚠️ Skipping contact loading for maintenance user - no tenantContacts access');
-        return Promise.resolve(); // Maintenance users can't access tenantContacts
-    }
-    
+    // Maintenance users CAN access tenantContacts for tenants in assigned properties
+    // The tenants passed in are already filtered by assigned properties
     try {
         // Use cached contacts if available, otherwise load them
         let allContacts = window._cachedContacts;

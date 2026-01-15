@@ -267,6 +267,27 @@ service cloud.firestore {
                       getUserRole() == 'property_manager');
     }
     
+    // Tenant Contacts collection
+    match /tenantContacts/{contactId} {
+      // Users can read contacts if they're admin OR if they're maintenance with assigned properties
+      // Maintenance staff can read contacts (client-side will filter by assigned properties via tenantIds)
+      // Note: Firestore rules can't check if tenantId belongs to assigned properties, so we allow read
+      // and rely on client-side filtering to only query contacts for tenants in assigned properties
+      allow read: if isAuthenticated() && isUserActive() && 
+                    (isSuperAdmin() ||
+                     isAdmin() || 
+                     getUserRole() == 'property_manager' ||
+                     getUserRole() == 'viewer' ||
+                     (getUserRole() == 'maintenance' && 
+                      getUserAssignedProperties().size() > 0));
+      
+      // Only admins and property managers can write
+      allow write: if isAuthenticated() && isUserActive() && 
+                     (isSuperAdmin() ||
+                      isAdmin() || 
+                      getUserRole() == 'property_manager');
+    }
+    
     // Super admin full access override (must be last, before default deny)
     // Super admins can access any document that doesn't match above rules
     match /{document=**} {
