@@ -1671,6 +1671,12 @@ function setupEventListeners() {
     if (cancelTicketFormBtn) cancelTicketFormBtn.addEventListener('click', closeTicketModal);
     if (ticketStatus) ticketStatus.addEventListener('change', handleStatusChange);
     
+    // Tenant selection handler
+    const ticketTenantSelect = document.getElementById('ticketTenantSelect');
+    if (ticketTenantSelect) {
+        ticketTenantSelect.addEventListener('change', handleTenantSelectionChange);
+    }
+    
     // Handle "Other" option for user dropdowns
     function setupUserDropdownOtherToggle(selectId, otherInputId) {
         const select = document.getElementById(selectId);
@@ -4725,12 +4731,34 @@ function loadTicketForEdit(ticketId) {
                 updateCommercialFieldsVisibility(ticket.propertyId).then(() => {
                     document.getElementById('buildingNumber').value = ticket.buildingNumber || '';
                     document.getElementById('floorNumber').value = ticket.floorNumber || '';
-                    document.getElementById('tenantName').value = ticket.tenantName || '';
+                    
+                    // Load tenants and set selected tenant
+                    loadTenantsForTicketForm(ticket.propertyId).then(() => {
+                        if (ticket.tenantId) {
+                            document.getElementById('ticketTenantSelect').value = ticket.tenantId;
+                            document.getElementById('ticketTenantId').value = ticket.tenantId;
+                            document.getElementById('tenantName').style.display = 'none';
+                        } else if (ticket.tenantName) {
+                            document.getElementById('ticketTenantSelect').value = '__manual__';
+                            document.getElementById('tenantName').value = ticket.tenantName;
+                            document.getElementById('tenantName').style.display = 'block';
+                        }
+                    });
                 });
             } else {
                 document.getElementById('buildingNumber').value = ticket.buildingNumber || '';
                 document.getElementById('floorNumber').value = ticket.floorNumber || '';
-                document.getElementById('tenantName').value = ticket.tenantName || '';
+                
+                // Handle tenant
+                if (ticket.tenantId) {
+                    document.getElementById('ticketTenantSelect').value = ticket.tenantId;
+                    document.getElementById('ticketTenantId').value = ticket.tenantId;
+                    document.getElementById('tenantName').style.display = 'none';
+                } else if (ticket.tenantName) {
+                    document.getElementById('ticketTenantSelect').value = '__manual__';
+                    document.getElementById('tenantName').value = ticket.tenantName;
+                    document.getElementById('tenantName').style.display = 'block';
+                }
             }
             document.getElementById('workDescription').value = ticket.workDescription || '';
             document.getElementById('detailedDescription').value = ticket.detailedDescription || '';
@@ -4866,7 +4894,14 @@ function handleTicketSubmit(e) {
     }
     const buildingNumber = document.getElementById('buildingNumber').value.trim();
     const floorNumber = document.getElementById('floorNumber').value.trim();
-    const tenantName = document.getElementById('tenantName').value.trim();
+    
+    // Get tenant info - either from dropdown or manual entry
+    const ticketTenantSelect = document.getElementById('ticketTenantSelect');
+    const ticketTenantId = document.getElementById('ticketTenantId').value;
+    const tenantNameInput = document.getElementById('tenantName');
+    const tenantName = ticketTenantSelect?.value === '__manual__' 
+        ? tenantNameInput.value.trim() 
+        : (ticketTenantSelect?.selectedOptions[0]?.text || '');
     const workDescription = document.getElementById('workDescription').value.trim();
     const detailedDescription = document.getElementById('detailedDescription').value.trim();
     const workUpdates = document.getElementById('workUpdates').value.trim();
