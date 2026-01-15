@@ -5007,6 +5007,7 @@ function handleTicketSubmit(e) {
                     buildingNumber: buildingNumber || null,
                     floorNumber: floorNumber || null,
                     tenantName: tenantName || null,
+                    tenantId: ticketTenantId || null,
                     workDescription,
                     detailedDescription: detailedDescription || null,
                     workUpdates: workUpdates || null,
