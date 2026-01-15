@@ -13654,7 +13654,16 @@ function populateLeaseForm(lease) {
     if (document.getElementById('leasePropertyId')) document.getElementById('leasePropertyId').value = lease.propertyId || '';
     if (document.getElementById('leaseUnitId')) document.getElementById('leaseUnitId').value = lease.unitId || '';
     if (document.getElementById('leaseType')) document.getElementById('leaseType').value = lease.leaseType || '';
-    if (document.getElementById('leaseStatus')) document.getElementById('leaseStatus').value = lease.status || 'Active';
+    // Set status - if deprecated, status should be "Deprecated"
+    const leaseStatusField = document.getElementById('leaseStatus');
+    if (leaseStatusField) {
+        if (lease.isDeprecated === true) {
+            leaseStatusField.value = 'Deprecated';
+        } else {
+            leaseStatusField.value = lease.status || 'Active';
+        }
+    }
+    
     // Set deprecated toggle and show/hide fields
     const isDeprecatedCheckbox = document.getElementById('isDeprecated');
     const deprecatedDateGroup = document.getElementById('deprecatedDateGroup');
@@ -13735,7 +13744,15 @@ function populateLeaseForm(lease) {
     
     if (document.getElementById('leaseSquareFootage')) document.getElementById('leaseSquareFootage').value = lease.squareFootage || '';
     if (document.getElementById('monthlyRent')) document.getElementById('monthlyRent').value = lease.monthlyRent || '';
-    if (document.getElementById('securityDeposit')) document.getElementById('securityDeposit').value = lease.securityDeposit || '';
+    if (document.getElementById('securityDeposit')) {
+        // Explicitly handle 0 value - don't use || operator which treats 0 as falsy
+        const securityDepositField = document.getElementById('securityDeposit');
+        if (lease.securityDeposit !== null && lease.securityDeposit !== undefined) {
+            securityDepositField.value = lease.securityDeposit;
+        } else {
+            securityDepositField.value = '';
+        }
+    }
     
     // Additional charges
     if (lease.additionalMonthlyCharges) {
@@ -14700,10 +14717,16 @@ function buildUnitLeaseRow(unit, activeLeases, legacyLeases, tenants, occupancie
 }
 
 // Calculate current rent based on escalations
-function calculateCurrentRent(lease) {
+function calculateCurrentRent(lease, asOfDate = null) {
     if (!lease.monthlyRent) return null;
     
     const initialRent = lease.monthlyRent;
+    
+    // If deprecated, calculate rent as of deprecation date instead of today
+    const isDeprecated = lease.isDeprecated === true;
+    const calculationDate = isDeprecated && lease.deprecatedDate 
+        ? (lease.deprecatedDate.toDate ? lease.deprecatedDate.toDate() : new Date(lease.deprecatedDate))
+        : (asOfDate || new Date());
     
     // If no escalations, current rent is initial rent
     if (!lease.rentEscalation || !lease.rentEscalation.escalationType || lease.rentEscalation.escalationType === 'None') {
@@ -14717,10 +14740,9 @@ function calculateCurrentRent(lease) {
     
     const startDate = lease.leaseStartDate.toDate();
     const firstEscDate = lease.rentEscalation.firstEscalationDate.toDate();
-    const today = new Date();
     
     // If we haven't reached the first escalation date, return initial rent
-    if (today < firstEscDate) {
+    if (calculationDate < firstEscDate) {
         return initialRent;
     }
     
@@ -14732,14 +14754,14 @@ function calculateCurrentRent(lease) {
     const frequency = esc.escalationFrequency;
     
     if (frequency === 'Monthly') {
-        const monthsDiff = (today.getFullYear() - firstEscDate.getFullYear()) * 12 + (today.getMonth() - firstEscDate.getMonth());
+        const monthsDiff = (calculationDate.getFullYear() - firstEscDate.getFullYear()) * 12 + (calculationDate.getMonth() - firstEscDate.getMonth());
         periods = Math.floor(monthsDiff);
     } else if (frequency === 'Quarterly') {
-        const monthsDiff = (today.getFullYear() - firstEscDate.getFullYear()) * 12 + (today.getMonth() - firstEscDate.getMonth());
+        const monthsDiff = (calculationDate.getFullYear() - firstEscDate.getFullYear()) * 12 + (calculationDate.getMonth() - firstEscDate.getMonth());
         periods = Math.floor(monthsDiff / 3);
     } else if (frequency === 'Annually') {
-        const yearsDiff = today.getFullYear() - firstEscDate.getFullYear();
-        if (today.getMonth() > firstEscDate.getMonth() || (today.getMonth() === firstEscDate.getMonth() && today.getDate() >= firstEscDate.getDate())) {
+        const yearsDiff = calculationDate.getFullYear() - firstEscDate.getFullYear();
+        if (calculationDate.getMonth() > firstEscDate.getMonth() || (calculationDate.getMonth() === firstEscDate.getMonth() && calculationDate.getDate() >= firstEscDate.getDate())) {
             periods = yearsDiff;
         } else {
             periods = yearsDiff - 1;
