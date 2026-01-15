@@ -4810,7 +4810,14 @@ function loadTicketForEdit(ticketId) {
             document.getElementById('workDescription').value = ticket.workDescription || '';
             document.getElementById('detailedDescription').value = ticket.detailedDescription || '';
             document.getElementById('workUpdates').value = ticket.workUpdates || '';
+            const enableTimeAllocation = ticket.enableTimeAllocation !== false; // Default to true for backward compatibility
+            document.getElementById('enableTimeAllocation').checked = enableTimeAllocation;
             document.getElementById('timeAllocated').value = ticket.timeAllocated || '';
+            // Update time allocation group visibility
+            const timeAllocationGroup = document.getElementById('timeAllocationGroup');
+            if (timeAllocationGroup) {
+                timeAllocationGroup.style.display = enableTimeAllocation ? 'block' : 'none';
+            }
             document.getElementById('billingRate').value = ticket.billingRate || '';
             // Set billing type (default to hourly if not set for backward compatibility)
             const billingType = ticket.billingType || 'hourly';

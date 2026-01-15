@@ -1651,6 +1651,12 @@ hr {
     background: #f9f9f9;
 }
 
+.file-upload-item.drag-over {
+    border-color: #2563EB;
+    background: #EBF5FF;
+    border-style: solid;
+}
+
 .file-upload-label {
     display: flex;
     flex-direction: column;
