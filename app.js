@@ -8146,11 +8146,44 @@ async function renderTenantsTableView(tenants) {
     
     // Load occupancies, buildings, units, and properties to group by building
     // We need to load these even if there are no tenants, to show orphaned units
+    // Filter for maintenance users
+    let occupanciesQuery = db.collection('occupancies');
+    let buildingsQuery = db.collection('buildings');
+    let unitsQuery = db.collection('units');
+    let propertiesPromise;
+    
+    // For maintenance users, filter by assigned properties
+    if (currentUserProfile && currentUserProfile.role === 'maintenance' && 
+        Array.isArray(currentUserProfile.assignedProperties) && 
+        currentUserProfile.assignedProperties.length > 0) {
+        if (currentUserProfile.assignedProperties.length <= 10) {
+            occupanciesQuery = occupanciesQuery.where('propertyId', 'in', currentUserProfile.assignedProperties);
+            buildingsQuery = buildingsQuery.where('propertyId', 'in', currentUserProfile.assignedProperties);
+            unitsQuery = unitsQuery.where('propertyId', 'in', currentUserProfile.assignedProperties);
+        }
+        // Load assigned properties individually
+        const propertyPromises = currentUserProfile.assignedProperties.map(propId => 
+            db.collection('properties').doc(propId).get().catch(e => {
+                console.warn(`Could not load property ${propId}:`, e);
+                return null;
+            })
+        );
+        propertiesPromise = Promise.all(propertyPromises).then(docs => {
+            // Convert to snapshot-like object
+            return {
+                forEach: (fn) => docs.forEach(doc => doc && doc.exists && fn(doc))
+            };
+        });
+    } else {
+        // For other roles, load all
+        propertiesPromise = db.collection('properties').get();
+    }
+    
     const [occupanciesSnapshot, buildingsSnapshot, unitsSnapshot, propertiesSnapshot] = await Promise.all([
-        db.collection('occupancies').get(),
-        db.collection('buildings').get(),
-        db.collection('units').get(),
-        db.collection('properties').get()
+        occupanciesQuery.get(),
+        buildingsQuery.get(),
+        unitsQuery.get(),
+        propertiesPromise
     ]);
     
     const occupanciesMap = {};
