@@ -380,8 +380,20 @@ async function syncUserData(userId, email) {
         const syncedDoc = await db.collection('users').doc(userId).get();
         return { id: syncedDoc.id, ...syncedDoc.data() };
     } else if (userExists) {
-        // User exists, no pending invitation - return existing data
+        // User exists, no pending invitation - ensure assignedProperties is an array
         console.log('✅ User exists, no pending invitation');
+        
+        // Ensure assignedProperties is always an array
+        if (!Array.isArray(userData.assignedProperties)) {
+            console.log('⚠️ assignedProperties is not an array, fixing...');
+            const fixedProps = userData.assignedProperties ? [userData.assignedProperties] : [];
+            await db.collection('users').doc(userId).update({
+                assignedProperties: fixedProps
+            });
+            userData.assignedProperties = fixedProps;
+            console.log('✅ Fixed assignedProperties:', fixedProps);
+        }
+        
         return { id: userDoc.id, ...userData };
     } else {
         // No user, no pending invitation - create default profile
@@ -423,6 +435,25 @@ async function loadUserProfile(userId) {
         // Use sync function to ensure everything is in sync
         currentUserProfile = await syncUserData(userId, normalizedEmail);
         console.log('✅ User profile loaded:', currentUserProfile);
+        
+        // CRITICAL: Ensure assignedProperties is always an array
+        if (!Array.isArray(currentUserProfile.assignedProperties)) {
+            console.warn('⚠️ assignedProperties is not an array, fixing immediately...');
+            const fixedProps = currentUserProfile.assignedProperties ? [currentUserProfile.assignedProperties] : [];
+            try {
+                await db.collection('users').doc(userId).update({
+                    assignedProperties: fixedProps
+                });
+                currentUserProfile.assignedProperties = fixedProps;
+                console.log('✅ Fixed assignedProperties in database:', fixedProps);
+            } catch (fixError) {
+                console.error('❌ Could not fix assignedProperties:', fixError);
+                // Set it locally anyway so the app doesn't crash
+                currentUserProfile.assignedProperties = fixedProps;
+            }
+        }
+        
+        console.log('📋 User assignedProperties:', currentUserProfile.assignedProperties);
         
         // Update user menu with name
         updateUserMenu();

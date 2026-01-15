@@ -116,6 +116,7 @@ service cloud.firestore {
                     (isSuperAdmin() || 
                      isAdmin() || 
                      (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties != null &&
+                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties is list &&
                       propertyId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties));
       
       // Super admins and admins have full write access, property managers can write
@@ -133,6 +134,7 @@ service cloud.firestore {
                     (isSuperAdmin() ||
                      isAdmin() || 
                      (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties != null &&
+                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties is list &&
                       get(/databases/$(database)/documents/buildings/$(buildingId)).data.propertyId in 
                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties));
       
@@ -151,6 +153,7 @@ service cloud.firestore {
                     (isSuperAdmin() ||
                      isAdmin() || 
                      (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties != null &&
+                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties is list &&
                       get(/databases/$(database)/documents/units/$(unitId)).data.propertyId in 
                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties));
       
@@ -185,6 +188,7 @@ service cloud.firestore {
                     (isSuperAdmin() ||
                      isAdmin() || 
                      (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties != null &&
+                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties is list &&
                       get(/databases/$(database)/documents/leases/$(leaseId)).data.propertyId in 
                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties));
       
@@ -203,6 +207,7 @@ service cloud.firestore {
                     (isSuperAdmin() ||
                      isAdmin() || 
                      (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties != null &&
+                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties is list &&
                       get(/databases/$(database)/documents/tickets/$(ticketId)).data.propertyId in 
                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties));
       
@@ -213,10 +218,12 @@ service cloud.firestore {
                       isAdmin() || 
                       (getUserRole() == 'property_manager' && 
                        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties != null &&
+                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties is list &&
                        request.resource.data.propertyId in 
                        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties) ||
                       (getUserRole() == 'maintenance' && 
                        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties != null &&
+                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties is list &&
                        request.resource.data.propertyId in 
                        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties));
     }
@@ -229,6 +236,7 @@ service cloud.firestore {
                     (isSuperAdmin() ||
                      isAdmin() || 
                      (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties != null &&
+                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties is list &&
                       get(/databases/$(database)/documents/occupancies/$(occupancyId)).data.propertyId in 
                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties));
       
