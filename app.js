@@ -10352,41 +10352,56 @@ function rebuildTableWithContactColumns(tenantsByBuilding, tenantsWithoutBuildin
 }
 
 async function loadContactsForTableView(tenants, maxContacts, maxBrokers) {
+    console.log('🔍 loadContactsForTableView called', {
+        tenantCount: Object.keys(tenants).length,
+        userRole: currentUserProfile?.role
+    });
+    
     const tenantIds = Object.keys(tenants);
-    if (tenantIds.length === 0) return;
+    if (tenantIds.length === 0) {
+        console.log('⚠️ loadContactsForTableView: No tenants provided');
+        return;
+    }
     
     // Skip loading contacts for maintenance users - they don't have access to tenantContacts collection
     if (currentUserProfile && currentUserProfile.role === 'maintenance') {
-        console.log('⚠️ Skipping contact loading for maintenance user');
-        return; // Maintenance users can't access tenantContacts
+        console.log('⚠️ Skipping contact loading for maintenance user - no tenantContacts access');
+        return Promise.resolve(); // Maintenance users can't access tenantContacts
     }
     
-    // Use cached contacts if available, otherwise load them
-    let allContacts = window._cachedContacts;
-    if (!allContacts) {
-        allContacts = {};
-        const batchSize = 10;
-        
-        for (let i = 0; i < tenantIds.length; i += batchSize) {
-            const batch = tenantIds.slice(i, i + batchSize);
-            try {
-                const contactsSnapshot = await db.collection('tenantContacts')
-                    .where('tenantId', 'in', batch)
-                    .get();
-                
-                contactsSnapshot.forEach(doc => {
-                    const contact = { id: doc.id, ...doc.data() };
-                    if (!allContacts[contact.tenantId]) {
-                        allContacts[contact.tenantId] = [];
-                    }
-                    allContacts[contact.tenantId].push(contact);
-                });
-            } catch (error) {
-                console.warn('Error loading contacts batch:', error);
-                // Continue with other batches
+    try {
+        // Use cached contacts if available, otherwise load them
+        let allContacts = window._cachedContacts;
+        if (!allContacts) {
+            console.log('🔍 loadContactsForTableView: Loading contacts from Firestore');
+            allContacts = {};
+            const batchSize = 10;
+            
+            for (let i = 0; i < tenantIds.length; i += batchSize) {
+                const batch = tenantIds.slice(i, i + batchSize);
+                try {
+                    console.log(`🔍 loadContactsForTableView: Loading batch ${i / batchSize + 1} (${batch.length} tenants)`);
+                    const contactsSnapshot = await db.collection('tenantContacts')
+                        .where('tenantId', 'in', batch)
+                        .get();
+                    
+                    console.log(`✅ loadContactsForTableView: Loaded ${contactsSnapshot.size} contacts for batch`);
+                    contactsSnapshot.forEach(doc => {
+                        const contact = { id: doc.id, ...doc.data() };
+                        if (!allContacts[contact.tenantId]) {
+                            allContacts[contact.tenantId] = [];
+                        }
+                        allContacts[contact.tenantId].push(contact);
+                    });
+                } catch (error) {
+                    console.error(`❌ loadContactsForTableView: Error loading contacts batch ${i / batchSize + 1}:`, error);
+                    // Continue with other batches
+                }
             }
+            window._cachedContacts = allContacts; // Cache for future use
+        } else {
+            console.log('✅ loadContactsForTableView: Using cached contacts');
         }
-    }
     
     // Update table with contact info in individual columns - show ALL contacts and brokers
     Object.keys(tenants).forEach(tenantId => {
