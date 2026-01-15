@@ -4907,7 +4907,6 @@ function loadTicketForEdit(ticketId) {
             }
             // Update label based on selected type
             const billingRateLabel = document.getElementById('billingRateLabel');
-            const billingRateInput = document.getElementById('billingRate');
             if (billingRateLabel && billingRateInput) {
                 if (billingType === 'flat') {
                     billingRateLabel.textContent = 'Flat Rate Amount ($)';
