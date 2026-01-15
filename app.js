@@ -434,7 +434,7 @@ async function loadUserProfile(userId) {
         
         // Use sync function to ensure everything is in sync
         currentUserProfile = await syncUserData(userId, normalizedEmail);
-        console.log('✅ User profile loaded:', currentUserProfile);
+            console.log('✅ User profile loaded:', currentUserProfile);
         
         // CRITICAL: Ensure assignedProperties is always an array
         if (!Array.isArray(currentUserProfile.assignedProperties)) {
@@ -454,16 +454,16 @@ async function loadUserProfile(userId) {
         }
         
         console.log('📋 User assignedProperties:', currentUserProfile.assignedProperties);
-        
-        // Update user menu with name
-        updateUserMenu();
-        
-        // Check if user is active
-        if (!currentUserProfile.isActive) {
-            console.warn('⚠️ User account is not active');
-            showPermissionDeniedModal('Your account is pending admin approval. Please contact a system administrator to activate your account.');
-            await auth.signOut();
-            return;
+            
+            // Update user menu with name
+            updateUserMenu();
+            
+            // Check if user is active
+            if (!currentUserProfile.isActive) {
+                console.warn('⚠️ User account is not active');
+                showPermissionDeniedModal('Your account is pending admin approval. Please contact a system administrator to activate your account.');
+                await auth.signOut();
+                return;
         }
     } catch (error) {
         console.error('Error loading user profile:', error);
@@ -1119,7 +1119,7 @@ async function handleSignup(e) {
             console.log('✅ User data synced:', syncedProfile);
         } catch (syncError) {
             console.error('❌ Failed to sync user data:', syncError);
-            await auth.signOut();
+        await auth.signOut();
             if (errorDiv) {
                 errorDiv.textContent = `Account created but failed to sync data: ${syncError.message}. Please contact an administrator.`;
                 errorDiv.style.display = 'block';
@@ -1134,14 +1134,14 @@ async function handleSignup(e) {
             sessionStorage.setItem('rememberMe', 'true');
             localStorage.setItem('rememberMe', 'true');
             await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-            
-            // Show success message
-            if (successDiv) {
+        
+        // Show success message
+        if (successDiv) {
                 successDiv.innerHTML = '<p>Account created successfully! You are now logged in.</p>';
-                successDiv.style.display = 'block';
-            }
-            
-            // Reset form
+            successDiv.style.display = 'block';
+        }
+        
+        // Reset form
             const signupForm = document.getElementById('signupForm');
             if (signupForm) {
                 signupForm.reset();
@@ -6467,6 +6467,7 @@ function loadTenants() {
                 .where('propertyId', 'in', currentUserProfile.assignedProperties)
                 .get()
                 .then((occupanciesSnapshot) => {
+                    console.log('✅ Loaded occupancies for maintenance user:', occupanciesSnapshot.size);
                     const tenantIds = new Set();
                     occupanciesSnapshot.forEach(doc => {
                         const occ = doc.data();
@@ -6505,26 +6506,33 @@ function loadTenants() {
                     });
                 }).catch((error) => {
                     console.error('Error loading occupancies:', error);
-                    const tenantsList = document.getElementById('tenantsList');
-                    if (tenantsList) {
-                        tenantsList.innerHTML = '<p style="color: #e74c3c; text-align: center; padding: 20px;">Error loading tenants. Please try again.</p>';
+                    console.error('Error details:', error.code, error.message);
+                    // If permission denied, show empty list instead of error
+                    if (error.code === 'permission-denied') {
+                        console.warn('⚠️ Permission denied loading occupancies - showing empty tenant list');
+                        renderTenantsList({});
+                    } else {
+                        const tenantsList = document.getElementById('tenantsList');
+                        if (tenantsList) {
+                            tenantsList.innerHTML = '<p style="color: #e74c3c; text-align: center; padding: 20px;">Error loading tenants. Please try again.</p>';
+                        }
                     }
                 });
         } else {
             console.warn('⚠️ User has more than 10 assigned properties, loading all tenants (will be filtered by rules)');
-            db.collection('tenants').onSnapshot((snapshot) => {
-                const tenants = {};
-                snapshot.forEach((doc) => {
-                    tenants[doc.id] = { id: doc.id, ...doc.data() };
-                });
-                renderTenantsList(tenants);
-            }, (error) => {
-                console.error('Error loading tenants:', error);
-                const tenantsList = document.getElementById('tenantsList');
-                if (tenantsList) {
-                    tenantsList.innerHTML = '<p style="color: #e74c3c; text-align: center; padding: 20px;">Error loading tenants. Please try again.</p>';
-                }
-            });
+    db.collection('tenants').onSnapshot((snapshot) => {
+        const tenants = {};
+        snapshot.forEach((doc) => {
+            tenants[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        renderTenantsList(tenants);
+    }, (error) => {
+        console.error('Error loading tenants:', error);
+        const tenantsList = document.getElementById('tenantsList');
+        if (tenantsList) {
+            tenantsList.innerHTML = '<p style="color: #e74c3c; text-align: center; padding: 20px;">Error loading tenants. Please try again.</p>';
+        }
+    });
         }
         return; // Exit early for maintenance users
     }
@@ -8971,32 +8979,19 @@ async function renderTenantsTableView(tenants) {
 
 async function loadOrphanContacts(maxContacts, maxBrokers) {
     try {
+        // Skip orphan contacts for maintenance users - they don't have access to tenantContacts collection
+        if (currentUserProfile && currentUserProfile.role === 'maintenance') {
+            console.log('⚠️ Skipping orphan contacts for maintenance user');
+            return; // Maintenance users can't access tenantContacts
+        }
+        
         // Get all contacts
         const allContactsSnapshot = await db.collection('tenantContacts').get();
         
-        // Get tenant IDs - filter for maintenance users
+        // Get tenant IDs
+        const allTenantsSnapshot = await db.collection('tenants').get();
         const tenantIds = new Set();
-        if (currentUserProfile && currentUserProfile.role === 'maintenance' && 
-            Array.isArray(currentUserProfile.assignedProperties) && 
-            currentUserProfile.assignedProperties.length > 0) {
-            // For maintenance users, only get tenants from assigned properties via occupancies
-            if (currentUserProfile.assignedProperties.length <= 10) {
-                const occupanciesSnapshot = await db.collection('occupancies')
-                    .where('propertyId', 'in', currentUserProfile.assignedProperties)
-                    .get();
-                occupanciesSnapshot.forEach(doc => {
-                    const occ = doc.data();
-                    if (occ.tenantId) {
-                        tenantIds.add(occ.tenantId);
-                    }
-                });
-            }
-            // If more than 10 properties, skip orphan contacts check for maintenance users
-        } else {
-            // For other roles, get all tenant IDs
-            const allTenantsSnapshot = await db.collection('tenants').get();
-            allTenantsSnapshot.forEach(doc => tenantIds.add(doc.id));
-        }
+        allTenantsSnapshot.forEach(doc => tenantIds.add(doc.id));
         
         // Find orphan contacts (contacts whose tenantId is null, undefined, or doesn't exist)
         const orphanContacts = [];
@@ -12024,7 +12019,7 @@ async function loadLeases() {
             if (needsClientSideSort) {
                 leasesArray.push(leaseData);
             } else {
-                leases[doc.id] = leaseData;
+            leases[doc.id] = leaseData;
             }
         });
         
@@ -12105,11 +12100,11 @@ async function loadLeases() {
                 }
             });
             // Only include tenants that have occupancies in assigned properties
-            tenantsSnapshot.forEach((doc) => {
+        tenantsSnapshot.forEach((doc) => {
                 if (tenantIds.has(doc.id)) {
-                    tenants[doc.id] = { id: doc.id, ...doc.data() };
+            tenants[doc.id] = { id: doc.id, ...doc.data() };
                 }
-            });
+        });
         } else {
             tenantsSnapshot.forEach((doc) => {
                 tenants[doc.id] = { id: doc.id, ...doc.data() };
