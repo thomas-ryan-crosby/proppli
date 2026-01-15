@@ -1444,6 +1444,33 @@ function setupNavigation() {
             }
         });
     });
+    
+    // Sidebar toggle functionality
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    const sidebarNav = document.getElementById('sidebarNav');
+    const mainContentWrapper = document.querySelector('.main-content-wrapper');
+    
+    if (sidebarToggle && sidebarNav) {
+        // Load saved state from localStorage
+        const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+        if (isCollapsed) {
+            sidebarNav.classList.add('collapsed');
+            if (mainContentWrapper) {
+                mainContentWrapper.classList.add('sidebar-collapsed');
+            }
+        }
+        
+        sidebarToggle.addEventListener('click', () => {
+            sidebarNav.classList.toggle('collapsed');
+            if (mainContentWrapper) {
+                mainContentWrapper.classList.toggle('sidebar-collapsed');
+            }
+            
+            // Save state to localStorage
+            const isNowCollapsed = sidebarNav.classList.contains('collapsed');
+            localStorage.setItem('sidebarCollapsed', isNowCollapsed.toString());
+        });
+    }
 }
 
 function switchPage(page) {

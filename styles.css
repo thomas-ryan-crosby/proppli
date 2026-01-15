@@ -16,7 +16,7 @@ body {
 /* Landing Page Styles */
 .landing-page {
     min-height: 100vh;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #2563EB 0%, #1d4ed8 100%);
     display: flex;
     flex-direction: column;
     position: relative;
@@ -34,10 +34,10 @@ body {
 
 .launch-app-btn {
     background: white;
-    color: #667eea;
+    color: #2563EB;
     border: none;
     padding: 12px 24px;
-    border-radius: 8px;
+    border-radius: 10px;
     font-size: 16px;
     font-weight: 600;
     cursor: pointer;
@@ -259,13 +259,13 @@ body {
 
 .sidebar-nav-link:hover {
     background: #f1f5f9;
-    color: #667eea;
+    color: #2563EB;
 }
 
 .sidebar-nav-link.active {
-    background: #667eea;
+    background: #2563EB;
     color: white;
-    border-left: 3px solid #5568d3;
+    border-left: 3px solid #1d4ed8;
 }
 
 .sidebar-nav-link .nav-icon {
@@ -276,6 +276,85 @@ body {
 
 .sidebar-nav-link .nav-label {
     flex: 1;
+    white-space: nowrap;
+    opacity: 1;
+    transition: opacity 0.2s;
+}
+
+/* Sidebar Toggle Button */
+.sidebar-toggle {
+    background: #F9FAFB;
+    border: 1px solid #E5E7EB;
+    border-radius: 6px;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: #6B7280;
+    font-size: 14px;
+    padding: 0;
+}
+
+.sidebar-toggle:hover {
+    background: #F3F4F6;
+    color: #2563EB;
+    border-color: #2563EB;
+}
+
+.sidebar-toggle:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.sidebar-toggle-icon {
+    transition: transform 0.2s;
+    display: inline-block;
+}
+
+/* Collapsed Sidebar Styles */
+.sidebar-nav.collapsed {
+    width: 80px;
+}
+
+.sidebar-nav.collapsed .sidebar-brand {
+    justify-content: center;
+    padding: 20px 12px;
+}
+
+.sidebar-nav.collapsed .sidebar-logo {
+    display: none;
+}
+
+.sidebar-nav.collapsed .sidebar-toggle-icon {
+    transform: rotate(180deg);
+}
+
+.sidebar-nav.collapsed .nav-label {
+    opacity: 0;
+    width: 0;
+    overflow: hidden;
+}
+
+.sidebar-nav.collapsed .sidebar-nav-link {
+    justify-content: center;
+    padding: 14px;
+}
+
+.sidebar-nav.collapsed .nav-icon {
+    margin: 0;
+}
+
+/* Update main content margin when sidebar is collapsed */
+.main-content-wrapper {
+    transition: margin-left 0.3s ease;
+}
+
+.sidebar-nav.collapsed ~ .main-content-wrapper,
+.main-content-wrapper.sidebar-collapsed {
+    margin-left: 80px;
 }
 
 /* Main Content Wrapper */
@@ -317,7 +396,7 @@ body {
 /* Authentication Pages */
 .auth-page {
     min-height: 100vh;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #2563EB 0%, #1d4ed8 100%);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -374,7 +453,7 @@ body {
     width: 100%;
     padding: 12px 16px;
     border: 1px solid #d1d5db;
-    border-radius: 8px;
+    border-radius: 10px;
     font-size: 1rem;
     transition: border-color 0.2s;
     box-sizing: border-box;
@@ -382,8 +461,8 @@ body {
 
 .auth-card .form-group input:focus {
     outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    border-color: #2563EB;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
 }
 
 .password-hint {
@@ -425,7 +504,7 @@ body {
 
 .password-toggle:focus {
     outline: none;
-    color: #667eea;
+    color: #2563EB;
 }
 
 .eye-icon {
@@ -454,10 +533,10 @@ body {
 .auth-button {
     width: 100%;
     padding: 14px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #2563EB 0%, #1d4ed8 100%);
     color: white;
     border: none;
-    border-radius: 8px;
+    border-radius: 10px;
     font-size: 1rem;
     font-weight: 600;
     cursor: pointer;
@@ -467,7 +546,7 @@ body {
 
 .auth-button:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
 }
 
 .auth-button:active {
@@ -480,7 +559,7 @@ body {
 }
 
 .auth-links a {
-    color: #667eea;
+    color: #2563EB;
     text-decoration: none;
     font-size: 0.9rem;
     display: block;
@@ -489,7 +568,7 @@ body {
 }
 
 .auth-links a:hover {
-    color: #764ba2;
+    color: #1d4ed8;
     text-decoration: underline;
 }
 
@@ -498,7 +577,7 @@ body {
     padding: 12px;
     background: #fee2e2;
     border: 1px solid #fecaca;
-    border-radius: 8px;
+    border-radius: 10px;
     color: #991b1b;
     font-size: 0.9rem;
 }
@@ -508,7 +587,7 @@ body {
     padding: 12px;
     background: #d1fae5;
     border: 1px solid #a7f3d0;
-    border-radius: 8px;
+    border-radius: 10px;
     color: #065f46;
     font-size: 0.9rem;
 }
@@ -530,11 +609,11 @@ body {
 }
 
 .user-menu-btn {
-    background: #667eea;
+    background: #2563EB;
     color: white;
     border: none;
     padding: 8px 16px;
-    border-radius: 8px;
+    border-radius: 10px;
     font-size: 0.9rem;
     font-weight: 500;
     cursor: pointer;
@@ -545,7 +624,7 @@ body {
 }
 
 .user-menu-btn:hover {
-    background: #5568d3;
+    background: #1d4ed8;
 }
 
 .dropdown-arrow {
@@ -565,7 +644,7 @@ body {
     background: white;
     min-width: 150px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    border-radius: 8px;
+    border-radius: 10px;
     overflow: hidden;
     z-index: 1000;
 }
@@ -595,13 +674,13 @@ body {
     max-width: 1000px;
     margin: 0 auto;
     background: white;
-    border-radius: 12px;
+    border-radius: 18px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     overflow: hidden;
 }
 
 .profile-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #2563EB 0%, #1d4ed8 100%);
     padding: 40px;
     color: white;
     display: flex;
@@ -681,13 +760,13 @@ body {
 }
 
 .profile-tab:hover {
-    color: #667eea;
+    color: #2563EB;
     background: #f8f9fa;
 }
 
 .profile-tab.active {
-    color: #667eea;
-    border-bottom-color: #667eea;
+    color: #2563EB;
+    border-bottom-color: #2563EB;
 }
 
 .profile-content {
@@ -724,7 +803,7 @@ body {
 .info-card {
     background: #f8f9fa;
     padding: 16px;
-    border-radius: 8px;
+    border-radius: 10px;
     border: 1px solid #e2e8f0;
 }
 
@@ -752,7 +831,7 @@ body {
 .properties-list-item {
     padding: 12px 16px;
     background: #f8f9fa;
-    border-radius: 8px;
+    border-radius: 10px;
     border: 1px solid #e2e8f0;
 }
 
@@ -765,8 +844,8 @@ body {
 .activity-item {
     padding: 12px 16px;
     background: #f8f9fa;
-    border-radius: 8px;
-    border-left: 3px solid #667eea;
+    border-radius: 10px;
+    border-left: 3px solid #2563EB;
 }
 
 /* Page Views */
@@ -788,7 +867,8 @@ body {
 }
 
 .page header h2 {
-    font-size: 1.8rem;
+    font-size: 20px; /* H2: 20/28, 600 */
+    line-height: 28px;
     color: #1F2937;
     margin-bottom: 15px;
     font-weight: 600;
@@ -830,7 +910,7 @@ body {
 .btn-primary, .btn-secondary, .btn-toggle, .btn-danger {
     padding: 10px 20px;
     border: none;
-    border-radius: 8px;
+    border-radius: 10px;
     font-size: 14px;
     font-weight: 500;
     cursor: pointer;
@@ -990,7 +1070,7 @@ body {
 .ticket-card {
     background: white;
     border: 1px solid #E5E7EB;
-    border-radius: 10px;
+    border-radius: 16px;
     padding: 20px;
     transition: all 0.2s;
 }
@@ -1042,7 +1122,7 @@ body {
 .status-badge {
     display: inline-block;
     padding: 4px 12px;
-    border-radius: 12px;
+    border-radius: 18px;
     font-size: 12px;
     font-weight: 600;
     margin-left: 10px;
@@ -1137,7 +1217,7 @@ body {
 
 .modal-content {
     background: white;
-    border-radius: 12px;
+    border-radius: 18px;
     width: 90%;
     max-width: 600px;
     max-height: 90vh;
@@ -1285,7 +1365,7 @@ body {
 }
 
 .toggle-switch input:checked + .toggle-slider {
-    background-color: #667eea;
+    background-color: #2563EB;
 }
 
 .toggle-switch input:checked + .toggle-slider:before {
@@ -1293,13 +1373,13 @@ body {
 }
 
 .toggle-switch input:focus + .toggle-slider {
-    box-shadow: 0 0 1px #667eea;
+    box-shadow: 0 0 1px #2563EB;
 }
 
 .property-item {
     background: #f8f9fa;
     border: 2px solid #e0e0e0;
-    border-radius: 8px;
+    border-radius: 10px;
     padding: 20px;
     transition: all 0.3s;
     cursor: pointer;
@@ -1330,7 +1410,7 @@ body {
 .building-item, .unit-item {
     background: #f8f9fa;
     border: 2px solid #e0e0e0;
-    border-radius: 8px;
+    border-radius: 10px;
     padding: 20px;
     transition: all 0.3s;
 }
@@ -1472,7 +1552,7 @@ hr {
 
 .file-upload-item {
     border: 2px dashed #e0e0e0;
-    border-radius: 8px;
+    border-radius: 10px;
     padding: 15px;
     text-align: center;
     transition: all 0.3s;
@@ -1543,7 +1623,7 @@ hr {
     width: 150px;
     height: 150px;
     object-fit: cover;
-    border-radius: 8px;
+    border-radius: 10px;
     cursor: pointer;
     border: 2px solid #e0e0e0;
     transition: all 0.3s;
@@ -1623,7 +1703,7 @@ hr {
     width: 100%;
     max-width: 500px;
     height: auto;
-    border-radius: 8px;
+    border-radius: 10px;
     cursor: pointer;
     border: 2px solid #e0e0e0;
     transition: all 0.3s;
@@ -1689,7 +1769,7 @@ hr {
 /* Property Detail View */
 .property-detail-view {
     background: white;
-    border-radius: 12px;
+    border-radius: 18px;
     padding: 30px;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     margin-top: 20px;
@@ -1770,7 +1850,7 @@ hr {
 /* Building Units Section */
 .building-units-section {
     background: #f8f9fa;
-    border-radius: 8px;
+    border-radius: 10px;
     padding: 20px;
     margin-bottom: 25px;
     border: 1px solid #e0e0e0;
@@ -1814,7 +1894,7 @@ hr {
 .building-item {
     background: white;
     border: 2px solid #e0e0e0;
-    border-radius: 8px;
+    border-radius: 10px;
     padding: 20px;
     display: flex;
     justify-content: space-between;
@@ -1860,7 +1940,7 @@ hr {
 .unit-item {
     background: white;
     border: 2px solid #e0e0e0;
-    border-radius: 8px;
+    border-radius: 10px;
     padding: 20px;
     display: flex;
     justify-content: space-between;
@@ -1915,7 +1995,7 @@ hr {
     margin-bottom: 20px;
     padding: 15px;
     background: #f8f9fa;
-    border-radius: 8px;
+    border-radius: 10px;
     flex-wrap: wrap;
     gap: 15px;
 }
@@ -1978,7 +2058,7 @@ hr {
 .building-group {
     margin-bottom: 20px;
     background: white;
-    border-radius: 12px;
+    border-radius: 18px;
     overflow: hidden;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
@@ -2004,7 +2084,7 @@ hr {
     min-width: 800px;
     border-collapse: collapse;
     background: white;
-    border-radius: 8px;
+    border-radius: 10px;
     overflow: hidden;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     table-layout: fixed;
@@ -2595,7 +2675,7 @@ hr {
 /* Tenant Card Styling */
 .tenant-card {
     background: white;
-    border-radius: 12px;
+    border-radius: 18px;
     padding: 20px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     transition: all 0.3s;
@@ -2657,7 +2737,7 @@ hr {
 
 .user-card {
     background: white;
-    border-radius: 12px;
+    border-radius: 18px;
     padding: 20px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     transition: all 0.3s;
@@ -2774,12 +2854,12 @@ hr {
 }
 
 .user-detail-tabs .tab-btn:hover {
-    color: #667eea;
+    color: #2563EB;
 }
 
 .user-detail-tabs .tab-btn.active {
-    color: #667eea;
-    border-bottom-color: #667eea;
+    color: #2563EB;
+    border-bottom-color: #2563EB;
 }
 
 .user-tab-content {
@@ -2794,7 +2874,7 @@ hr {
 .status-badge {
     display: inline-block;
     padding: 4px 12px;
-    border-radius: 12px;
+    border-radius: 18px;
     font-size: 12px;
     font-weight: 600;
     text-transform: uppercase;
@@ -2965,7 +3045,7 @@ hr {
     padding: 16px;
     margin-top: 16px;
     background: #E5E7EB;
-    border-radius: 12px;
+    border-radius: 18px;
     color: #666;
     font-size: 0.9rem;
     line-height: 1.6;
@@ -3288,7 +3368,7 @@ hr {
 }
 
 .finance-tabs .tab-btn.active {
-    background: #667eea;
+    background: #2563EB;
     color: white;
-    border-color: #667eea;
+    border-color: #2563EB;
 }

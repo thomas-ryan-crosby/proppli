@@ -206,9 +206,12 @@
     <div id="appContainer" class="app-container" style="display: none;">
     <div class="app-layout">
         <!-- Left Sidebar Navigation -->
-        <aside class="sidebar-nav">
+        <aside class="sidebar-nav" id="sidebarNav">
             <div class="sidebar-brand">
                 <img src="assets/images/logos/Logo+Word.png" alt="proppli" class="sidebar-logo" height="32">
+                <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar" title="Collapse sidebar">
+                    <span class="sidebar-toggle-icon">◀</span>
+                </button>
             </div>
             <nav class="sidebar-nav-links">
                 <button class="sidebar-nav-link active" data-page="maintenance" title="Maintenance">
