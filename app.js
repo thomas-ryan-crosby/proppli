@@ -12039,9 +12039,29 @@ async function loadLeases() {
         });
         
         const tenants = {};
-        tenantsSnapshot.forEach((doc) => {
-            tenants[doc.id] = { id: doc.id, ...doc.data() };
-        });
+        // For maintenance users, filter tenants by those with occupancies in assigned properties
+        if (currentUserProfile.role === 'maintenance' && 
+            Array.isArray(currentUserProfile.assignedProperties) && 
+            currentUserProfile.assignedProperties.length > 0) {
+            // Get tenant IDs from occupancies
+            const tenantIds = new Set();
+            occupanciesSnapshot.forEach((doc) => {
+                const occ = doc.data();
+                if (occ.tenantId && currentUserProfile.assignedProperties.includes(occ.propertyId)) {
+                    tenantIds.add(occ.tenantId);
+                }
+            });
+            // Only include tenants that have occupancies in assigned properties
+            tenantsSnapshot.forEach((doc) => {
+                if (tenantIds.has(doc.id)) {
+                    tenants[doc.id] = { id: doc.id, ...doc.data() };
+                }
+            });
+        } else {
+            tenantsSnapshot.forEach((doc) => {
+                tenants[doc.id] = { id: doc.id, ...doc.data() };
+            });
+        }
         
         const units = {};
         unitsSnapshot.forEach((doc) => {
