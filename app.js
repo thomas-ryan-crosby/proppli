@@ -1417,6 +1417,13 @@ function initializeApp() {
     setupNavigation();
     setupUserMenu();
     
+    // Restore saved view state
+    const savedView = localStorage.getItem('currentView');
+    if (savedView && ['active', 'monitoring', 'completed', 'deleted'].includes(savedView)) {
+        currentView = savedView;
+        switchView(savedView);
+    }
+    
     // Only load data if user is authenticated
     if (currentUser && auth && auth.currentUser) {
         loadProperties();
@@ -4225,6 +4232,11 @@ function renderTickets(tickets) {
         const bTime = b.dateCreated?.toMillis ? b.dateCreated.toMillis() : (b.dateCreated || 0);
         return bTime - aTime;
     });
+    monitoringTickets.sort((a, b) => {
+        const aTime = a.dateCreated?.toMillis ? a.dateCreated.toMillis() : (a.dateCreated || 0);
+        const bTime = b.dateCreated?.toMillis ? b.dateCreated.toMillis() : (b.dateCreated || 0);
+        return bTime - aTime;
+    });
     completedTickets.sort((a, b) => {
         const aTime = a.dateCompleted?.toMillis ? a.dateCompleted.toMillis() : (a.dateCompleted || 0);
         const bTime = b.dateCompleted?.toMillis ? b.dateCompleted.toMillis() : (b.dateCompleted || 0);
@@ -4294,6 +4306,7 @@ function createTicketCard(ticket, isDeleted = false) {
     });
 
     const isCompleted = ticket.status === 'Completed';
+    const isMonitoring = ticket.status === 'Monitoring';
     const statusClass = `status-${ticket.status.toLowerCase().replace(' ', '-')}`;
 
     // Get assigned to display name
@@ -4306,7 +4319,20 @@ function createTicketCard(ticket, isDeleted = false) {
         </div>
         ${ticket.assignedTo ? `
             <div class="ticket-assigned-badge" style="text-align: center; margin: 8px 0; padding: 6px 12px; background: #e0e7ff; border-radius: 16px; display: inline-block; max-width: fit-content; margin-left: auto; margin-right: auto;">
-                <span style="font-size: 0.85rem; color: #667eea; font-weight: 600;">👤 Assigned to: ${escapeHtml(assignedToDisplay)}</span>
+                <span style="font-size: 0.85rem; color: #2563EB; font-weight: 600;">👤 Assigned to: ${escapeHtml(assignedToDisplay)}</span>
+            </div>
+        ` : ''}
+        ${isMonitoring && (ticket.invoiceUrl || ticket.invoiceNotes) ? `
+            <div class="monitoring-info" style="background: #F9FAFB; border-left: 3px solid #F59E0B; padding: 12px; margin: 12px 0; border-radius: 8px;">
+                <div style="font-size: 0.85rem; color: #6B7280; font-weight: 600; margin-bottom: 8px;">📄 Monitoring Information:</div>
+                ${ticket.invoiceUrl ? `
+                    <div style="margin-bottom: 8px;">
+                        <a href="${escapeHtml(ticket.invoiceUrl)}" target="_blank" style="color: #2563EB; text-decoration: underline; font-size: 0.85rem;">View Invoice/Proposal</a>
+                    </div>
+                ` : ''}
+                ${ticket.invoiceNotes ? `
+                    <div style="font-size: 0.85rem; color: #1F2937; line-height: 1.5;">${escapeHtml(ticket.invoiceNotes)}</div>
+                ` : ''}
             </div>
         ` : ''}
         <div class="ticket-details">
@@ -4735,6 +4761,18 @@ function loadTicketForEdit(ticketId) {
             
             document.getElementById('ticketStatus').value = ticket.status || 'Not Started';
             
+            // Show/hide fields based on status
+            const status = ticket.status || 'Not Started';
+            if (status === 'Monitoring') {
+                const monitoringFieldsGroup = document.getElementById('monitoringFieldsGroup');
+                if (monitoringFieldsGroup) monitoringFieldsGroup.style.display = 'block';
+                document.getElementById('invoiceUrl').value = ticket.invoiceUrl || '';
+                document.getElementById('invoiceNotes').value = ticket.invoiceNotes || '';
+            } else {
+                const monitoringFieldsGroup = document.getElementById('monitoringFieldsGroup');
+                if (monitoringFieldsGroup) monitoringFieldsGroup.style.display = 'none';
+            }
+            
             // Always show before photo if it exists
             if (ticket.beforePhotoUrl) {
                 beforePhotoUrl = ticket.beforePhotoUrl;
@@ -4952,6 +4990,18 @@ function handleTicketSubmit(e) {
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 };
                 
+                // Add monitoring-specific fields if status is Monitoring
+                if (status === 'Monitoring') {
+                    const invoiceUrl = document.getElementById('invoiceUrl')?.value.trim() || null;
+                    const invoiceNotes = document.getElementById('invoiceNotes')?.value.trim() || null;
+                    ticketData.invoiceUrl = invoiceUrl;
+                    ticketData.invoiceNotes = invoiceNotes;
+                } else {
+                    // Clear monitoring fields if status is not Monitoring
+                    ticketData.invoiceUrl = null;
+                    ticketData.invoiceNotes = null;
+                }
+                
                 // ONLY include dateCreated if a custom date is explicitly provided
                 // Otherwise, DO NOT include it in the update to preserve the existing value
                 if (customDateCreated) {
@@ -5057,6 +5107,17 @@ function handleTicketSubmit(e) {
                 ticketData.completedBy = null;
                 ticketData.howResolved = null;
                 ticketData.dateCompleted = null;
+            }
+            
+            // Add monitoring-specific fields if status is Monitoring
+            if (status === 'Monitoring') {
+                const invoiceUrl = document.getElementById('invoiceUrl')?.value.trim() || null;
+                const invoiceNotes = document.getElementById('invoiceNotes')?.value.trim() || null;
+                ticketData.invoiceUrl = invoiceUrl;
+                ticketData.invoiceNotes = invoiceNotes;
+            } else {
+                ticketData.invoiceUrl = null;
+                ticketData.invoiceNotes = null;
             }
 
             // Create ticket first to get ID
