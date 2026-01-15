@@ -2531,10 +2531,62 @@ function handleAvatarChange(e) {
 // Property Management
 function loadProperties() {
     // Don't load if user is not authenticated
-    if (!currentUser || !auth || !auth.currentUser) {
+    if (!currentUser || !auth || !auth.currentUser || !currentUserProfile) {
         return;
     }
     
+    // Build query based on user role
+    // For maintenance users with assigned properties, load them individually
+    // For others, use full collection query
+    if (currentUserProfile.role === 'maintenance' && 
+        Array.isArray(currentUserProfile.assignedProperties) && 
+        currentUserProfile.assignedProperties.length > 0) {
+        // Load assigned properties individually (more efficient than complex rules)
+        console.log('🔍 Loading assigned properties for maintenance user:', currentUserProfile.assignedProperties);
+        const propertyPromises = currentUserProfile.assignedProperties.map(propId => 
+            db.collection('properties').doc(propId).get().catch(e => {
+                console.warn(`Could not load property ${propId}:`, e);
+                return null;
+            })
+        );
+        
+        Promise.all(propertyPromises).then((propertyDocs) => {
+            const properties = {};
+            propertyDocs.forEach(doc => {
+                if (doc && doc.exists) {
+                    properties[doc.id] = { id: doc.id, ...doc.data() };
+                }
+            });
+            
+            // Set up listeners for changes to assigned properties
+            const propertiesRef = properties; // Store reference for listeners
+            currentUserProfile.assignedProperties.forEach(propId => {
+                db.collection('properties').doc(propId).onSnapshot((doc) => {
+                    if (doc.exists) {
+                        propertiesRef[doc.id] = { id: doc.id, ...doc.data() };
+                        renderPropertiesList(propertiesRef);
+                    } else {
+                        // Property was deleted, remove from list
+                        delete propertiesRef[doc.id];
+                        renderPropertiesList(propertiesRef);
+                    }
+                }, (error) => {
+                    console.warn(`Error listening to property ${propId}:`, error);
+                });
+            });
+            
+            renderPropertiesList(properties);
+            // loadTickets will be called separately after properties are loaded
+        }).catch((error) => {
+            console.error('Error loading properties:', error);
+            if (error.code === 'permission-denied') {
+                handlePermissionError('properties');
+            }
+        });
+        return; // Exit early for maintenance users
+    }
+    
+    // For admins, super admins, and property managers - use full collection query
     db.collection('properties').onSnapshot((snapshot) => {
         const properties = {};
         snapshot.docs.forEach(doc => {
@@ -4211,11 +4263,25 @@ function handlePropertySelect(e) {
 // Ticket Management
 function loadTickets() {
     // Don't load if user is not authenticated
-    if (!currentUser || !auth || !auth.currentUser) {
+    if (!currentUser || !auth || !auth.currentUser || !currentUserProfile) {
         return;
     }
     
-    db.collection('tickets').onSnapshot((snapshot) => {
+    // Build query based on user role
+    let ticketsQuery = db.collection('tickets');
+    
+    // For maintenance users, filter by assigned properties at query level
+    if (currentUserProfile.role === 'maintenance' && 
+        Array.isArray(currentUserProfile.assignedProperties) && 
+        currentUserProfile.assignedProperties.length > 0) {
+        // Use whereIn to filter tickets by assigned properties
+        ticketsQuery = ticketsQuery.where('propertyId', 'in', currentUserProfile.assignedProperties);
+        console.log('🔍 Filtering tickets for maintenance user by properties:', currentUserProfile.assignedProperties);
+    }
+    // Admins and super admins can see all tickets (no filter)
+    // Property managers are handled by Firestore rules
+    
+    ticketsQuery.onSnapshot((snapshot) => {
         const tickets = {};
         snapshot.docs.forEach(doc => {
             tickets[doc.id] = { id: doc.id, ...doc.data() };
@@ -11652,12 +11718,30 @@ function shouldPermanentlyRemoveLease(lease) {
 // Load leases from Firestore
 async function loadLeases() {
     // Don't load if user is not authenticated
-    if (!currentUser || !auth || !auth.currentUser) {
+    if (!currentUser || !auth || !auth.currentUser || !currentUserProfile) {
         return;
     }
     
     try {
-        const leasesSnapshot = await db.collection('leases').orderBy('leaseStartDate', 'desc').get();
+        // Build query based on user role
+        let leasesQuery = db.collection('leases').orderBy('leaseStartDate', 'desc');
+        
+        // For maintenance users, filter by assigned properties
+        if (currentUserProfile.role === 'maintenance' && 
+            Array.isArray(currentUserProfile.assignedProperties) && 
+            currentUserProfile.assignedProperties.length > 0) {
+            // Firestore 'in' queries are limited to 10 items
+            if (currentUserProfile.assignedProperties.length <= 10) {
+                leasesQuery = leasesQuery.where('propertyId', 'in', currentUserProfile.assignedProperties);
+                console.log('🔍 Filtering leases for maintenance user by properties:', currentUserProfile.assignedProperties);
+            } else {
+                console.warn('⚠️ User has more than 10 assigned properties, loading all leases (will be filtered by rules)');
+            }
+        }
+        // Admins and super admins can see all leases (no filter)
+        // Property managers are handled by Firestore rules
+        
+        const leasesSnapshot = await leasesQuery.get();
         const leases = {};
         const today = new Date();
         today.setHours(0, 0, 0, 0);
