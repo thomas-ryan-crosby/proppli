@@ -269,6 +269,132 @@ function initAuth() {
     }
 }
 
+// ============================================
+// QUERY HELPER FUNCTIONS - Role-based query building
+// ============================================
+
+/**
+ * Builds a Firestore query for a collection based on user role
+ * For maintenance users, filters by assignedProperties
+ * @param {string} collectionName - Name of the collection
+ * @param {string} propertyField - Field name that contains propertyId (default: 'propertyId')
+ * @returns {Object} Firestore query object
+ */
+function buildFilteredQuery(collectionName, propertyField = 'propertyId') {
+    console.log(`🔍 buildFilteredQuery: ${collectionName}`, {
+        userRole: currentUserProfile?.role,
+        assignedProperties: currentUserProfile?.assignedProperties
+    });
+    
+    let query = db.collection(collectionName);
+    
+    // For maintenance users, filter by assigned properties
+    if (currentUserProfile && currentUserProfile.role === 'maintenance' && 
+        Array.isArray(currentUserProfile.assignedProperties) && 
+        currentUserProfile.assignedProperties.length > 0) {
+        if (currentUserProfile.assignedProperties.length <= 10) {
+            query = query.where(propertyField, 'in', currentUserProfile.assignedProperties);
+            console.log(`✅ buildFilteredQuery: Applied whereIn filter for ${collectionName}`);
+        } else {
+            console.warn(`⚠️ buildFilteredQuery: More than 10 assigned properties, cannot use whereIn for ${collectionName}`);
+        }
+    }
+    
+    return query;
+}
+
+/**
+ * Loads properties based on user role
+ * For maintenance users, loads assigned properties individually
+ * @returns {Promise} Promise that resolves to a snapshot-like object
+ */
+async function loadPropertiesForRole() {
+    console.log('🔍 loadPropertiesForRole called', {
+        userRole: currentUserProfile?.role,
+        assignedProperties: currentUserProfile?.assignedProperties
+    });
+    
+    if (currentUserProfile && currentUserProfile.role === 'maintenance' && 
+        Array.isArray(currentUserProfile.assignedProperties) && 
+        currentUserProfile.assignedProperties.length > 0) {
+        // Load assigned properties individually
+        const propertyPromises = currentUserProfile.assignedProperties.map(propId => 
+            db.collection('properties').doc(propId).get().catch(e => {
+                console.warn(`Could not load property ${propId}:`, e);
+                return null;
+            })
+        );
+        const docs = await Promise.all(propertyPromises);
+        console.log(`✅ loadPropertiesForRole: Loaded ${docs.filter(d => d && d.exists).length} properties for maintenance user`);
+        // Convert to snapshot-like object
+        return {
+            forEach: (fn) => docs.forEach(doc => doc && doc.exists && fn(doc))
+        };
+    } else {
+        // For other roles, load all properties
+        console.log('🔍 loadPropertiesForRole: Loading all properties for non-maintenance user');
+        return db.collection('properties').get();
+    }
+}
+
+/**
+ * Loads tenants based on user role
+ * For maintenance users, filters via occupancies
+ * @returns {Promise} Promise that resolves to tenants object
+ */
+async function loadTenantsForRole() {
+    console.log('🔍 loadTenantsForRole called', {
+        userRole: currentUserProfile?.role,
+        assignedProperties: currentUserProfile?.assignedProperties
+    });
+    
+    if (currentUserProfile && currentUserProfile.role === 'maintenance' && 
+        Array.isArray(currentUserProfile.assignedProperties) && 
+        currentUserProfile.assignedProperties.length > 0) {
+        // Load occupancies for assigned properties first, then filter tenants
+        if (currentUserProfile.assignedProperties.length <= 10) {
+            const occupanciesSnapshot = await db.collection('occupancies')
+                .where('propertyId', 'in', currentUserProfile.assignedProperties)
+                .get();
+            
+            const tenantIds = new Set();
+            occupanciesSnapshot.forEach(doc => {
+                const occ = doc.data();
+                if (occ.tenantId) {
+                    tenantIds.add(occ.tenantId);
+                }
+            });
+            
+            // Load tenants individually
+            const tenantPromises = Array.from(tenantIds).map(tenantId => 
+                db.collection('tenants').doc(tenantId).get().catch(e => {
+                    console.warn(`Could not load tenant ${tenantId}:`, e);
+                    return null;
+                })
+            );
+            
+            const tenantDocs = await Promise.all(tenantPromises);
+            const tenants = {};
+            tenantDocs.forEach(doc => {
+                if (doc && doc.exists) {
+                    tenants[doc.id] = { id: doc.id, ...doc.data() };
+                }
+            });
+            console.log(`✅ loadTenantsForRole: Loaded ${Object.keys(tenants).length} tenants for maintenance user`);
+            return tenants;
+        }
+    }
+    
+    // For other roles or if more than 10 properties, load all tenants
+    console.log('🔍 loadTenantsForRole: Loading all tenants');
+    const tenantsSnapshot = await db.collection('tenants').get();
+    const tenants = {};
+    tenantsSnapshot.forEach(doc => {
+        tenants[doc.id] = { id: doc.id, ...doc.data() };
+    });
+    return tenants;
+}
+
 // Comprehensive sync function to ensure all user data is in sync
 async function syncUserData(userId, email) {
     const normalizedEmail = (email || '').toLowerCase().trim();
