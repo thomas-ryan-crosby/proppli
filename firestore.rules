@@ -253,10 +253,11 @@ service cloud.firestore {
       allow read: if isAuthenticated() && isUserActive() && 
                     (isSuperAdmin() ||
                      isAdmin() || 
-                     (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties != null &&
-                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties is list &&
-                      get(/databases/$(database)/documents/occupancies/$(occupancyId)).data.propertyId in 
-                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties));
+                     getUserRole() == 'property_manager' ||
+                     getUserRole() == 'viewer' ||
+                     (getUserRole() == 'maintenance' && 
+                      get(/databases/$(database)/documents/occupancies/$(occupancyId)).data.propertyId != null &&
+                      isPropertyAssigned(get(/databases/$(database)/documents/occupancies/$(occupancyId)).data.propertyId)));
       
       // Only admins and property managers can write
       allow write: if isAuthenticated() && isUserActive() && 

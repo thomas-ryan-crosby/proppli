@@ -549,6 +549,16 @@ function updateUserMenu() {
             usersNavLink.style.display = 'none';
         }
     }
+    
+    // Hide Finance nav link for maintenance users
+    const financeNavLinks = document.querySelectorAll('.sidebar-nav-link[data-page="finance"]');
+    financeNavLinks.forEach(link => {
+        if (currentUserProfile && currentUserProfile.role === 'maintenance') {
+            link.style.display = 'none';
+        } else {
+            link.style.display = 'inline-block';
+        }
+    });
 }
 
 // Handle permission errors globally
@@ -1556,6 +1566,13 @@ function updatePageTitle(page) {
 }
 
 function showPage(page) {
+    // Prevent maintenance users from accessing finance page
+    if (page === 'finance' && currentUserProfile && currentUserProfile.role === 'maintenance') {
+        console.warn('⚠️ Maintenance users cannot access finance page');
+        switchPage('maintenance'); // Redirect to maintenance page
+        return;
+    }
+    
     // Hide all pages
     document.querySelectorAll('.page').forEach(p => {
         p.classList.remove('active');
@@ -6409,10 +6426,86 @@ window.openPhotoModal = function(photoUrl) {
 
 function loadTenants() {
     // Don't load if user is not authenticated
-    if (!currentUser || !auth || !auth.currentUser) {
+    if (!currentUser || !auth || !auth.currentUser || !currentUserProfile) {
         return;
     }
     
+    // For maintenance users, filter tenants by assigned properties via occupancies
+    if (currentUserProfile.role === 'maintenance' && 
+        Array.isArray(currentUserProfile.assignedProperties) && 
+        currentUserProfile.assignedProperties.length > 0) {
+        // Load occupancies for assigned properties first, then filter tenants
+        console.log('🔍 Filtering tenants for maintenance user by properties:', currentUserProfile.assignedProperties);
+        
+        // Firestore 'in' queries are limited to 10 items
+        if (currentUserProfile.assignedProperties.length <= 10) {
+            db.collection('occupancies')
+                .where('propertyId', 'in', currentUserProfile.assignedProperties)
+                .get()
+                .then((occupanciesSnapshot) => {
+                    const tenantIds = new Set();
+                    occupanciesSnapshot.forEach(doc => {
+                        const occ = doc.data();
+                        if (occ.tenantId) {
+                            tenantIds.add(occ.tenantId);
+                        }
+                    });
+                    
+                    if (tenantIds.size === 0) {
+                        renderTenantsList({});
+                        return;
+                    }
+                    
+                    // Load tenants that have occupancies in assigned properties
+                    const tenantPromises = Array.from(tenantIds).map(tenantId => 
+                        db.collection('tenants').doc(tenantId).get().catch(e => {
+                            console.warn(`Could not load tenant ${tenantId}:`, e);
+                            return null;
+                        })
+                    );
+                    
+                    Promise.all(tenantPromises).then((tenantDocs) => {
+                        const tenants = {};
+                        tenantDocs.forEach(doc => {
+                            if (doc && doc.exists) {
+                                tenants[doc.id] = { id: doc.id, ...doc.data() };
+                            }
+                        });
+                        renderTenantsList(tenants);
+                    }).catch((error) => {
+                        console.error('Error loading tenants:', error);
+                        const tenantsList = document.getElementById('tenantsList');
+                        if (tenantsList) {
+                            tenantsList.innerHTML = '<p style="color: #e74c3c; text-align: center; padding: 20px;">Error loading tenants. Please try again.</p>';
+                        }
+                    });
+                }).catch((error) => {
+                    console.error('Error loading occupancies:', error);
+                    const tenantsList = document.getElementById('tenantsList');
+                    if (tenantsList) {
+                        tenantsList.innerHTML = '<p style="color: #e74c3c; text-align: center; padding: 20px;">Error loading tenants. Please try again.</p>';
+                    }
+                });
+        } else {
+            console.warn('⚠️ User has more than 10 assigned properties, loading all tenants (will be filtered by rules)');
+            db.collection('tenants').onSnapshot((snapshot) => {
+                const tenants = {};
+                snapshot.forEach((doc) => {
+                    tenants[doc.id] = { id: doc.id, ...doc.data() };
+                });
+                renderTenantsList(tenants);
+            }, (error) => {
+                console.error('Error loading tenants:', error);
+                const tenantsList = document.getElementById('tenantsList');
+                if (tenantsList) {
+                    tenantsList.innerHTML = '<p style="color: #e74c3c; text-align: center; padding: 20px;">Error loading tenants. Please try again.</p>';
+                }
+            });
+        }
+        return; // Exit early for maintenance users
+    }
+    
+    // For admins, super admins, property managers, and viewers - use full collection query
     db.collection('tenants').onSnapshot((snapshot) => {
         const tenants = {};
         snapshot.forEach((doc) => {
@@ -7850,6 +7943,40 @@ function loadPropertiesForTenantFilter() {
     
     propertyFilter.innerHTML = '<option value="">All Properties</option>';
     
+    // For maintenance users, only show assigned properties
+    if (currentUserProfile && currentUserProfile.role === 'maintenance' && 
+        Array.isArray(currentUserProfile.assignedProperties) && 
+        currentUserProfile.assignedProperties.length > 0) {
+        // Load assigned properties individually
+        const propertyPromises = currentUserProfile.assignedProperties.map(propId => 
+            db.collection('properties').doc(propId).get().catch(e => {
+                console.warn(`Could not load property ${propId}:`, e);
+                return null;
+            })
+        );
+        
+        Promise.all(propertyPromises).then((propertyDocs) => {
+            propertyDocs.forEach(doc => {
+                if (doc && doc.exists) {
+                    const property = doc.data();
+                    const option = document.createElement('option');
+                    option.value = doc.id;
+                    option.textContent = property.name || 'Unnamed Property';
+                    propertyFilter.appendChild(option);
+                }
+            });
+            
+            // Restore selected property from localStorage
+            const savedProperty = localStorage.getItem('selectedPropertyForTenants');
+            if (savedProperty && Array.from(propertyFilter.options).some(opt => opt.value === savedProperty)) {
+                propertyFilter.value = savedProperty;
+                selectedPropertyForTenants = savedProperty;
+            }
+        });
+        return; // Exit early for maintenance users
+    }
+    
+    // For other roles, load all properties
     db.collection('properties').get().then((querySnapshot) => {
         querySnapshot.forEach((doc) => {
             const property = doc.data();
@@ -11782,7 +11909,7 @@ async function loadLeases() {
     
     try {
         // Build query based on user role
-        let leasesQuery = db.collection('leases').orderBy('leaseStartDate', 'desc');
+        let leasesQuery = db.collection('leases');
         
         // For maintenance users, filter by assigned properties
         if (currentUserProfile.role === 'maintenance' && 
@@ -11798,6 +11925,9 @@ async function loadLeases() {
         }
         // Admins and super admins can see all leases (no filter)
         // Property managers are handled by Firestore rules
+        
+        // Apply orderBy after where clause (Firestore requires where before orderBy when using whereIn)
+        leasesQuery = leasesQuery.orderBy('leaseStartDate', 'desc');
         
         const leasesSnapshot = await leasesQuery.get();
         const leases = {};
