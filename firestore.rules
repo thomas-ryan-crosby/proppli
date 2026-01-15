@@ -111,10 +111,12 @@ service cloud.firestore {
     // Properties collection - role-based access
     match /properties/{propertyId} {
       // Super admins have full access, others need proper permissions
+      // Maintenance staff can read properties if they have them assigned
       allow read: if isAuthenticated() && isUserActive() && 
                     (isSuperAdmin() || 
                      isAdmin() || 
-                     propertyId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties);
+                     (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties != null &&
+                      propertyId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties));
       
       // Super admins and admins have full write access, property managers can write
       allow write: if isAuthenticated() && isUserActive() && 
@@ -126,11 +128,13 @@ service cloud.firestore {
     // Buildings collection
     match /buildings/{buildingId} {
       // Users can read if they have access to the building's property
+      // Maintenance staff can read buildings for assigned properties
       allow read: if isAuthenticated() && isUserActive() && 
                     (isSuperAdmin() ||
                      isAdmin() || 
-                     get(/databases/$(database)/documents/buildings/$(buildingId)).data.propertyId in 
-                     get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties);
+                     (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties != null &&
+                      get(/databases/$(database)/documents/buildings/$(buildingId)).data.propertyId in 
+                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties));
       
       // Only admins and property managers can write
       allow write: if isAuthenticated() && isUserActive() && 
@@ -142,11 +146,13 @@ service cloud.firestore {
     // Units collection
     match /units/{unitId} {
       // Users can read if they have access to the unit's property
+      // Maintenance staff can read units for assigned properties
       allow read: if isAuthenticated() && isUserActive() && 
                     (isSuperAdmin() ||
                      isAdmin() || 
-                     get(/databases/$(database)/documents/units/$(unitId)).data.propertyId in 
-                     get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties);
+                     (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties != null &&
+                      get(/databases/$(database)/documents/units/$(unitId)).data.propertyId in 
+                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties));
       
       // Only admins and property managers can write
       allow write: if isAuthenticated() && isUserActive() && 
@@ -158,10 +164,11 @@ service cloud.firestore {
     // Tenants collection
     match /tenants/{tenantId} {
       // Users can read if they're admin OR have access to assigned properties
+      // Maintenance staff can read tenants (they need this to create tickets)
       allow read: if isAuthenticated() && isUserActive() && 
                     (isSuperAdmin() ||
                      isAdmin() || 
-                     getUserRole() in ['property_manager', 'viewer']);
+                     getUserRole() in ['property_manager', 'viewer', 'maintenance']);
       
       // Only admins and property managers can write
       allow write: if isAuthenticated() && isUserActive() && 
@@ -173,11 +180,13 @@ service cloud.firestore {
     // Leases collection
     match /leases/{leaseId} {
       // Users can read if they're admin OR have access to the lease's property
+      // Maintenance staff can read leases for assigned properties
       allow read: if isAuthenticated() && isUserActive() && 
                     (isSuperAdmin() ||
                      isAdmin() || 
-                     get(/databases/$(database)/documents/leases/$(leaseId)).data.propertyId in 
-                     get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties);
+                     (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties != null &&
+                      get(/databases/$(database)/documents/leases/$(leaseId)).data.propertyId in 
+                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties));
       
       // Only admins and property managers can write
       allow write: if isAuthenticated() && isUserActive() && 
@@ -193,8 +202,9 @@ service cloud.firestore {
       allow read: if isAuthenticated() && isUserActive() && 
                     (isSuperAdmin() ||
                      isAdmin() || 
-                     get(/databases/$(database)/documents/tickets/$(ticketId)).data.propertyId in 
-                     get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties);
+                     (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties != null &&
+                      get(/databases/$(database)/documents/tickets/$(ticketId)).data.propertyId in 
+                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties));
       
       // Admins, property managers, and maintenance staff can write
       // Property managers and maintenance staff can only write tickets for assigned properties
@@ -202,9 +212,11 @@ service cloud.firestore {
                      (isSuperAdmin() ||
                       isAdmin() || 
                       (getUserRole() == 'property_manager' && 
+                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties != null &&
                        request.resource.data.propertyId in 
                        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties) ||
                       (getUserRole() == 'maintenance' && 
+                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties != null &&
                        request.resource.data.propertyId in 
                        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties));
     }
@@ -212,11 +224,13 @@ service cloud.firestore {
     // Occupancies collection
     match /occupancies/{occupancyId} {
       // Users can read if they have access to the occupancy's property
+      // Maintenance staff can read occupancies for assigned properties
       allow read: if isAuthenticated() && isUserActive() && 
                     (isSuperAdmin() ||
                      isAdmin() || 
-                     get(/databases/$(database)/documents/occupancies/$(occupancyId)).data.propertyId in 
-                     get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties);
+                     (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties != null &&
+                      get(/databases/$(database)/documents/occupancies/$(occupancyId)).data.propertyId in 
+                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties));
       
       // Only admins and property managers can write
       allow write: if isAuthenticated() && isUserActive() && 
