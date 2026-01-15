@@ -11208,6 +11208,7 @@ window.viewTenantDetail = function(tenantId) {
         });
         loadContacts(tenantId);
         loadOccupancies(tenantId);
+        loadTenantDocuments(tenantId);
         
         // Show modal
         tenantDetailModal.classList.add('show');
@@ -11938,6 +11939,196 @@ window.addOccupancy = function(tenantId) {
         console.error('Error loading properties:', error);
         alert('Error loading properties. Please try again.');
     });
+};
+
+// Tenant Document Management
+function loadTenantDocuments(tenantId) {
+    const documentsList = document.getElementById('documentsList');
+    if (!documentsList) return;
+    
+    db.collection('tenants').doc(tenantId).get().then((doc) => {
+        const tenant = doc.data();
+        if (!tenant) {
+            documentsList.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">No documents found.</p>';
+            return;
+        }
+        
+        const documents = tenant.documents || [];
+        documentsList.innerHTML = '';
+        
+        if (documents.length === 0) {
+            documentsList.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">No documents uploaded yet. Click "Upload Document" to add one.</p>';
+            return;
+        }
+        
+        // Sort documents by upload date (newest first)
+        const sortedDocuments = [...documents].sort((a, b) => {
+            const dateA = a.uploadedAt?.toDate ? a.uploadedAt.toDate() : new Date(a.uploadedAt || 0);
+            const dateB = b.uploadedAt?.toDate ? b.uploadedAt.toDate() : new Date(b.uploadedAt || 0);
+            return dateB - dateA;
+        });
+        
+        sortedDocuments.forEach((document, index) => {
+            const documentItem = document.createElement('div');
+            documentItem.className = 'unit-item';
+            documentItem.style.marginBottom = '15px';
+            
+            const uploadedDate = document.uploadedAt?.toDate 
+                ? document.uploadedAt.toDate().toLocaleDateString() 
+                : 'Unknown date';
+            
+            const fileIcon = getFileIcon(document.fileName);
+            const fileSize = document.fileSize ? formatFileSize(document.fileSize) : '';
+            
+            documentItem.innerHTML = `
+                <div class="unit-info">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                        <span style="font-size: 24px;">${fileIcon}</span>
+                        <div style="flex: 1;">
+                            <h4 style="margin: 0;">${escapeHtml(document.fileName)}</h4>
+                            ${fileSize ? `<p style="margin: 4px 0 0 0; color: #666; font-size: 0.85em;">${fileSize}</p>` : ''}
+                        </div>
+                    </div>
+                    <p style="margin: 8px 0 0 0; color: #999; font-size: 0.85em;">Uploaded: ${uploadedDate}</p>
+                    ${document.description ? `<p style="margin: 8px 0 0 0; color: #666;">${escapeHtml(document.description)}</p>` : ''}
+                </div>
+                <div class="unit-item-actions">
+                    <a href="${document.fileUrl}" target="_blank" class="btn-primary btn-small" style="text-decoration: none; display: inline-block;">View</a>
+                    <a href="${document.fileUrl}" download="${document.fileName}" class="btn-secondary btn-small" style="text-decoration: none; display: inline-block;">Download</a>
+                    <button class="btn-danger btn-small" onclick="deleteTenantDocument('${tenantId}', ${index})">Delete</button>
+                </div>
+            `;
+            documentsList.appendChild(documentItem);
+        });
+    })
+    .catch((error) => {
+        console.error('Error loading tenant documents:', error);
+        documentsList.innerHTML = '<p style="color: #e74c3c; text-align: center; padding: 20px;">Error loading documents. Please try again.</p>';
+    });
+}
+
+function getFileIcon(fileName) {
+    const extension = fileName.split('.').pop().toLowerCase();
+    const iconMap = {
+        'pdf': '📄',
+        'doc': '📝',
+        'docx': '📝',
+        'xls': '📊',
+        'xlsx': '📊',
+        'txt': '📄',
+        'jpg': '🖼️',
+        'jpeg': '🖼️',
+        'png': '🖼️',
+        'gif': '🖼️'
+    };
+    return iconMap[extension] || '📎';
+}
+
+function formatFileSize(bytes) {
+    if (!bytes || bytes === 0) return '';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+}
+
+async function uploadTenantDocument(tenantId, file) {
+    try {
+        const storageRef = firebase.storage().ref();
+        const fileRef = storageRef.child(`tenants/${tenantId}/documents/${Date.now()}_${file.name}`);
+        
+        // Upload file
+        const uploadTask = fileRef.put(file);
+        
+        await new Promise((resolve, reject) => {
+            uploadTask.on('state_changed',
+                (snapshot) => {
+                    // Progress tracking (optional)
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    console.log(`Upload progress: ${progress}%`);
+                },
+                (error) => {
+                    console.error('Upload error:', error);
+                    reject(error);
+                },
+                () => {
+                    resolve();
+                }
+            );
+        });
+        
+        // Get download URL
+        const fileUrl = await fileRef.getDownloadURL();
+        
+        // Get tenant document
+        const tenantDoc = await db.collection('tenants').doc(tenantId).get();
+        const tenant = tenantDoc.data();
+        const documents = tenant.documents || [];
+        
+        // Add new document to array
+        documents.push({
+            fileName: file.name,
+            fileUrl: fileUrl,
+            fileSize: file.size,
+            uploadedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            description: null
+        });
+        
+        // Update tenant document
+        await db.collection('tenants').doc(tenantId).update({
+            documents: documents,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        console.log('Document uploaded successfully');
+        return true;
+    } catch (error) {
+        console.error('Error uploading document:', error);
+        throw error;
+    }
+}
+
+window.deleteTenantDocument = async function(tenantId, documentIndex) {
+    if (!confirm('Are you sure you want to delete this document?')) {
+        return;
+    }
+    
+    try {
+        const tenantDoc = await db.collection('tenants').doc(tenantId).get();
+        const tenant = tenantDoc.data();
+        const documents = tenant.documents || [];
+        
+        if (documentIndex < 0 || documentIndex >= documents.length) {
+            alert('Invalid document index');
+            return;
+        }
+        
+        const document = documents[documentIndex];
+        
+        // Delete file from storage
+        try {
+            const storageRef = firebase.storage().refFromURL(document.fileUrl);
+            await storageRef.delete();
+        } catch (storageError) {
+            console.warn('Error deleting file from storage:', storageError);
+            // Continue with removing from Firestore even if storage delete fails
+        }
+        
+        // Remove document from array
+        documents.splice(documentIndex, 1);
+        
+        // Update tenant document
+        await db.collection('tenants').doc(tenantId).update({
+            documents: documents,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        // Reload documents
+        loadTenantDocuments(tenantId);
+    } catch (error) {
+        console.error('Error deleting document:', error);
+        alert('Error deleting document: ' + error.message);
+    }
 };
 
 window.editOccupancy = function(occupancyId) {
