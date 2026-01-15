@@ -1765,9 +1765,15 @@ function setupEventListeners() {
     
     // Completion modal file handlers (check if elements exist)
     const completionAfterPhoto = document.getElementById('completionAfterPhoto');
+    const completionAfterPhotoDropZone = document.getElementById('completionAfterPhotoDropZone');
     const removeCompletionAfterPhoto = document.getElementById('removeCompletionAfterPhoto');
     if (completionAfterPhoto) {
         completionAfterPhoto.addEventListener('change', (e) => handleCompletionFileSelect(e));
+    }
+    
+    // Drag and drop handler for completion after photo
+    if (completionAfterPhotoDropZone && completionAfterPhoto) {
+        setupDragAndDrop(completionAfterPhotoDropZone, completionAfterPhoto, 'completion');
     }
     if (removeCompletionAfterPhoto) {
         removeCompletionAfterPhoto.addEventListener('click', () => removeCompletionFile());
