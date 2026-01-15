@@ -8147,6 +8147,11 @@ async function renderTenantsTableView(tenants) {
     // Load occupancies, buildings, units, and properties to group by building
     // We need to load these even if there are no tenants, to show orphaned units
     // Filter for maintenance users
+    console.log('🔍 renderTenantsTableView: Starting to load data...', {
+        userRole: currentUserProfile?.role,
+        assignedProperties: currentUserProfile?.assignedProperties
+    });
+    
     let occupanciesQuery = db.collection('occupancies');
     let buildingsQuery = db.collection('buildings');
     let unitsQuery = db.collection('units');
@@ -8156,10 +8161,12 @@ async function renderTenantsTableView(tenants) {
     if (currentUserProfile && currentUserProfile.role === 'maintenance' && 
         Array.isArray(currentUserProfile.assignedProperties) && 
         currentUserProfile.assignedProperties.length > 0) {
+        console.log('🔍 renderTenantsTableView: Filtering for maintenance user');
         if (currentUserProfile.assignedProperties.length <= 10) {
             occupanciesQuery = occupanciesQuery.where('propertyId', 'in', currentUserProfile.assignedProperties);
             buildingsQuery = buildingsQuery.where('propertyId', 'in', currentUserProfile.assignedProperties);
             unitsQuery = unitsQuery.where('propertyId', 'in', currentUserProfile.assignedProperties);
+            console.log('🔍 renderTenantsTableView: Applied whereIn filters');
         }
         // Load assigned properties individually
         const propertyPromises = currentUserProfile.assignedProperties.map(propId => 
@@ -8169,6 +8176,7 @@ async function renderTenantsTableView(tenants) {
             })
         );
         propertiesPromise = Promise.all(propertyPromises).then(docs => {
+            console.log('✅ renderTenantsTableView: Loaded properties:', docs.filter(d => d && d.exists).length);
             // Convert to snapshot-like object
             return {
                 forEach: (fn) => docs.forEach(doc => doc && doc.exists && fn(doc))
@@ -8176,15 +8184,34 @@ async function renderTenantsTableView(tenants) {
         });
     } else {
         // For other roles, load all
+        console.log('🔍 renderTenantsTableView: Loading all data for non-maintenance user');
         propertiesPromise = db.collection('properties').get();
     }
     
+    console.log('🔍 renderTenantsTableView: Executing Promise.all...');
     const [occupanciesSnapshot, buildingsSnapshot, unitsSnapshot, propertiesSnapshot] = await Promise.all([
-        occupanciesQuery.get(),
-        buildingsQuery.get(),
-        unitsQuery.get(),
-        propertiesPromise
+        occupanciesQuery.get().catch(e => {
+            console.error('❌ Error loading occupancies:', e);
+            throw e;
+        }),
+        buildingsQuery.get().catch(e => {
+            console.error('❌ Error loading buildings:', e);
+            throw e;
+        }),
+        unitsQuery.get().catch(e => {
+            console.error('❌ Error loading units:', e);
+            throw e;
+        }),
+        propertiesPromise.catch(e => {
+            console.error('❌ Error loading properties:', e);
+            throw e;
+        })
     ]);
+    console.log('✅ renderTenantsTableView: All data loaded', {
+        occupancies: occupanciesSnapshot.size,
+        buildings: buildingsSnapshot.size,
+        units: unitsSnapshot.size
+    });
     
     const occupanciesMap = {};
     occupanciesSnapshot.forEach(doc => {
@@ -10378,18 +10405,50 @@ function refreshContactsTableView() {
 }
 
 async function filterTenantsByProperty(tenants) {
+    console.log('🔍 filterTenantsByProperty called', {
+        tenantCount: Object.keys(tenants).length,
+        selectedProperty: selectedPropertyForTenants,
+        userRole: currentUserProfile?.role
+    });
+    
     if (!selectedPropertyForTenants) {
         return tenants;
     }
     
-    // Get all occupancies to check which tenants have occupancies
-    const allOccupanciesSnapshot = await db.collection('occupancies').get();
+    // For maintenance users, verify the selected property is assigned
+    if (currentUserProfile && currentUserProfile.role === 'maintenance' && 
+        Array.isArray(currentUserProfile.assignedProperties) && 
+        !currentUserProfile.assignedProperties.includes(selectedPropertyForTenants)) {
+        console.warn('⚠️ Maintenance user trying to filter by unassigned property:', selectedPropertyForTenants);
+        return {}; // Return empty - can't filter by unassigned property
+    }
+    
+    // Get occupancies to check which tenants have occupancies
+    // Filter for maintenance users
+    let occupanciesQuery = db.collection('occupancies');
+    if (currentUserProfile && currentUserProfile.role === 'maintenance' && 
+        Array.isArray(currentUserProfile.assignedProperties) && 
+        currentUserProfile.assignedProperties.length > 0 &&
+        currentUserProfile.assignedProperties.length <= 10) {
+        occupanciesQuery = occupanciesQuery.where('propertyId', 'in', currentUserProfile.assignedProperties);
+        console.log('🔍 Filtering occupancies for maintenance user in filterTenantsByProperty');
+    }
+    
+    console.log('🔍 Loading occupancies for filterTenantsByProperty...');
+    const allOccupanciesSnapshot = await occupanciesQuery.get().catch(error => {
+        console.error('❌ Error loading occupancies in filterTenantsByProperty:', error);
+        throw error;
+    });
+    console.log('✅ Loaded occupancies for filterTenantsByProperty:', allOccupanciesSnapshot.size);
+    
     const tenantIdsWithOccupancies = new Set();
     const tenantIdsInProperty = new Set();
     
     allOccupanciesSnapshot.forEach(doc => {
         const occ = doc.data();
-        tenantIdsWithOccupancies.add(occ.tenantId);
+        if (occ.tenantId) {
+            tenantIdsWithOccupancies.add(occ.tenantId);
+        }
         if (occ.propertyId === selectedPropertyForTenants) {
             tenantIdsInProperty.add(occ.tenantId);
         }
