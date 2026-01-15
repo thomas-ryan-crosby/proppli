@@ -6647,30 +6647,15 @@ async function checkPendingInvitation(email) {
                 
                 if (result.data && result.data.hasInvitation) {
                     console.log('✅ Found pending invitation via Cloud Function');
-                    // We need the full pending user data for linking, so try to get it from Firestore
-                    // But if we can't, return what we have
-                    if (db && auth && auth.currentUser) {
-                        // User is authenticated, get full data
-                        const pendingUsersSnapshot = await db.collection('pendingUsers')
-                            .where('email', '==', normalizedEmail)
-                            .where('status', '==', 'pending_signup')
-                            .limit(1)
-                            .get();
-                        
-                        if (!pendingUsersSnapshot.empty) {
-                            const pendingUser = pendingUsersSnapshot.docs[0].data();
-                            console.log('✅ Got full pending user data from Firestore');
-                            return pendingUser;
-                        }
-                    }
-                    
-                    // Return simplified data (we'll get full data during linking)
+                    // Cloud Function now returns full data
                     return {
                         displayName: result.data.displayName,
                         role: result.data.role,
-                        isActive: true,
-                        email: normalizedEmail,
-                        assignedProperties: [] // Will be filled during linking
+                        isActive: result.data.isActive !== false,
+                        email: result.data.email || normalizedEmail,
+                        assignedProperties: result.data.assignedProperties || [],
+                        profile: result.data.profile || {},
+                        createdBy: result.data.createdBy
                     };
                 } else {
                     console.log('ℹ️ No pending invitation found via Cloud Function');

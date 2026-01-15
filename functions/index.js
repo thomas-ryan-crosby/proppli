@@ -165,11 +165,16 @@ exports.checkPendingInvitation = functions.https.onCall(async (data, context) =>
     
     if (!pendingUsersSnapshot.empty) {
       const pendingUser = pendingUsersSnapshot.docs[0].data();
-      // Don't return sensitive data, just indicate invitation exists
+      // Return full pending user data (needed for account linking)
       return {
         hasInvitation: true,
         displayName: pendingUser.displayName,
-        role: pendingUser.role
+        role: pendingUser.role,
+        isActive: pendingUser.isActive !== false, // Ensure true for invited users
+        assignedProperties: pendingUser.assignedProperties || [],
+        profile: pendingUser.profile || {},
+        createdBy: pendingUser.createdBy,
+        email: normalizedEmail
       };
     }
     
