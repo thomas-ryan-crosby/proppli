@@ -2485,7 +2485,7 @@
                     
                     // Now load app.js after config is ready
                     const appScript = document.createElement('script');
-                    appScript.src = 'app.js?v=8.0';
+                    appScript.src = 'app.js?v=' + Date.now();
                     appScript.onload = function() {
                         console.log('✅ app.js loaded successfully');
                     };
@@ -2514,7 +2514,7 @@
                     }
                     console.log('✅ Fallback config loaded successfully');
                     const appScript = document.createElement('script');
-                    appScript.src = 'app.js?v=8.0';
+                    appScript.src = 'app.js?v=' + Date.now();
                     document.head.appendChild(appScript);
                 };
                 fallback.onerror = function() {
