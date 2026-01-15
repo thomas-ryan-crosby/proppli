@@ -4937,17 +4937,107 @@ async function loadTenantsForTicketForm(propertyId) {
             buildingsMap[doc.id] = { id: doc.id, ...doc.data() };
         });
         
-        // Add tenants that have active occupancies for this property
+        // Group tenants by building for sorting
+        const tenantsByBuilding = {};
+        const tenantsWithoutBuilding = [];
+        
         Object.keys(occupanciesMap).forEach(tenantId => {
             if (tenantsMap[tenantId]) {
                 const tenant = tenantsMap[tenantId];
+                const occupancies = occupanciesMap[tenantId];
+                
+                // Find the first occupancy with a unit that has a building
+                let buildingId = null;
+                let buildingName = null;
+                
+                for (const occ of occupancies) {
+                    if (occ.unitId && unitsMap[occ.unitId]) {
+                        const unit = unitsMap[occ.unitId];
+                        if (unit.buildingId && buildingsMap[unit.buildingId]) {
+                            buildingId = unit.buildingId;
+                            buildingName = buildingsMap[buildingId].buildingName || `Building ${buildingId}`;
+                            break;
+                        }
+                    }
+                }
+                
+                if (buildingId) {
+                    if (!tenantsByBuilding[buildingId]) {
+                        tenantsByBuilding[buildingId] = {
+                            buildingName: buildingName,
+                            tenants: []
+                        };
+                    }
+                    tenantsByBuilding[buildingId].tenants.push({
+                        tenantId: tenantId,
+                        tenant: tenant,
+                        occupancies: occupancies
+                    });
+                } else {
+                    tenantsWithoutBuilding.push({
+                        tenantId: tenantId,
+                        tenant: tenant,
+                        occupancies: occupancies
+                    });
+                }
+            }
+        });
+        
+        // Sort buildings by name
+        const sortedBuildingIds = Object.keys(tenantsByBuilding).sort((a, b) => {
+            const nameA = tenantsByBuilding[a].buildingName.toLowerCase();
+            const nameB = tenantsByBuilding[b].buildingName.toLowerCase();
+            return nameA.localeCompare(nameB);
+        });
+        
+        // Sort tenants within each building by name
+        sortedBuildingIds.forEach(buildingId => {
+            tenantsByBuilding[buildingId].tenants.sort((a, b) => {
+                const nameA = a.tenant.tenantName.toLowerCase();
+                const nameB = b.tenant.tenantName.toLowerCase();
+                return nameA.localeCompare(nameB);
+            });
+        });
+        
+        // Sort tenants without building by name
+        tenantsWithoutBuilding.sort((a, b) => {
+            const nameA = a.tenant.tenantName.toLowerCase();
+            const nameB = b.tenant.tenantName.toLowerCase();
+            return nameA.localeCompare(nameB);
+        });
+        
+        // Add tenants grouped by building
+        sortedBuildingIds.forEach(buildingId => {
+            const buildingGroup = tenantsByBuilding[buildingId];
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = buildingGroup.buildingName;
+            
+            buildingGroup.tenants.forEach(({ tenantId, tenant, occupancies }) => {
                 const option = document.createElement('option');
                 option.value = tenantId;
                 option.textContent = tenant.tenantName;
-                option.dataset.occupancies = JSON.stringify(occupanciesMap[tenantId]);
-                tenantSelect.appendChild(option);
-            }
+                option.dataset.occupancies = JSON.stringify(occupancies);
+                optgroup.appendChild(option);
+            });
+            
+            tenantSelect.appendChild(optgroup);
         });
+        
+        // Add tenants without building (if any)
+        if (tenantsWithoutBuilding.length > 0) {
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = 'No Building';
+            
+            tenantsWithoutBuilding.forEach(({ tenantId, tenant, occupancies }) => {
+                const option = document.createElement('option');
+                option.value = tenantId;
+                option.textContent = tenant.tenantName;
+                option.dataset.occupancies = JSON.stringify(occupancies);
+                optgroup.appendChild(option);
+            });
+            
+            tenantSelect.appendChild(optgroup);
+        }
         
         return Promise.resolve();
     } catch (error) {
