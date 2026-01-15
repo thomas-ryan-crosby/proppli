@@ -931,6 +931,10 @@ async function handleSignup(e) {
         
         console.log('🔵 Starting signup for email:', normalizedEmail);
         
+        // Set flag to indicate user is actively signing up (not a page load)
+        // This prevents the "Remember Me" check from signing them out
+        isUserActivelyLoggingIn = true;
+        
         // Create user account
         const userCredential = await auth.createUserWithEmailAndPassword(normalizedEmail, password);
         console.log('✅ Account created successfully');
