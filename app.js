@@ -14992,30 +14992,56 @@ function formatLeaseSummaries(leases, tenants, units = {}) {
         }
         
         return `
-            <div style="margin-bottom: 8px; padding: 8px; background: #f8f9fa; border-radius: 4px; border-left: 3px solid ${getStatusColor(lease.status)};">
-                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 4px;">
-                    <div style="flex: 1;">
-                        <div style="font-weight: 600; margin-bottom: 4px;">
-                            ${escapeHtml(tenantName)}
-                            <span style="font-size: 0.7em; font-weight: 400; color: #999; margin-left: 6px;">ID: ${lease.id.substring(0, 8)}</span>
+            <div style="margin-bottom: 12px; padding: 12px; background: white; border-radius: 8px; border-left: 4px solid ${getStatusColor(displayStatus)}; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: box-shadow 0.2s;">
+                <div style="display: flex; justify-content: space-between; align-items: start; gap: 16px;">
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;">
+                            <div style="font-weight: 600; font-size: 1em; color: #1e293b;">
+                                ${escapeHtml(tenantName)}
+                            </div>
+                            <span class="status-badge ${statusClass}" style="font-size: 0.75em; padding: 3px 8px;">${displayStatus}</span>
+                            <span style="font-size: 0.75em; color: #94a3b8; font-weight: 400;">ID: ${lease.id.substring(0, 8)}</span>
                         </div>
-                        <div style="font-size: 0.85em; color: #666;">
-                            <span class="status-badge ${statusClass}" style="margin-right: 8px;">${displayStatus}</span>
-                            <span style="margin-right: 8px;">${leaseTerm}</span>
-                            ${squareFootage ? `<span style="margin-right: 8px;">${squareFootage.toLocaleString('en-US', { maximumFractionDigits: 0 })} sq ft</span>` : ''}
-                            ${deprecatedDate ? `<span style="color: #dc2626;">Deprecated: ${deprecatedDate}</span>` : ''}
+                        
+                        <div style="display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 8px; font-size: 0.85em; color: #64748b;">
+                            <div style="display: flex; align-items: center; gap: 4px;">
+                                <span style="color: #94a3b8;">📅</span>
+                                <span>${leaseTerm}</span>
+                            </div>
+                            ${squareFootage ? `
+                            <div style="display: flex; align-items: center; gap: 4px;">
+                                <span style="color: #94a3b8;">📐</span>
+                                <span>${squareFootage.toLocaleString('en-US', { maximumFractionDigits: 0 })} sq ft</span>
+                            </div>
+                            ` : ''}
+                            ${deprecatedDate ? `
+                            <div style="display: flex; align-items: center; gap: 4px; color: #dc2626;">
+                                <span>⚠️</span>
+                                <span>Deprecated: ${deprecatedDate}</span>
+                            </div>
+                            ` : ''}
                         </div>
+                        
                         ${rentDisplay}
-                        ${lease.leaseDocument && lease.leaseDocument.fileUrl ? `
-                        <div style="margin-top: 8px;">
-                            <a href="${lease.leaseDocument.fileUrl}" target="_blank" class="btn-sm btn-primary" style="font-size: 0.85em; padding: 6px 12px; font-weight: 500; text-decoration: none; display: inline-block;" title="View Lease Document">View Lease</a>
-                        </div>
-                        ` : ''}
                     </div>
-                    <div style="display: flex; gap: 4px; margin-left: 8px; flex-direction: column; align-items: flex-end;">
-                        <button class="btn-sm btn-secondary" onclick="window.openLeaseModal('${lease.id}', true)" style="font-size: 0.75em; padding: 4px 8px;" title="Edit">Edit</button>
-                        ${!lease.isDeprecated ? `<button class="btn-sm btn-warning" onclick="window.openDeprecatedModal('${lease.id}')" style="font-size: 0.75em; padding: 4px 8px; margin-top: 4px;" title="Mark as Deprecated/Legacy">Deprecate</button>` : ''}
-                        ${!lease.deletedAt ? `<button class="btn-sm btn-danger" onclick="window.deleteLease('${lease.id}')" style="font-size: 0.75em; padding: 4px 8px; margin-top: 4px;" title="Delete Lease">Delete</button>` : ''}
+                    
+                    <div style="display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;">
+                        ${lease.leaseDocument && lease.leaseDocument.fileUrl ? `
+                        <a href="${lease.leaseDocument.fileUrl}" target="_blank" class="btn-sm btn-primary" style="font-size: 0.8em; padding: 6px 12px; font-weight: 500; text-decoration: none; display: inline-block; text-align: center; white-space: nowrap;" title="View Lease PDF">
+                            📄 View Lease
+                        </a>
+                        ` : ''}
+                        <button class="btn-sm btn-secondary" onclick="window.openLeaseModal('${lease.id}')" style="font-size: 0.8em; padding: 6px 12px; white-space: nowrap;" title="View Details">
+                            👁️ View Details
+                        </button>
+                        <button class="btn-sm btn-secondary" onclick="window.openLeaseModal('${lease.id}', true)" style="font-size: 0.8em; padding: 6px 12px; white-space: nowrap;" title="Edit">
+                            ✏️ Edit
+                        </button>
+                        ${!lease.deletedAt ? `
+                        <button class="btn-sm btn-danger" onclick="window.deleteLease('${lease.id}')" style="font-size: 0.8em; padding: 6px 12px; white-space: nowrap;" title="Delete Lease">
+                            🗑️ Delete
+                        </button>
+                        ` : ''}
                     </div>
                 </div>
             </div>
