@@ -3,10 +3,26 @@
 ## Overview
 Enhance the rent roll functionality to include deprecated leases, showing historical rent data up to the deprecation date. This allows users to look back at what rents were for leases that have been deprecated.
 
+## Important Distinction: Deleted vs Deprecated Leases
+
+### Deleted Leases (`deletedAt` field)
+- **Purpose**: Leases that were deleted due to clerical errors, duplicates, or mistakes
+- **Should NEVER appear in rent rolls**: These are not valid leases and should be completely excluded
+- **Current handling**: Already correctly excluded via `!isLeaseDeleted(lease)` check
+
+### Deprecated Leases (`isDeprecated` field)
+- **Purpose**: Legacy leases containing important historical information
+- **Should be INCLUDED in rent rolls** (when user opts in): These are valid historical records that provide valuable context
+- **Current handling**: Currently excluded, but should be included when "Include Deprecated Leases" is checked
+
+**Key Point**: The implementation must ALWAYS exclude deleted leases, but should allow deprecated leases to be included for historical reference.
+
 ## Current State Analysis
 
 ### Current Behavior
-- **Line 16066**: Rent rolls currently filter out deprecated leases: `if (isLeaseActive(lease) && !isLeaseDeleted(lease))`
+- **Line 16066**: Rent rolls currently filter out both deprecated AND deleted leases: `if (isLeaseActive(lease) && !isLeaseDeleted(lease))`
+  - This correctly excludes deleted leases ✅
+  - This incorrectly excludes deprecated leases (which should be optional) ❌
 - **`calculateRentForMonth` function**: Calculates rent for any given month/year but doesn't account for deprecated leases
 - **`calculateCurrentRent` function**: Already handles deprecated leases by using `deprecatedDate` as the calculation date
 - Rent rolls only show active leases, excluding any historical data for deprecated leases
@@ -46,25 +62,31 @@ Enhance the rent roll functionality to include deprecated leases, showing histor
 1. Add checkbox state reading: `const includeDeprecated = document.getElementById('rentRollIncludeDeprecated')?.checked || false;`
 2. Modify lease filtering logic:
    ```javascript
+   // CRITICAL: Always exclude deleted leases (clerical errors, etc.)
+   // Only include deprecated leases if user opts in (legacy/historical data)
+   
    // Current: if (isLeaseActive(lease) && !isLeaseDeleted(lease))
    // New: 
-   if (!isLeaseDeleted(lease)) {
+   if (!isLeaseDeleted(lease)) {  // ALWAYS exclude deleted leases
        if (includeDeprecated) {
-           // Include both active and deprecated leases
+           // Include both active and deprecated leases (but NOT deleted)
            if (isLeaseActive(lease) || isLeaseDeprecated(lease)) {
                // Apply filters and add to list
            }
        } else {
            // Only include active leases (current behavior)
+           // Deprecated leases excluded unless checkbox is checked
            if (isLeaseActive(lease)) {
                // Apply filters and add to list
            }
        }
    }
+   // Deleted leases are always excluded regardless of checkbox state
    ```
 3. Separate deprecated leases for optional grouping:
    - Create `deprecatedLeases` array alongside `activeLeases`
    - Group separately or merge based on UI preference
+   - **Important**: Never include deleted leases in either array
 
 #### B. Enhance `calculateRentForMonth()` Function
 **Location**: `app.js` line ~15884
@@ -191,6 +213,8 @@ if (includeDeprecatedCheckbox) {
 2. **Multiple deprecated leases**: Ensure proper grouping and display
 3. **Deprecated lease with no deprecation date**: Use current date or lease end date as fallback
 4. **Year filter with deprecated leases**: Show deprecated leases for historical years even if deprecated in current year
+5. **Deleted vs Deprecated confusion**: Ensure deleted leases (`deletedAt` field) are NEVER included, even if checkbox is checked
+6. **Lease that is both deleted AND deprecated**: Should be excluded (deleted takes precedence)
 
 ### Performance Considerations
 - Deprecated leases add to the dataset size - ensure filtering is efficient
@@ -201,6 +225,8 @@ if (includeDeprecatedCheckbox) {
 - Ensure `deprecatedDate` is always set when `isDeprecated = true`
 - Validate deprecation dates are within lease term dates
 - Handle timezone issues with date comparisons
+- **Critical**: Always check `isLeaseDeleted()` FIRST before any other checks - deleted leases must never appear
+- Ensure deleted leases are excluded even if they also have `isDeprecated = true`
 
 ## Testing Scenarios
 
@@ -230,6 +256,8 @@ if (includeDeprecatedCheckbox) {
    - Lease deprecated on last day of month
    - Deprecated lease spanning multiple years in rent roll
    - Deprecated lease with no deprecation date (fallback behavior)
+   - **Deleted lease never appears** even if checkbox is checked
+   - Lease that is both deleted and deprecated (should be excluded)
 
 ## Success Criteria
 
