@@ -16418,10 +16418,12 @@ function renderVerticalTable(leases, tenants, units, buildings, year, monthLabel
             }
             
             const rentDisplay = shouldShowRent && rent > 0 ? `$${rent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—';
-            const cellColor = shouldShowRent && rent > 0 ? (isDeprecated ? '#64748b' : '#1e293b') : '#cbd5e1';
-            const cellStyle = isDeprecated ? 'opacity: 0.7;' : '';
+            // Use light red for deprecated lease rents, standard color for active leases
+            const cellColor = shouldShowRent && rent > 0 ? (isDeprecated ? '#f87171' : '#1e293b') : '#cbd5e1';
+            const cellBgColor = shouldShowRent && rent > 0 && isDeprecated ? 'background-color: #fef2f2;' : '';
+            const cellStyle = isDeprecated ? 'opacity: 0.9;' : '';
             
-            html += `<td style="padding: 10px; text-align: right; font-variant-numeric: tabular-nums; color: ${cellColor}; position: relative; ${cellStyle}">`;
+            html += `<td style="padding: 10px; text-align: right; font-variant-numeric: tabular-nums; color: ${cellColor}; position: relative; ${cellStyle} ${cellBgColor}">`;
             if (hasEscalation && rent > 0 && shouldShowRent) {
                 html += `<span style="position: absolute; top: 2px; right: 4px; color: #10b981; font-size: 0.75em; font-weight: bold;" title="Rent escalation applied">↑</span>`;
             }
@@ -16618,10 +16620,12 @@ function renderHorizontalTable(leases, tenants, units, buildings, year, monthLab
             }
             
             const rentDisplay = shouldShowRent && rent > 0 ? `$${rent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—';
-            const cellColor = shouldShowRent && rent > 0 ? (isDeprecated ? '#64748b' : '#1e293b') : '#cbd5e1';
-            const cellStyle = isDeprecated ? 'opacity: 0.7;' : '';
+            // Use light red for deprecated lease rents, standard color for active leases
+            const cellColor = shouldShowRent && rent > 0 ? (isDeprecated ? '#f87171' : '#1e293b') : '#cbd5e1';
+            const cellBgColor = shouldShowRent && rent > 0 && isDeprecated ? 'background-color: #fef2f2;' : '';
+            const cellStyle = isDeprecated ? 'opacity: 0.9;' : '';
             
-            html += `<td style="padding: 10px; text-align: right; font-variant-numeric: tabular-nums; color: ${cellColor}; position: relative; ${cellStyle}">`;
+            html += `<td style="padding: 10px; text-align: right; font-variant-numeric: tabular-nums; color: ${cellColor}; position: relative; ${cellStyle} ${cellBgColor}">`;
             if (hasEscalation && rent > 0 && shouldShowRent) {
                 html += `<span style="position: absolute; top: 2px; right: 4px; color: #10b981; font-size: 0.75em; font-weight: bold;" title="Rent escalation applied">↑</span>`;
             }
@@ -16629,9 +16633,9 @@ function renderHorizontalTable(leases, tenants, units, buildings, year, monthLab
             html += `</td>`;
         });
         
-        html += `<td style="padding: 10px; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; color: ${isDeprecated ? '#64748b' : '#667eea'}; ${textStyle}">$${annualRent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+        html += `<td style="padding: 10px; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; color: ${isDeprecated ? '#f87171' : '#667eea'}; background-color: ${isDeprecated ? '#fef2f2' : 'transparent'}; ${textStyle}">$${annualRent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
         const ppfDisplay = rentPerSqFt ? `$${rentPerSqFt.toFixed(2)}` : '—';
-        html += `<td style="padding: 10px; text-align: right; font-variant-numeric: tabular-nums; color: ${isDeprecated ? '#64748b' : '#7c3aed'}; ${textStyle}">${ppfDisplay}</td>`;
+        html += `<td style="padding: 10px; text-align: right; font-variant-numeric: tabular-nums; color: ${isDeprecated ? '#f87171' : '#7c3aed'}; background-color: ${isDeprecated ? '#fef2f2' : 'transparent'}; ${textStyle}">${ppfDisplay}</td>`;
         if (isDeprecated && deprecatedDate) {
             html += `<td style="padding: 10px; text-align: center; font-size: 0.8em; color: #fca5a5; ${textStyle}" colspan="2">Dep: ${deprecatedDate.toLocaleDateString()}</td>`;
         }
