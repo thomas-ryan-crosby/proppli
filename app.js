@@ -15006,9 +15006,11 @@ function formatLeaseSummaries(leases, tenants, units = {}) {
                             ${deprecatedDate ? `<span style="color: #dc2626;">Deprecated: ${deprecatedDate}</span>` : ''}
                         </div>
                         ${rentDisplay}
+                        ${lease.leaseDocument && lease.leaseDocument.fileUrl ? `
                         <div style="margin-top: 8px;">
-                            <button class="btn-sm btn-primary" onclick="window.openLeaseModal('${lease.id}')" style="font-size: 0.85em; padding: 6px 12px; font-weight: 500;" title="View Lease">View Lease</button>
+                            <a href="${lease.leaseDocument.fileUrl}" target="_blank" class="btn-sm btn-primary" style="font-size: 0.85em; padding: 6px 12px; font-weight: 500; text-decoration: none; display: inline-block;" title="View Lease Document">View Lease</a>
                         </div>
+                        ` : ''}
                     </div>
                     <div style="display: flex; gap: 4px; margin-left: 8px; flex-direction: column; align-items: flex-end;">
                         <button class="btn-sm btn-secondary" onclick="window.openLeaseModal('${lease.id}', true)" style="font-size: 0.75em; padding: 4px 8px;" title="Edit">Edit</button>
