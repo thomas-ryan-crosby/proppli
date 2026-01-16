@@ -16292,35 +16292,71 @@ function renderRentRollVertical(leasesByProperty, properties, tenants, units, bu
         const property = properties[propertyId] || { name: 'Unknown Property' };
         const tenantsByProperty = leasesByProperty[propertyId]; // This is now { tenantId: { activeLeases: [], deprecatedLeases: [] } }
         
+        // Skip if no tenants in this property
+        if (!tenantsByProperty || Object.keys(tenantsByProperty).length === 0) {
+            return;
+        }
+        
         html += `<div style="margin-bottom: 40px;">`;
         html += `<h3 style="margin-bottom: 20px; color: #1e293b; font-size: 1.5rem;">${escapeHtml(property.name)} Rent Roll</h3>`;
         html += `<div style="font-size: 0.9em; color: #64748b; margin-bottom: 15px;">As of ${new Date().toLocaleDateString()}</div>`;
         
         if (breakoutByBuilding) {
             // Group tenants by building
+            // A tenant might have leases in multiple buildings, so we need to split them
             const tenantsByBuilding = {};
             Object.keys(tenantsByProperty).forEach(tenantId => {
                 const tenantLeases = tenantsByProperty[tenantId];
-                // Get building from first active lease, or first deprecated lease
-                const firstLease = tenantLeases.activeLeases[0] || tenantLeases.deprecatedLeases[0];
-                if (firstLease) {
-                    const unit = firstLease.unitId ? units[firstLease.unitId] : null;
+                
+                // Group leases by building
+                const leasesByBuilding = {};
+                [...tenantLeases.activeLeases, ...(includeDeprecated ? tenantLeases.deprecatedLeases : [])].forEach(lease => {
+                    const unit = lease.unitId ? units[lease.unitId] : null;
                     const buildingId = unit?.buildingId || 'no-building';
+                    
+                    if (!leasesByBuilding[buildingId]) {
+                        leasesByBuilding[buildingId] = {
+                            activeLeases: [],
+                            deprecatedLeases: []
+                        };
+                    }
+                    
+                    if (isLeaseDeprecated(lease)) {
+                        leasesByBuilding[buildingId].deprecatedLeases.push(lease);
+                    } else {
+                        leasesByBuilding[buildingId].activeLeases.push(lease);
+                    }
+                });
+                
+                // Create tenant entry for each building they have leases in
+                Object.keys(leasesByBuilding).forEach(buildingId => {
                     if (!tenantsByBuilding[buildingId]) {
                         tenantsByBuilding[buildingId] = {};
                     }
-                    tenantsByBuilding[buildingId][tenantId] = tenantLeases;
-                }
+                    tenantsByBuilding[buildingId][tenantId] = leasesByBuilding[buildingId];
+                });
             });
             
             // Render each building separately
-            Object.keys(tenantsByBuilding).forEach(buildingId => {
-                const buildingTenants = tenantsByBuilding[buildingId];
-                const building = buildingId !== 'no-building' ? buildings[buildingId] : null;
-                const buildingName = building?.name || 'No Building Assigned';
-                
-                html += renderVerticalTable(buildingTenants, tenants, units, buildings, year, monthLabels, buildingName, includeDeprecated);
+            const sortedBuildingIds = Object.keys(tenantsByBuilding).sort((a, b) => {
+                const buildingA = a !== 'no-building' ? buildings[a] : null;
+                const buildingB = b !== 'no-building' ? buildings[b] : null;
+                const nameA = buildingA?.name || 'No Building Assigned';
+                const nameB = buildingB?.name || 'No Building Assigned';
+                return nameA.localeCompare(nameB);
             });
+            
+            if (sortedBuildingIds.length === 0) {
+                html += `<p style="color: #999; text-align: center; padding: 20px;">No buildings found for this property.</p>`;
+            } else {
+                sortedBuildingIds.forEach(buildingId => {
+                    const buildingTenants = tenantsByBuilding[buildingId];
+                    const building = buildingId !== 'no-building' ? buildings[buildingId] : null;
+                    const buildingName = building?.name || 'No Building Assigned';
+                    
+                    html += renderVerticalTable(buildingTenants, tenants, units, buildings, year, monthLabels, buildingName, includeDeprecated);
+                });
+            }
         } else {
             // Render all tenants together
             html += renderVerticalTable(tenantsByProperty, tenants, units, buildings, year, monthLabels, null, includeDeprecated);
@@ -16534,35 +16570,71 @@ function renderRentRollHorizontal(leasesByProperty, properties, tenants, units, 
         const property = properties[propertyId] || { name: 'Unknown Property' };
         const tenantsByProperty = leasesByProperty[propertyId]; // This is now { tenantId: { activeLeases: [], deprecatedLeases: [] } }
         
+        // Skip if no tenants in this property
+        if (!tenantsByProperty || Object.keys(tenantsByProperty).length === 0) {
+            return;
+        }
+        
         html += `<div style="margin-bottom: 40px;">`;
         html += `<h3 style="margin-bottom: 20px; color: #1e293b; font-size: 1.5rem;">${escapeHtml(property.name)} Rent Roll</h3>`;
         html += `<div style="font-size: 0.9em; color: #64748b; margin-bottom: 15px;">As of ${new Date().toLocaleDateString()}</div>`;
         
         if (breakoutByBuilding) {
             // Group tenants by building
+            // A tenant might have leases in multiple buildings, so we need to split them
             const tenantsByBuilding = {};
             Object.keys(tenantsByProperty).forEach(tenantId => {
                 const tenantLeases = tenantsByProperty[tenantId];
-                // Get building from first active lease, or first deprecated lease
-                const firstLease = tenantLeases.activeLeases[0] || tenantLeases.deprecatedLeases[0];
-                if (firstLease) {
-                    const unit = firstLease.unitId ? units[firstLease.unitId] : null;
+                
+                // Group leases by building
+                const leasesByBuilding = {};
+                [...tenantLeases.activeLeases, ...(includeDeprecated ? tenantLeases.deprecatedLeases : [])].forEach(lease => {
+                    const unit = lease.unitId ? units[lease.unitId] : null;
                     const buildingId = unit?.buildingId || 'no-building';
+                    
+                    if (!leasesByBuilding[buildingId]) {
+                        leasesByBuilding[buildingId] = {
+                            activeLeases: [],
+                            deprecatedLeases: []
+                        };
+                    }
+                    
+                    if (isLeaseDeprecated(lease)) {
+                        leasesByBuilding[buildingId].deprecatedLeases.push(lease);
+                    } else {
+                        leasesByBuilding[buildingId].activeLeases.push(lease);
+                    }
+                });
+                
+                // Create tenant entry for each building they have leases in
+                Object.keys(leasesByBuilding).forEach(buildingId => {
                     if (!tenantsByBuilding[buildingId]) {
                         tenantsByBuilding[buildingId] = {};
                     }
-                    tenantsByBuilding[buildingId][tenantId] = tenantLeases;
-                }
+                    tenantsByBuilding[buildingId][tenantId] = leasesByBuilding[buildingId];
+                });
             });
             
             // Render each building separately
-            Object.keys(tenantsByBuilding).forEach(buildingId => {
-                const buildingTenants = tenantsByBuilding[buildingId];
-                const building = buildingId !== 'no-building' ? buildings[buildingId] : null;
-                const buildingName = building?.name || 'No Building Assigned';
-                
-                html += renderHorizontalTable(buildingTenants, tenants, units, buildings, year, monthLabels, buildingName, includeDeprecated);
+            const sortedBuildingIds = Object.keys(tenantsByBuilding).sort((a, b) => {
+                const buildingA = a !== 'no-building' ? buildings[a] : null;
+                const buildingB = b !== 'no-building' ? buildings[b] : null;
+                const nameA = buildingA?.name || 'No Building Assigned';
+                const nameB = buildingB?.name || 'No Building Assigned';
+                return nameA.localeCompare(nameB);
             });
+            
+            if (sortedBuildingIds.length === 0) {
+                html += `<p style="color: #999; text-align: center; padding: 20px;">No buildings found for this property.</p>`;
+            } else {
+                sortedBuildingIds.forEach(buildingId => {
+                    const buildingTenants = tenantsByBuilding[buildingId];
+                    const building = buildingId !== 'no-building' ? buildings[buildingId] : null;
+                    const buildingName = building?.name || 'No Building Assigned';
+                    
+                    html += renderHorizontalTable(buildingTenants, tenants, units, buildings, year, monthLabels, buildingName, includeDeprecated);
+                });
+            }
         } else {
             // Render all tenants together
             html += renderHorizontalTable(tenantsByProperty, tenants, units, buildings, year, monthLabels, null, includeDeprecated);
