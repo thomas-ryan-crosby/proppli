@@ -15006,12 +15006,14 @@ function formatLeaseSummaries(leases, tenants, units = {}) {
                             ${deprecatedDate ? `<span style="color: #dc2626;">Deprecated: ${deprecatedDate}</span>` : ''}
                         </div>
                         ${rentDisplay}
+                        <div style="margin-top: 8px;">
+                            <button class="btn-sm btn-primary" onclick="window.openLeaseModal('${lease.id}')" style="font-size: 0.85em; padding: 6px 12px; font-weight: 500;" title="View Lease">View Lease</button>
+                        </div>
                     </div>
-                    <div style="display: flex; gap: 4px; margin-left: 8px;">
-                        <button class="btn-sm btn-primary" onclick="window.openLeaseModal('${lease.id}')" style="font-size: 0.75em; padding: 4px 8px;" title="View">View</button>
+                    <div style="display: flex; gap: 4px; margin-left: 8px; flex-direction: column; align-items: flex-end;">
                         <button class="btn-sm btn-secondary" onclick="window.openLeaseModal('${lease.id}', true)" style="font-size: 0.75em; padding: 4px 8px;" title="Edit">Edit</button>
-                        ${!lease.isDeprecated ? `<button class="btn-sm btn-warning" onclick="window.openDeprecatedModal('${lease.id}')" style="font-size: 0.75em; padding: 4px 8px;" title="Mark as Deprecated/Legacy">Deprecate</button>` : ''}
-                        ${!lease.deletedAt ? `<button class="btn-sm btn-danger" onclick="window.deleteLease('${lease.id}')" style="font-size: 0.75em; padding: 4px 8px; margin-left: 4px;" title="Delete Lease">Delete</button>` : ''}
+                        ${!lease.isDeprecated ? `<button class="btn-sm btn-warning" onclick="window.openDeprecatedModal('${lease.id}')" style="font-size: 0.75em; padding: 4px 8px; margin-top: 4px;" title="Mark as Deprecated/Legacy">Deprecate</button>` : ''}
+                        ${!lease.deletedAt ? `<button class="btn-sm btn-danger" onclick="window.deleteLease('${lease.id}')" style="font-size: 0.75em; padding: 4px 8px; margin-top: 4px;" title="Delete Lease">Delete</button>` : ''}
                     </div>
                 </div>
             </div>
