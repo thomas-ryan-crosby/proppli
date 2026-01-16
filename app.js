@@ -15376,6 +15376,8 @@ function renderLeaseDetailList(leases, tenants, container, units = {}) {
         const tenantName = tenant?.tenantName || 'Unknown Tenant';
         const startDate = lease.leaseStartDate ? lease.leaseStartDate.toDate().toLocaleDateString() : 'N/A';
         const endDate = lease.leaseEndDate ? lease.leaseEndDate.toDate().toLocaleDateString() : 'N/A';
+        const leaseTerm = `${startDate} - ${endDate}`;
+        const deprecatedDate = lease.deprecatedDate ? (lease.deprecatedDate.toDate ? lease.deprecatedDate.toDate().toLocaleDateString() : new Date(lease.deprecatedDate).toLocaleDateString()) : null;
         const initialRent = lease.monthlyRent ? lease.monthlyRent : 0;
         const currentRent = calculateCurrentRent(lease);
         const hasEscalation = lease.rentEscalation && lease.rentEscalation.escalationType && lease.rentEscalation.escalationType !== 'None';
@@ -15482,17 +15484,19 @@ function renderLeaseDetailList(leases, tenants, container, units = {}) {
                 </div>
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">
                     <div>
-                        <div style="color: #64748b; font-size: 0.85em; margin-bottom: 4px;">Start Date</div>
-                        <div style="font-weight: 600;">${startDate}</div>
-                    </div>
-                    <div>
-                        <div style="color: #64748b; font-size: 0.85em; margin-bottom: 4px;">End Date</div>
-                        <div style="font-weight: 600;">${endDate}</div>
+                        <div style="color: #64748b; font-size: 0.85em; margin-bottom: 4px;">Lease Term</div>
+                        <div style="font-weight: 600;">${leaseTerm}</div>
                     </div>
                     ${squareFootage ? `
                     <div>
                         <div style="color: #64748b; font-size: 0.85em; margin-bottom: 4px;">Square Footage</div>
                         <div style="font-weight: 600;">${squareFootage.toLocaleString('en-US', { maximumFractionDigits: 0 })} sq ft</div>
+                    </div>
+                    ` : ''}
+                    ${deprecatedDate ? `
+                    <div>
+                        <div style="color: #64748b; font-size: 0.85em; margin-bottom: 4px;">Deprecated On</div>
+                        <div style="font-weight: 600;">${deprecatedDate}</div>
                     </div>
                     ` : ''}
                     ${rentDisplay}
