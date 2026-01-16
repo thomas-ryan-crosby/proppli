@@ -13562,12 +13562,58 @@ async function populateLeaseFormDropdowns() {
         });
     }
     
+    // Handle escalation notice type changes
+    const escalationNoticeTypeSelect = document.getElementById('escalationNoticeType');
+    if (escalationNoticeTypeSelect) {
+        escalationNoticeTypeSelect.addEventListener('change', function() {
+            const noticeType = this.value;
+            const dateInputGroup = document.getElementById('escalationNoticeDateInputGroup');
+            const periodGroup = document.getElementById('escalationNoticePeriodGroup');
+            
+            if (noticeType === 'date') {
+                if (dateInputGroup) dateInputGroup.style.display = 'block';
+                if (periodGroup) periodGroup.style.display = 'none';
+            } else {
+                if (dateInputGroup) dateInputGroup.style.display = 'none';
+                if (periodGroup) periodGroup.style.display = 'block';
+                // Set the unit based on notice type
+                const noticeUnitSelect = document.getElementById('escalationNoticeUnit');
+                if (noticeUnitSelect) {
+                    noticeUnitSelect.value = noticeType === 'months' ? 'months' : 'days';
+                }
+            }
+        });
+    }
+    
     // Handle auto renewal checkbox
     const autoRenewalCheckbox = document.getElementById('autoRenewal');
     const autoRenewalTermGroup = document.getElementById('autoRenewalTermGroup');
     if (autoRenewalCheckbox && autoRenewalTermGroup) {
         autoRenewalCheckbox.addEventListener('change', function() {
             autoRenewalTermGroup.style.display = this.checked ? 'block' : 'none';
+        });
+    }
+    
+    // Handle auto renewal notice type changes
+    const autoRenewalNoticeTypeSelect = document.getElementById('autoRenewalNoticeType');
+    if (autoRenewalNoticeTypeSelect) {
+        autoRenewalNoticeTypeSelect.addEventListener('change', function() {
+            const noticeType = this.value;
+            const dateInputGroup = document.getElementById('autoRenewalNoticeDateInputGroup');
+            const periodGroup = document.getElementById('autoRenewalNoticePeriodGroup');
+            
+            if (noticeType === 'date') {
+                if (dateInputGroup) dateInputGroup.style.display = 'block';
+                if (periodGroup) periodGroup.style.display = 'none';
+            } else {
+                if (dateInputGroup) dateInputGroup.style.display = 'none';
+                if (periodGroup) periodGroup.style.display = 'block';
+                // Set the unit based on notice type
+                const noticeUnitSelect = document.getElementById('autoRenewalNoticeUnit');
+                if (noticeUnitSelect) {
+                    noticeUnitSelect.value = noticeType === 'months' ? 'months' : 'days';
+                }
+            }
         });
     }
     
@@ -13760,6 +13806,30 @@ function populateLeaseForm(lease) {
                 }
             }
         }
+        
+        // Populate auto renewal notice
+        if (lease.autoRenewalNoticeType || lease.autoRenewalNoticeDate) {
+            const autoRenewalNoticeTypeSelect = document.getElementById('autoRenewalNoticeType');
+            const noticeType = lease.autoRenewalNoticeType || 'date';
+            if (autoRenewalNoticeTypeSelect) {
+                autoRenewalNoticeTypeSelect.value = noticeType;
+                autoRenewalNoticeTypeSelect.dispatchEvent(new Event('change'));
+            }
+            
+            if (noticeType === 'date' && lease.autoRenewalNoticeDate && document.getElementById('autoRenewalNoticeDate')) {
+                const noticeDate = lease.autoRenewalNoticeDate.toDate ? lease.autoRenewalNoticeDate.toDate() : new Date(lease.autoRenewalNoticeDate);
+                document.getElementById('autoRenewalNoticeDate').value = noticeDate.toISOString().split('T')[0];
+            } else if ((noticeType === 'months' || noticeType === 'days') && lease.autoRenewalNoticePeriod) {
+                const noticePeriodInput = document.getElementById('autoRenewalNoticePeriod');
+                const noticeUnitSelect = document.getElementById('autoRenewalNoticeUnit');
+                if (noticePeriodInput) {
+                    noticePeriodInput.value = lease.autoRenewalNoticePeriod;
+                    if (noticeUnitSelect) {
+                        noticeUnitSelect.value = noticeType === 'months' ? 'months' : 'days';
+                    }
+                }
+            }
+        }
     }
     
     if (document.getElementById('leaseSquareFootage')) document.getElementById('leaseSquareFootage').value = lease.squareFootage || '';
@@ -13834,10 +13904,34 @@ function populateLeaseForm(lease) {
                 const firstEscDate = esc.firstEscalationDate.toDate().toISOString().split('T')[0];
                 document.getElementById('firstEscalationDate').value = firstEscDate;
             }
-            if (esc.noticeDate && document.getElementById('escalationNoticeDate')) {
-                const noticeDate = esc.noticeDate.toDate ? esc.noticeDate.toDate() : new Date(esc.noticeDate);
-                document.getElementById('escalationNoticeDate').value = noticeDate.toISOString().split('T')[0];
+            
+            // Populate escalation notice
+            const noticeTypeSelect = document.getElementById('escalationNoticeType');
+            if (esc.noticeType || esc.noticeDate) {
+                const noticeType = esc.noticeType || 'date';
+                if (noticeTypeSelect) {
+                    noticeTypeSelect.value = noticeType;
+                    noticeTypeSelect.dispatchEvent(new Event('change'));
+                }
+                
+                if (noticeType === 'date' && esc.noticeDate && document.getElementById('escalationNoticeDate')) {
+                    const noticeDate = esc.noticeDate.toDate ? esc.noticeDate.toDate() : new Date(esc.noticeDate);
+                    document.getElementById('escalationNoticeDate').value = noticeDate.toISOString().split('T')[0];
+                } else if ((noticeType === 'months' || noticeType === 'days') && esc.noticePeriod) {
+                    const noticePeriodInput = document.getElementById('escalationNoticePeriod');
+                    const noticeUnitSelect = document.getElementById('escalationNoticeUnit');
+                    if (noticePeriodInput) {
+                        if (noticeType === 'months') {
+                            noticePeriodInput.value = esc.noticePeriod;
+                            if (noticeUnitSelect) noticeUnitSelect.value = 'months';
+                        } else {
+                            noticePeriodInput.value = esc.noticePeriod;
+                            if (noticeUnitSelect) noticeUnitSelect.value = 'days';
+                        }
+                    }
+                }
             }
+            
             // Trigger change to show/hide fields
             if (document.getElementById('escalationType')) {
                 document.getElementById('escalationType').dispatchEvent(new Event('change'));
@@ -14065,6 +14159,10 @@ async function handleLeaseSubmit(e) {
                 return null;
             })(),
             autoRenewalTermUnit: document.getElementById('autoRenewal').checked ? (document.getElementById('autoRenewalTermUnit')?.value || 'months') : null,
+            autoRenewalNoticeType: document.getElementById('autoRenewal').checked ? (document.getElementById('autoRenewalNoticeType')?.value || null) : null,
+            autoRenewalNoticeDate: document.getElementById('autoRenewal').checked && document.getElementById('autoRenewalNoticeDate')?.value ? firebase.firestore.Timestamp.fromDate(new Date(document.getElementById('autoRenewalNoticeDate').value)) : null,
+            autoRenewalNoticePeriod: document.getElementById('autoRenewal').checked && document.getElementById('autoRenewalNoticePeriod')?.value ? parseFloat(document.getElementById('autoRenewalNoticePeriod').value) : null,
+            autoRenewalNoticeUnit: document.getElementById('autoRenewal').checked ? (document.getElementById('autoRenewalNoticeUnit')?.value || null) : null,
             squareFootage: document.getElementById('leaseSquareFootage').value ? parseFloat(document.getElementById('leaseSquareFootage').value) : null,
             monthlyRent: parseFloat(document.getElementById('monthlyRent').value) || 0,
             securityDeposit: parseFloat(document.getElementById('securityDeposit').value) || 0,
@@ -14085,7 +14183,10 @@ async function handleLeaseSubmit(e) {
                     escalationPercentage: document.getElementById('escalationPercentage').value ? parseFloat(document.getElementById('escalationPercentage').value) : null,
                     escalationFrequency: document.getElementById('escalationFrequency').value || null,
                     firstEscalationDate: document.getElementById('firstEscalationDate').value ? firebase.firestore.Timestamp.fromDate(new Date(document.getElementById('firstEscalationDate').value)) : null,
-                    noticeDate: document.getElementById('escalationNoticeDate').value ? firebase.firestore.Timestamp.fromDate(new Date(document.getElementById('escalationNoticeDate').value)) : null
+                    noticeType: document.getElementById('escalationNoticeType')?.value || null,
+                    noticeDate: document.getElementById('escalationNoticeDate')?.value ? firebase.firestore.Timestamp.fromDate(new Date(document.getElementById('escalationNoticeDate').value)) : null,
+                    noticePeriod: document.getElementById('escalationNoticePeriod')?.value ? parseFloat(document.getElementById('escalationNoticePeriod').value) : null,
+                    noticeUnit: document.getElementById('escalationNoticeUnit')?.value || null
                 },
                 extensionOptions: {
                     hasExtensionOptions: document.getElementById('hasExtensionOptions').checked || false,

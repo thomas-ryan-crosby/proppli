@@ -1579,6 +1579,34 @@
                                     </div>
                                     <small style="color: #666;">Term length for each auto renewal</small>
                                 </div>
+                                
+                                <div class="form-group">
+                                    <label for="autoRenewalNoticeType">Renewal Notice Type</label>
+                                    <select id="autoRenewalNoticeType">
+                                        <option value="date">Set Date</option>
+                                        <option value="months">Months Before</option>
+                                        <option value="days">Days Before</option>
+                                    </select>
+                                    <small style="color: #666;">How to specify when tenant must be notified of renewal</small>
+                                </div>
+                                
+                                <div class="form-group" id="autoRenewalNoticeDateInputGroup" style="display: none;">
+                                    <label for="autoRenewalNoticeDate">Renewal Notice Date</label>
+                                    <input type="date" id="autoRenewalNoticeDate">
+                                    <small style="color: #666;">Exact date when tenant must be notified</small>
+                                </div>
+                                
+                                <div class="form-group" id="autoRenewalNoticePeriodGroup" style="display: none;">
+                                    <label for="autoRenewalNoticePeriod">Renewal Notice Period</label>
+                                    <div style="display: flex; gap: 5px;">
+                                        <input type="number" id="autoRenewalNoticePeriod" min="0" placeholder="30" style="flex: 1;">
+                                        <select id="autoRenewalNoticeUnit" style="width: 120px;">
+                                            <option value="days">Days Before</option>
+                                            <option value="months">Months Before</option>
+                                        </select>
+                                    </div>
+                                    <small style="color: #666;">Time before renewal date that tenant must be notified</small>
+                                </div>
                             </div>
                             
                             <!-- Financial Information -->
@@ -1679,9 +1707,31 @@
                                 </div>
                                 
                                 <div class="form-group" id="escalationNoticeDateGroup" style="display: none;">
+                                    <label for="escalationNoticeType">Notice Type</label>
+                                    <select id="escalationNoticeType">
+                                        <option value="date">Set Date</option>
+                                        <option value="months">Months Before</option>
+                                        <option value="days">Days Before</option>
+                                    </select>
+                                    <small style="color: #666;">How to specify when tenant must be notified of escalation</small>
+                                </div>
+                                
+                                <div class="form-group" id="escalationNoticeDateInputGroup" style="display: none;">
                                     <label for="escalationNoticeDate">Notice Date</label>
                                     <input type="date" id="escalationNoticeDate">
-                                    <small style="color: #666;">Date when tenant must be notified of escalation</small>
+                                    <small style="color: #666;">Exact date when tenant must be notified</small>
+                                </div>
+                                
+                                <div class="form-group" id="escalationNoticePeriodGroup" style="display: none;">
+                                    <label for="escalationNoticePeriod">Notice Period</label>
+                                    <div style="display: flex; gap: 5px;">
+                                        <input type="number" id="escalationNoticePeriod" min="0" placeholder="30" style="flex: 1;">
+                                        <select id="escalationNoticeUnit" style="width: 120px;">
+                                            <option value="days">Days Before</option>
+                                            <option value="months">Months Before</option>
+                                        </select>
+                                    </div>
+                                    <small style="color: #666;">Time before escalation date that tenant must be notified</small>
                                 </div>
                                 
                                 <!-- Extension/Options -->
