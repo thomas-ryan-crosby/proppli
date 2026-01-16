@@ -15847,27 +15847,53 @@ async function populateRentRollFilters() {
                 const selectedPropertyId = propertyFilter.value;
                 buildingFilter.innerHTML = '<option value="">All Buildings</option>';
                 
-                if (selectedPropertyId) {
-                    try {
-                        const buildingsSnapshot = await db.collection('buildings')
+                try {
+                    let buildingsSnapshot;
+                    if (selectedPropertyId) {
+                        // Load buildings for selected property
+                        buildingsSnapshot = await db.collection('buildings')
                             .where('propertyId', '==', selectedPropertyId)
                             .orderBy('name')
                             .get();
-                        
-                        buildingsSnapshot.forEach(doc => {
-                            const building = doc.data();
-                            const option = document.createElement('option');
-                            option.value = doc.id;
-                            option.textContent = building.name || 'Unnamed Building';
-                            buildingFilter.appendChild(option);
-                        });
-                    } catch (error) {
-                        console.error('Error loading buildings:', error);
+                    } else {
+                        // Load all buildings when "All Properties" is selected
+                        buildingsSnapshot = await db.collection('buildings')
+                            .orderBy('name')
+                            .get();
                     }
+                    
+                    buildingsSnapshot.forEach(doc => {
+                        const building = doc.data();
+                        const option = document.createElement('option');
+                        option.value = doc.id;
+                        option.textContent = building.name || 'Unnamed Building';
+                        buildingFilter.appendChild(option);
+                    });
+                } catch (error) {
+                    console.error('Error loading buildings:', error);
                 }
             }
             loadRentRoll();
         });
+        
+        // Also populate buildings on initial load if "All Properties" is selected
+        if (buildingFilter && !propertyFilter.value) {
+            try {
+                const buildingsSnapshot = await db.collection('buildings')
+                    .orderBy('name')
+                    .get();
+                
+                buildingsSnapshot.forEach(doc => {
+                    const building = doc.data();
+                    const option = document.createElement('option');
+                    option.value = doc.id;
+                    option.textContent = building.name || 'Unnamed Building';
+                    buildingFilter.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading buildings on initial load:', error);
+            }
+        }
         
         if (buildingFilter) {
             buildingFilter.addEventListener('change', () => {
