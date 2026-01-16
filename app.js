@@ -15776,6 +15776,70 @@ async function populateRentRollFilters() {
             });
         }
         
+        // Populate year filter dynamically based on lease dates
+        const yearFilterSelect = document.getElementById('rentRollYearFilter');
+        if (yearFilterSelect) {
+            // Load all leases to determine year range
+            const leasesSnapshot = await db.collection('leases').get();
+            const years = new Set();
+            const currentYear = new Date().getFullYear();
+            
+            // Always include current year and next 5 years
+            for (let y = currentYear; y <= currentYear + 5; y++) {
+                years.add(y);
+            }
+            
+            // Extract years from lease dates
+            leasesSnapshot.forEach(doc => {
+                const lease = doc.data();
+                
+                // Add years from lease start date
+                if (lease.leaseStartDate) {
+                    const startDate = lease.leaseStartDate.toDate ? lease.leaseStartDate.toDate() : new Date(lease.leaseStartDate);
+                    years.add(startDate.getFullYear());
+                }
+                
+                // Add years from lease end date
+                if (lease.leaseEndDate) {
+                    const endDate = lease.leaseEndDate.toDate ? lease.leaseEndDate.toDate() : new Date(lease.leaseEndDate);
+                    years.add(endDate.getFullYear());
+                }
+                
+                // Add years from deprecation date (important for deprecated leases)
+                if (lease.deprecatedDate) {
+                    const deprecatedDate = lease.deprecatedDate.toDate ? lease.deprecatedDate.toDate() : new Date(lease.deprecatedDate);
+                    years.add(deprecatedDate.getFullYear());
+                }
+                
+                // For deprecated leases, also check if they have historical data
+                // Add a few years before deprecation date to show historical context
+                if (lease.isDeprecated && lease.deprecatedDate) {
+                    const deprecatedDate = lease.deprecatedDate.toDate ? lease.deprecatedDate.toDate() : new Date(lease.deprecatedDate);
+                    const depYear = deprecatedDate.getFullYear();
+                    // Add 2 years before deprecation for historical context
+                    for (let y = depYear - 2; y <= depYear; y++) {
+                        years.add(y);
+                    }
+                }
+            });
+            
+            // Convert to sorted array
+            const sortedYears = Array.from(years).sort((a, b) => a - b);
+            
+            // Populate dropdown
+            yearFilterSelect.innerHTML = '';
+            sortedYears.forEach(year => {
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year;
+                // Default to current year
+                if (year === currentYear) {
+                    option.selected = true;
+                }
+                yearFilterSelect.appendChild(option);
+            });
+        }
+        
         // Add event listeners for filter changes
         propertyFilter.addEventListener('change', async () => {
             // Update building filter when property changes
@@ -16111,6 +16175,8 @@ async function loadRentRoll() {
         const activeLeases = [];
         const deprecatedLeases = [];
         
+        console.log('🔍 loadRentRoll: includeDeprecated checkbox state:', includeDeprecated);
+        
         leasesSnapshot.forEach(doc => {
             const lease = { id: doc.id, ...doc.data() };
             
@@ -16140,10 +16206,18 @@ async function loadRentRoll() {
             // Categorize lease: active or deprecated
             if (isLeaseActive(lease)) {
                 activeLeases.push(lease);
-            } else if (includeDeprecated && isLeaseDeprecated(lease)) {
-                deprecatedLeases.push(lease);
+            } else if (isLeaseDeprecated(lease)) {
+                // Always collect deprecated leases, but only include them if checkbox is checked
+                if (includeDeprecated) {
+                    deprecatedLeases.push(lease);
+                    console.log('✅ Including deprecated lease:', lease.id, 'deprecatedDate:', lease.deprecatedDate);
+                } else {
+                    console.log('⏭️ Skipping deprecated lease (checkbox unchecked):', lease.id);
+                }
             }
         });
+        
+        console.log('📊 loadRentRoll: Active leases:', activeLeases.length, 'Deprecated leases:', deprecatedLeases.length);
         
         // Group leases by property (combine active and deprecated if deprecated are included)
         const leasesByProperty = {};
@@ -16181,7 +16255,10 @@ function renderRentRoll(leasesByProperty, properties, tenants, units, buildings,
     if (!rentRollTable) return;
     
     if (Object.keys(leasesByProperty).length === 0) {
-        rentRollTable.innerHTML = '<p style="color: #999; text-align: center; padding: 40px;">No active leases found.</p>';
+        const message = includeDeprecated 
+            ? 'No leases found (active or deprecated).' 
+            : 'No active leases found. Check "Include Deprecated Leases" to view historical data.';
+        rentRollTable.innerHTML = `<p style="color: #999; text-align: center; padding: 40px;">${message}</p>`;
         return;
     }
     
