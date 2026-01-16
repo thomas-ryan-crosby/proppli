@@ -16219,26 +16219,37 @@ async function loadRentRoll() {
         
         console.log('📊 loadRentRoll: Active leases:', activeLeases.length, 'Deprecated leases:', deprecatedLeases.length);
         
-        // Group leases by property (combine active and deprecated if deprecated are included)
+        // Group leases by property, then by tenant (combining active and deprecated leases for same tenant)
         const leasesByProperty = {};
-        activeLeases.forEach(lease => {
+        
+        // First, combine all leases (active + deprecated) and group by tenant
+        const allLeases = [...activeLeases];
+        if (includeDeprecated) {
+            allLeases.push(...deprecatedLeases);
+        }
+        
+        // Group by property, then by tenant
+        allLeases.forEach(lease => {
             const propId = lease.propertyId || 'no-property';
             if (!leasesByProperty[propId]) {
-                leasesByProperty[propId] = [];
+                leasesByProperty[propId] = {};
             }
-            leasesByProperty[propId].push(lease);
+            
+            const tenantId = lease.tenantId || 'no-tenant';
+            if (!leasesByProperty[propId][tenantId]) {
+                leasesByProperty[propId][tenantId] = {
+                    activeLeases: [],
+                    deprecatedLeases: []
+                };
+            }
+            
+            // Categorize lease
+            if (isLeaseDeprecated(lease)) {
+                leasesByProperty[propId][tenantId].deprecatedLeases.push(lease);
+            } else {
+                leasesByProperty[propId][tenantId].activeLeases.push(lease);
+            }
         });
-        
-        // Add deprecated leases if included
-        if (includeDeprecated) {
-            deprecatedLeases.forEach(lease => {
-                const propId = lease.propertyId || 'no-property';
-                if (!leasesByProperty[propId]) {
-                    leasesByProperty[propId] = [];
-                }
-                leasesByProperty[propId].push(lease);
-            });
-        }
         
         // Render rent roll
         renderRentRoll(leasesByProperty, properties, tenants, units, buildings, yearFilter, orientation, breakoutByBuilding, includeDeprecated);
@@ -16279,41 +16290,40 @@ function renderRentRollVertical(leasesByProperty, properties, tenants, units, bu
     
     Object.keys(leasesByProperty).forEach(propertyId => {
         const property = properties[propertyId] || { name: 'Unknown Property' };
-        const propertyLeases = leasesByProperty[propertyId];
+        const tenantsByProperty = leasesByProperty[propertyId]; // This is now { tenantId: { activeLeases: [], deprecatedLeases: [] } }
         
         html += `<div style="margin-bottom: 40px;">`;
         html += `<h3 style="margin-bottom: 20px; color: #1e293b; font-size: 1.5rem;">${escapeHtml(property.name)} Rent Roll</h3>`;
         html += `<div style="font-size: 0.9em; color: #64748b; margin-bottom: 15px;">As of ${new Date().toLocaleDateString()}</div>`;
         
         if (breakoutByBuilding) {
-            // Group leases by building
-            const leasesByBuilding = {};
-            propertyLeases.forEach(lease => {
-                const unit = lease.unitId ? units[lease.unitId] : null;
-                const buildingId = unit?.buildingId || 'no-building';
-                if (!leasesByBuilding[buildingId]) {
-                    leasesByBuilding[buildingId] = [];
+            // Group tenants by building
+            const tenantsByBuilding = {};
+            Object.keys(tenantsByProperty).forEach(tenantId => {
+                const tenantLeases = tenantsByProperty[tenantId];
+                // Get building from first active lease, or first deprecated lease
+                const firstLease = tenantLeases.activeLeases[0] || tenantLeases.deprecatedLeases[0];
+                if (firstLease) {
+                    const unit = firstLease.unitId ? units[firstLease.unitId] : null;
+                    const buildingId = unit?.buildingId || 'no-building';
+                    if (!tenantsByBuilding[buildingId]) {
+                        tenantsByBuilding[buildingId] = {};
+                    }
+                    tenantsByBuilding[buildingId][tenantId] = tenantLeases;
                 }
-                leasesByBuilding[buildingId].push(lease);
             });
             
             // Render each building separately
-            Object.keys(leasesByBuilding).forEach(buildingId => {
-                const buildingLeases = leasesByBuilding[buildingId];
+            Object.keys(tenantsByBuilding).forEach(buildingId => {
+                const buildingTenants = tenantsByBuilding[buildingId];
                 const building = buildingId !== 'no-building' ? buildings[buildingId] : null;
                 const buildingName = building?.name || 'No Building Assigned';
                 
-                html += renderVerticalTable(buildingLeases, tenants, units, buildings, year, monthLabels, buildingName, includeDeprecated);
+                html += renderVerticalTable(buildingTenants, tenants, units, buildings, year, monthLabels, buildingName, includeDeprecated);
             });
         } else {
-            // Render all leases together
-            propertyLeases.sort((a, b) => {
-                const tenantA = tenants[a.tenantId]?.tenantName || '';
-                const tenantB = tenants[b.tenantId]?.tenantName || '';
-                return tenantA.localeCompare(tenantB);
-            });
-            
-            html += renderVerticalTable(propertyLeases, tenants, units, buildings, year, monthLabels, null, includeDeprecated);
+            // Render all tenants together
+            html += renderVerticalTable(tenantsByProperty, tenants, units, buildings, year, monthLabels, null, includeDeprecated);
         }
         
         html += `</div>`;
@@ -16323,7 +16333,8 @@ function renderRentRollVertical(leasesByProperty, properties, tenants, units, bu
 }
 
 // Helper function to render vertical table
-function renderVerticalTable(leases, tenants, units, buildings, year, monthLabels, buildingName = null, includeDeprecated = false) {
+// tenantsData: { tenantId: { activeLeases: [], deprecatedLeases: [] } }
+function renderVerticalTable(tenantsData, tenants, units, buildings, year, monthLabels, buildingName = null, includeDeprecated = false) {
     let html = '';
     
     if (buildingName) {
@@ -16338,27 +16349,31 @@ function renderVerticalTable(leases, tenants, units, buildings, year, monthLabel
     html += `<tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">`;
     html += `<th style="padding: 12px; text-align: left; font-weight: 600; border: 1px solid rgba(255,255,255,0.2); position: sticky; left: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); z-index: 10; min-width: 120px;">Month</th>`;
     
-    leases.forEach(lease => {
-        const tenant = tenants[lease.tenantId];
+    // Sort tenants by name
+    const sortedTenantIds = Object.keys(tenantsData).sort((a, b) => {
+        const tenantA = tenants[a]?.tenantName || '';
+        const tenantB = tenants[b]?.tenantName || '';
+        return tenantA.localeCompare(tenantB);
+    });
+    
+    sortedTenantIds.forEach(tenantId => {
+        const tenantLeases = tenantsData[tenantId];
+        const tenant = tenants[tenantId];
         const tenantName = tenant?.tenantName || 'Unknown Tenant';
-        const unit = lease.unitId ? units[lease.unitId] : null;
+        
+        // Get info from first active lease, or first deprecated lease if no active
+        const firstLease = tenantLeases.activeLeases[0] || tenantLeases.deprecatedLeases[0];
+        if (!firstLease) return;
+        
+        const unit = firstLease.unitId ? units[firstLease.unitId] : null;
         const suiteNumber = unit?.unitNumber || 'N/A';
-        const squareFootage = lease.squareFootage || unit?.squareFootage || null;
-        const isDeprecated = isLeaseDeprecated(lease);
-        const deprecatedDate = isDeprecated && lease.deprecatedDate ? (lease.deprecatedDate.toDate ? lease.deprecatedDate.toDate() : new Date(lease.deprecatedDate)) : null;
+        const squareFootage = firstLease.squareFootage || unit?.squareFootage || null;
         
-        // Apply muted styling for deprecated leases
-        const headerStyle = isDeprecated ? 'opacity: 0.7; background: rgba(100, 116, 139, 0.3);' : '';
-        const textStyle = isDeprecated ? 'opacity: 0.8;' : '';
-        
-        html += `<th style="padding: 12px; text-align: center; font-weight: 600; border: 1px solid rgba(255,255,255,0.2); min-width: 140px; vertical-align: top; ${headerStyle}">`;
-        html += `<div style="font-weight: 600; margin-bottom: 4px; ${textStyle}">${escapeHtml(tenantName)}${isDeprecated ? ' <span style="font-size: 0.7em; color: #fca5a5;" title="Deprecated">⚠️</span>' : ''}</div>`;
-        html += `<div style="font-size: 0.85em; font-weight: 400; opacity: 0.9; margin-bottom: 2px; ${textStyle}">${escapeHtml(suiteNumber)}</div>`;
+        html += `<th style="padding: 12px; text-align: center; font-weight: 600; border: 1px solid rgba(255,255,255,0.2); min-width: 140px; vertical-align: top;">`;
+        html += `<div style="font-weight: 600; margin-bottom: 4px;">${escapeHtml(tenantName)}</div>`;
+        html += `<div style="font-size: 0.85em; font-weight: 400; opacity: 0.9; margin-bottom: 2px;">${escapeHtml(suiteNumber)}</div>`;
         if (squareFootage) {
-            html += `<div style="font-size: 0.8em; font-weight: 400; opacity: 0.8; ${textStyle}">${squareFootage.toLocaleString()} SF</div>`;
-        }
-        if (isDeprecated && deprecatedDate) {
-            html += `<div style="font-size: 0.7em; color: #fca5a5; margin-top: 4px; font-weight: 500;">Dep: ${deprecatedDate.toLocaleDateString()}</div>`;
+            html += `<div style="font-size: 0.8em; font-weight: 400; opacity: 0.8;">${squareFootage.toLocaleString()} SF</div>`;
         }
         html += `</th>`;
     });
@@ -16376,58 +16391,71 @@ function renderVerticalTable(leases, tenants, units, buildings, year, monthLabel
         
         let monthTotal = 0;
         
-        leases.forEach(lease => {
-            const result = calculateRentForMonth(lease, year, month);
-            const rent = result.rent;
-            const isDeprecated = result.isDeprecated || isLeaseDeprecated(lease);
+        sortedTenantIds.forEach(tenantId => {
+            const tenantLeases = tenantsData[tenantId];
+            const allLeasesForMonth = [];
             
-            // For deprecated leases, check if month is after deprecation date
-            let shouldShowRent = rent > 0;
-            if (isDeprecated && lease.deprecatedDate) {
-                const deprecatedDate = lease.deprecatedDate.toDate ? lease.deprecatedDate.toDate() : new Date(lease.deprecatedDate);
-                const targetDate = new Date(year, month - 1, 1);
-                if (targetDate > deprecatedDate) {
-                    shouldShowRent = false; // Month is after deprecation
+            // Process active leases
+            tenantLeases.activeLeases.forEach(lease => {
+                const result = calculateRentForMonth(lease, year, month);
+                if (result.rent > 0) {
+                    allLeasesForMonth.push({
+                        lease,
+                        rent: result.rent,
+                        isDeprecated: false,
+                        leaseId: lease.id
+                    });
+                    monthTotal += result.rent;
                 }
+            });
+            
+            // Process deprecated leases if included
+            if (includeDeprecated) {
+                tenantLeases.deprecatedLeases.forEach(lease => {
+                    const result = calculateRentForMonth(lease, year, month);
+                    const isDeprecated = isLeaseDeprecated(lease);
+                    
+                    // Check if month is after deprecation date
+                    let shouldShowRent = result.rent > 0;
+                    if (isDeprecated && lease.deprecatedDate) {
+                        const deprecatedDate = lease.deprecatedDate.toDate ? lease.deprecatedDate.toDate() : new Date(lease.deprecatedDate);
+                        const targetDate = new Date(year, month - 1, 1);
+                        if (targetDate > deprecatedDate) {
+                            shouldShowRent = false;
+                        }
+                    }
+                    
+                    if (shouldShowRent) {
+                        allLeasesForMonth.push({
+                            lease,
+                            rent: result.rent,
+                            isDeprecated: true,
+                            leaseId: lease.id
+                        });
+                        monthTotal += result.rent;
+                    }
+                });
             }
             
-            if (shouldShowRent) {
-                monthTotal += rent;
+            // Render cell with all rents for this tenant
+            html += `<td style="padding: 10px; text-align: right; font-variant-numeric: tabular-nums; position: relative; vertical-align: top;">`;
+            
+            if (allLeasesForMonth.length === 0) {
+                html += `<span style="color: #cbd5e1;">—</span>`;
+            } else {
+                allLeasesForMonth.forEach((leaseData, idx) => {
+                    const rentDisplay = `$${leaseData.rent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                    const cellColor = leaseData.isDeprecated ? '#f87171' : '#1e293b';
+                    const cellBgColor = leaseData.isDeprecated ? 'background-color: #fef2f2;' : '';
+                    const leaseIdShort = leaseData.leaseId.substring(0, 8);
+                    
+                    html += `<div style="margin-bottom: ${idx < allLeasesForMonth.length - 1 ? '4px' : '0'}; color: ${cellColor}; ${cellBgColor} padding: 2px 4px; border-radius: 3px;">`;
+                    html += `<div style="font-weight: 500;">${rentDisplay}</div>`;
+                    html += `<div style="font-size: 0.65em; opacity: 0.7; margin-top: 1px;">${leaseIdShort}</div>`;
+                    html += `</div>`;
+                });
             }
             
-            // Determine if escalation indicator should be shown
-            // Show indicator if rent changed from previous month
-            let hasEscalation = false;
-            
-            if (rent > 0 && shouldShowRent) {
-                let prevRent = 0;
-                if (month > 1) {
-                    // Compare with previous month
-                    const prevResult = calculateRentForMonth(lease, year, month - 1);
-                    prevRent = prevResult.rent;
-                } else {
-                    // January - compare with December of previous year
-                    const prevResult = calculateRentForMonth(lease, year - 1, 12);
-                    prevRent = prevResult.rent;
-                }
-                
-                // Show escalation indicator if rent changed
-                if (prevRent > 0 && Math.abs(rent - prevRent) > 0.01) {
-                    hasEscalation = true;
-                }
-            }
-            
-            const rentDisplay = shouldShowRent && rent > 0 ? `$${rent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—';
-            // Use light red for deprecated lease rents, standard color for active leases
-            const cellColor = shouldShowRent && rent > 0 ? (isDeprecated ? '#f87171' : '#1e293b') : '#cbd5e1';
-            const cellBgColor = shouldShowRent && rent > 0 && isDeprecated ? 'background-color: #fef2f2;' : '';
-            const cellStyle = isDeprecated ? 'opacity: 0.9;' : '';
-            
-            html += `<td style="padding: 10px; text-align: right; font-variant-numeric: tabular-nums; color: ${cellColor}; position: relative; ${cellStyle} ${cellBgColor}">`;
-            if (hasEscalation && rent > 0 && shouldShowRent) {
-                html += `<span style="position: absolute; top: 2px; right: 4px; color: #10b981; font-size: 0.75em; font-weight: bold;" title="Rent escalation applied">↑</span>`;
-            }
-            html += `<span style="display: block; padding-right: ${hasEscalation ? '12px' : '0'};">${rentDisplay}</span>`;
             html += `</td>`;
         });
         
@@ -16439,12 +16467,40 @@ function renderVerticalTable(leases, tenants, units, buildings, year, monthLabel
     // Total row
     let grandTotal = 0;
     const annualRents = [];
-    leases.forEach(lease => {
+    
+    sortedTenantIds.forEach(tenantId => {
+        const tenantLeases = tenantsData[tenantId];
         let annualRent = 0;
-        for (let month = 1; month <= 12; month++) {
-            const result = calculateRentForMonth(lease, year, month);
-            annualRent += result.rent;
+        
+        // Sum active leases
+        tenantLeases.activeLeases.forEach(lease => {
+            for (let month = 1; month <= 12; month++) {
+                const result = calculateRentForMonth(lease, year, month);
+                annualRent += result.rent;
+            }
+        });
+        
+        // Sum deprecated leases if included
+        if (includeDeprecated) {
+            tenantLeases.deprecatedLeases.forEach(lease => {
+                for (let month = 1; month <= 12; month++) {
+                    const result = calculateRentForMonth(lease, year, month);
+                    const isDeprecated = isLeaseDeprecated(lease);
+                    
+                    // Only count if month is not after deprecation date
+                    if (isDeprecated && lease.deprecatedDate) {
+                        const deprecatedDate = lease.deprecatedDate.toDate ? lease.deprecatedDate.toDate() : new Date(lease.deprecatedDate);
+                        const targetDate = new Date(year, month - 1, 1);
+                        if (targetDate <= deprecatedDate) {
+                            annualRent += result.rent;
+                        }
+                    } else {
+                        annualRent += result.rent;
+                    }
+                }
+            });
         }
+        
         annualRents.push(annualRent);
         grandTotal += annualRent;
     });
@@ -16476,41 +16532,40 @@ function renderRentRollHorizontal(leasesByProperty, properties, tenants, units, 
     
     Object.keys(leasesByProperty).forEach(propertyId => {
         const property = properties[propertyId] || { name: 'Unknown Property' };
-        const propertyLeases = leasesByProperty[propertyId];
+        const tenantsByProperty = leasesByProperty[propertyId]; // This is now { tenantId: { activeLeases: [], deprecatedLeases: [] } }
         
         html += `<div style="margin-bottom: 40px;">`;
         html += `<h3 style="margin-bottom: 20px; color: #1e293b; font-size: 1.5rem;">${escapeHtml(property.name)} Rent Roll</h3>`;
         html += `<div style="font-size: 0.9em; color: #64748b; margin-bottom: 15px;">As of ${new Date().toLocaleDateString()}</div>`;
         
         if (breakoutByBuilding) {
-            // Group leases by building
-            const leasesByBuilding = {};
-            propertyLeases.forEach(lease => {
-                const unit = lease.unitId ? units[lease.unitId] : null;
-                const buildingId = unit?.buildingId || 'no-building';
-                if (!leasesByBuilding[buildingId]) {
-                    leasesByBuilding[buildingId] = [];
+            // Group tenants by building
+            const tenantsByBuilding = {};
+            Object.keys(tenantsByProperty).forEach(tenantId => {
+                const tenantLeases = tenantsByProperty[tenantId];
+                // Get building from first active lease, or first deprecated lease
+                const firstLease = tenantLeases.activeLeases[0] || tenantLeases.deprecatedLeases[0];
+                if (firstLease) {
+                    const unit = firstLease.unitId ? units[firstLease.unitId] : null;
+                    const buildingId = unit?.buildingId || 'no-building';
+                    if (!tenantsByBuilding[buildingId]) {
+                        tenantsByBuilding[buildingId] = {};
+                    }
+                    tenantsByBuilding[buildingId][tenantId] = tenantLeases;
                 }
-                leasesByBuilding[buildingId].push(lease);
             });
             
             // Render each building separately
-            Object.keys(leasesByBuilding).forEach(buildingId => {
-                const buildingLeases = leasesByBuilding[buildingId];
+            Object.keys(tenantsByBuilding).forEach(buildingId => {
+                const buildingTenants = tenantsByBuilding[buildingId];
                 const building = buildingId !== 'no-building' ? buildings[buildingId] : null;
                 const buildingName = building?.name || 'No Building Assigned';
                 
-                html += renderHorizontalTable(buildingLeases, tenants, units, buildings, year, monthLabels, buildingName, includeDeprecated);
+                html += renderHorizontalTable(buildingTenants, tenants, units, buildings, year, monthLabels, buildingName, includeDeprecated);
             });
         } else {
-            // Render all leases together
-            propertyLeases.sort((a, b) => {
-                const tenantA = tenants[a.tenantId]?.tenantName || '';
-                const tenantB = tenants[b.tenantId]?.tenantName || '';
-                return tenantA.localeCompare(tenantB);
-            });
-            
-            html += renderHorizontalTable(propertyLeases, tenants, units, buildings, year, monthLabels, null, includeDeprecated);
+            // Render all tenants together
+            html += renderHorizontalTable(tenantsByProperty, tenants, units, buildings, year, monthLabels, null, includeDeprecated);
         }
         
         html += `</div>`;
@@ -16520,7 +16575,8 @@ function renderRentRollHorizontal(leasesByProperty, properties, tenants, units, 
 }
 
 // Helper function to render horizontal table
-function renderHorizontalTable(leases, tenants, units, buildings, year, monthLabels, buildingName = null, includeDeprecated = false) {
+// tenantsData: { tenantId: { activeLeases: [], deprecatedLeases: [] } }
+function renderHorizontalTable(tenantsData, tenants, units, buildings, year, monthLabels, buildingName = null, includeDeprecated = false) {
     let html = '';
     
     if (buildingName) {
@@ -16550,95 +16606,113 @@ function renderHorizontalTable(leases, tenants, units, buildings, year, monthLab
     let totalAnnualRent = 0;
     const monthlyTotals = new Array(12).fill(0);
     
-    leases.forEach(lease => {
-        const tenant = tenants[lease.tenantId];
+    // Sort tenants by name
+    const sortedTenantIds = Object.keys(tenantsData).sort((a, b) => {
+        const tenantA = tenants[a]?.tenantName || '';
+        const tenantB = tenants[b]?.tenantName || '';
+        return tenantA.localeCompare(tenantB);
+    });
+    
+    sortedTenantIds.forEach(tenantId => {
+        const tenantLeases = tenantsData[tenantId];
+        const tenant = tenants[tenantId];
         const tenantName = tenant?.tenantName || 'Unknown Tenant';
-        const unit = lease.unitId ? units[lease.unitId] : null;
-        const suiteNumber = unit?.unitNumber || 'N/A';
-        const squareFootage = lease.squareFootage || unit?.squareFootage || null;
-        const isDeprecated = isLeaseDeprecated(lease);
-        const deprecatedDate = isDeprecated && lease.deprecatedDate ? (lease.deprecatedDate.toDate ? lease.deprecatedDate.toDate() : new Date(lease.deprecatedDate)) : null;
         
+        // Get info from first active lease, or first deprecated lease if no active
+        const firstLease = tenantLeases.activeLeases[0] || tenantLeases.deprecatedLeases[0];
+        if (!firstLease) return;
+        
+        const unit = firstLease.unitId ? units[firstLease.unitId] : null;
+        const suiteNumber = unit?.unitNumber || 'N/A';
+        const squareFootage = firstLease.squareFootage || unit?.squareFootage || null;
+        
+        // Calculate monthly rents for all leases (active + deprecated)
+        const monthlyRentsByLease = [];
         let annualRent = 0;
-        const monthlyRents = [];
         
         for (let month = 1; month <= 12; month++) {
-            const result = calculateRentForMonth(lease, year, month);
-            const rent = result.rent;
+            const allLeasesForMonth = [];
             
-            // For deprecated leases, check if month is after deprecation date
-            let shouldShowRent = rent > 0;
-            if (isDeprecated && lease.deprecatedDate) {
-                const deprecatedDate = lease.deprecatedDate.toDate ? lease.deprecatedDate.toDate() : new Date(lease.deprecatedDate);
-                const targetDate = new Date(year, month - 1, 1);
-                if (targetDate > deprecatedDate) {
-                    shouldShowRent = false; // Month is after deprecation
+            // Process active leases
+            tenantLeases.activeLeases.forEach(lease => {
+                const result = calculateRentForMonth(lease, year, month);
+                if (result.rent > 0) {
+                    allLeasesForMonth.push({
+                        lease,
+                        rent: result.rent,
+                        isDeprecated: false,
+                        leaseId: lease.id
+                    });
+                    annualRent += result.rent;
+                    monthlyTotals[month - 1] += result.rent;
                 }
+            });
+            
+            // Process deprecated leases if included
+            if (includeDeprecated) {
+                tenantLeases.deprecatedLeases.forEach(lease => {
+                    const result = calculateRentForMonth(lease, year, month);
+                    const isDeprecated = isLeaseDeprecated(lease);
+                    
+                    // Check if month is after deprecation date
+                    let shouldShowRent = result.rent > 0;
+                    if (isDeprecated && lease.deprecatedDate) {
+                        const deprecatedDate = lease.deprecatedDate.toDate ? lease.deprecatedDate.toDate() : new Date(lease.deprecatedDate);
+                        const targetDate = new Date(year, month - 1, 1);
+                        if (targetDate > deprecatedDate) {
+                            shouldShowRent = false;
+                        }
+                    }
+                    
+                    if (shouldShowRent) {
+                        allLeasesForMonth.push({
+                            lease,
+                            rent: result.rent,
+                            isDeprecated: true,
+                            leaseId: lease.id
+                        });
+                        annualRent += result.rent;
+                        monthlyTotals[month - 1] += result.rent;
+                    }
+                });
             }
             
-            monthlyRents.push({ rent, shouldShowRent });
-            if (shouldShowRent) {
-                annualRent += rent;
-                monthlyTotals[month - 1] += rent;
-            }
+            monthlyRentsByLease.push(allLeasesForMonth);
         }
         
         totalAnnualRent += annualRent;
         const rentPerSqFt = squareFootage && squareFootage > 0 ? (annualRent / 12 / squareFootage) : null;
         
-        // Apply muted styling for deprecated leases
-        const rowStyle = isDeprecated ? 'opacity: 0.7;' : '';
-        const textStyle = isDeprecated ? 'opacity: 0.8;' : '';
+        html += `<tr style="border-bottom: 1px solid #e2e8f0;">`;
+        html += `<td style="padding: 10px; font-weight: 600; position: sticky; left: 0; background: white; z-index: 5; border-right: 1px solid #e2e8f0;">${escapeHtml(tenantName)}</td>`;
+        html += `<td style="padding: 10px; text-align: center; color: #64748b;">${escapeHtml(suiteNumber)}</td>`;
+        html += `<td style="padding: 10px; text-align: right; color: #64748b; font-variant-numeric: tabular-nums;">${squareFootage ? squareFootage.toLocaleString() : '—'}</td>`;
         
-        html += `<tr style="border-bottom: 1px solid #e2e8f0; ${rowStyle}">`;
-        html += `<td style="padding: 10px; font-weight: 600; position: sticky; left: 0; background: white; z-index: 5; border-right: 1px solid #e2e8f0; ${textStyle}">${escapeHtml(tenantName)}${isDeprecated ? ' <span style="font-size: 0.7em; color: #fca5a5;" title="Deprecated">⚠️</span>' : ''}</td>`;
-        html += `<td style="padding: 10px; text-align: center; color: #64748b; ${textStyle}">${escapeHtml(suiteNumber)}</td>`;
-        html += `<td style="padding: 10px; text-align: right; color: #64748b; font-variant-numeric: tabular-nums; ${textStyle}">${squareFootage ? squareFootage.toLocaleString() : '—'}</td>`;
-        
-        monthlyRents.forEach((monthData, idx) => {
-            const month = idx + 1;
-            const rent = monthData.rent;
-            const shouldShowRent = monthData.shouldShowRent;
+        monthlyRentsByLease.forEach((allLeasesForMonth, idx) => {
+            html += `<td style="padding: 10px; text-align: right; font-variant-numeric: tabular-nums; position: relative; vertical-align: top;">`;
             
-            // Determine if escalation indicator should be shown
-            let hasEscalation = false;
-            if (rent > 0 && shouldShowRent) {
-                if (idx > 0) {
-                    // Compare with previous month
-                    const prevData = monthlyRents[idx - 1];
-                    if (prevData.shouldShowRent && prevData.rent > 0 && Math.abs(rent - prevData.rent) > 0.01) {
-                        hasEscalation = true;
-                    }
-                } else {
-                    // January - compare with December of previous year
-                    const prevResult = calculateRentForMonth(lease, year - 1, 12);
-                    const prevRent = prevResult.rent;
-                    if (prevRent > 0 && Math.abs(rent - prevRent) > 0.01) {
-                        hasEscalation = true;
-                    }
-                }
+            if (allLeasesForMonth.length === 0) {
+                html += `<span style="color: #cbd5e1;">—</span>`;
+            } else {
+                allLeasesForMonth.forEach((leaseData, leaseIdx) => {
+                    const rentDisplay = `$${leaseData.rent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                    const cellColor = leaseData.isDeprecated ? '#f87171' : '#1e293b';
+                    const cellBgColor = leaseData.isDeprecated ? 'background-color: #fef2f2;' : '';
+                    const leaseIdShort = leaseData.leaseId.substring(0, 8);
+                    
+                    html += `<div style="margin-bottom: ${leaseIdx < allLeasesForMonth.length - 1 ? '4px' : '0'}; color: ${cellColor}; ${cellBgColor} padding: 2px 4px; border-radius: 3px;">`;
+                    html += `<div style="font-weight: 500;">${rentDisplay}</div>`;
+                    html += `<div style="font-size: 0.65em; opacity: 0.7; margin-top: 1px;">${leaseIdShort}</div>`;
+                    html += `</div>`;
+                });
             }
             
-            const rentDisplay = shouldShowRent && rent > 0 ? `$${rent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—';
-            // Use light red for deprecated lease rents, standard color for active leases
-            const cellColor = shouldShowRent && rent > 0 ? (isDeprecated ? '#f87171' : '#1e293b') : '#cbd5e1';
-            const cellBgColor = shouldShowRent && rent > 0 && isDeprecated ? 'background-color: #fef2f2;' : '';
-            const cellStyle = isDeprecated ? 'opacity: 0.9;' : '';
-            
-            html += `<td style="padding: 10px; text-align: right; font-variant-numeric: tabular-nums; color: ${cellColor}; position: relative; ${cellStyle} ${cellBgColor}">`;
-            if (hasEscalation && rent > 0 && shouldShowRent) {
-                html += `<span style="position: absolute; top: 2px; right: 4px; color: #10b981; font-size: 0.75em; font-weight: bold;" title="Rent escalation applied">↑</span>`;
-            }
-            html += `<span style="display: block; padding-right: ${hasEscalation ? '12px' : '0'};">${rentDisplay}</span>`;
             html += `</td>`;
         });
         
-        html += `<td style="padding: 10px; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; color: ${isDeprecated ? '#f87171' : '#667eea'}; background-color: ${isDeprecated ? '#fef2f2' : 'transparent'}; ${textStyle}">$${annualRent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
+        html += `<td style="padding: 10px; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; color: #667eea;">$${annualRent.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>`;
         const ppfDisplay = rentPerSqFt ? `$${rentPerSqFt.toFixed(2)}` : '—';
-        html += `<td style="padding: 10px; text-align: right; font-variant-numeric: tabular-nums; color: ${isDeprecated ? '#f87171' : '#7c3aed'}; background-color: ${isDeprecated ? '#fef2f2' : 'transparent'}; ${textStyle}">${ppfDisplay}</td>`;
-        if (isDeprecated && deprecatedDate) {
-            html += `<td style="padding: 10px; text-align: center; font-size: 0.8em; color: #fca5a5; ${textStyle}" colspan="2">Dep: ${deprecatedDate.toLocaleDateString()}</td>`;
-        }
+        html += `<td style="padding: 10px; text-align: right; font-variant-numeric: tabular-nums; color: #7c3aed;">${ppfDisplay}</td>`;
         html += `</tr>`;
     });
     
