@@ -14919,6 +14919,8 @@ function formatLeaseSummaries(leases, tenants, units = {}) {
         const tenantName = tenant?.tenantName || 'Unknown Tenant';
         const startDate = lease.leaseStartDate ? lease.leaseStartDate.toDate().toLocaleDateString() : 'N/A';
         const endDate = lease.leaseEndDate ? lease.leaseEndDate.toDate().toLocaleDateString() : 'N/A';
+        const leaseTerm = `${startDate} - ${endDate}`;
+        const deprecatedDate = lease.deprecatedDate ? (lease.deprecatedDate.toDate ? lease.deprecatedDate.toDate().toLocaleDateString() : new Date(lease.deprecatedDate).toLocaleDateString()) : null;
         
         const initialRent = lease.monthlyRent ? lease.monthlyRent : 0;
         // If deprecated, calculate rent as of deprecation date
@@ -14998,8 +15000,10 @@ function formatLeaseSummaries(leases, tenants, units = {}) {
                             <span style="font-size: 0.7em; font-weight: 400; color: #999; margin-left: 6px;">ID: ${lease.id.substring(0, 8)}</span>
                         </div>
                         <div style="font-size: 0.85em; color: #666;">
-                            <span class="status-badge ${statusClass}" style="margin-right: 8px;">${lease.status}</span>
-                            ${startDate} - ${endDate}
+                            <span class="status-badge ${statusClass}" style="margin-right: 8px;">${displayStatus}</span>
+                            <span style="margin-right: 8px;">${leaseTerm}</span>
+                            ${squareFootage ? `<span style="margin-right: 8px;">${squareFootage.toLocaleString('en-US', { maximumFractionDigits: 0 })} sq ft</span>` : ''}
+                            ${deprecatedDate ? `<span style="color: #dc2626;">Deprecated: ${deprecatedDate}</span>` : ''}
                         </div>
                         ${rentDisplay}
                     </div>
