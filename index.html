@@ -1937,8 +1937,8 @@
                     <!-- Rent Roll Tab -->
                     <div id="rentRollTab" class="tab-content active">
                         <div class="section">
-                            <div class="section-header-controls">
-                                <div class="filter-controls" style="display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 20px;">
+                            <div class="section-header-controls" style="display: flex; flex-direction: column; align-items: flex-start;">
+                                <div class="filter-controls" style="display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 20px; justify-content: flex-start; width: 100%;">
                                     <div>
                                         <label for="rentRollPropertyFilter">Filter by Property:</label>
                                         <select id="rentRollPropertyFilter">
@@ -1964,10 +1964,10 @@
                                         </select>
                                     </div>
                                 </div>
-                                <div class="view-options" style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                                <div class="view-options" style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; justify-content: flex-start; width: 100%;">
                                     <div>
                                         <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #1e293b;">View Orientation:</label>
-                                        <div style="display: flex; gap: 15px;">
+                                        <div style="display: flex; gap: 15px; justify-content: flex-start;">
                                             <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
                                                 <input type="radio" name="rentRollOrientation" value="vertical" id="rentRollOrientationVertical" checked>
                                                 <span>Vertical (Tenants → X, Months → Y)</span>
