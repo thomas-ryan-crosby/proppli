@@ -15489,6 +15489,12 @@ function renderLeaseDetailList(leases, tenants, container, units = {}) {
                         <div style="color: #64748b; font-size: 0.85em; margin-bottom: 4px;">End Date</div>
                         <div style="font-weight: 600;">${endDate}</div>
                     </div>
+                    ${squareFootage ? `
+                    <div>
+                        <div style="color: #64748b; font-size: 0.85em; margin-bottom: 4px;">Square Footage</div>
+                        <div style="font-weight: 600;">${squareFootage.toLocaleString('en-US', { maximumFractionDigits: 0 })} sq ft</div>
+                    </div>
+                    ` : ''}
                     ${rentDisplay}
                     <div>
                         <div style="color: #64748b; font-size: 0.85em; margin-bottom: 4px;">Security Deposit</div>
