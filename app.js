@@ -5736,6 +5736,13 @@ function handleTicketSubmit(e) {
         alert('Please select a property');
         return;
     }
+    
+    // Validate id if it exists (for updates)
+    if (id && (String(id).trim() === '' || String(id).trim() === 'undefined')) {
+        console.error('handleTicketSubmit: Invalid ticket ID', id);
+        alert('Error: Invalid ticket ID. Please try again.');
+        return;
+    }
     const buildingNumber = document.getElementById('buildingNumber').value.trim();
     const floorNumber = document.getElementById('floorNumber').value.trim();
     
@@ -5828,14 +5835,17 @@ function handleTicketSubmit(e) {
     // Upload files first if any
     const uploadPromises = [];
     
+    // Use validated id or 'temp' for new tickets
+    const uploadTicketId = (id && String(id).trim() !== '' && String(id).trim() !== 'undefined') ? String(id).trim() : 'temp';
+    
     // Upload all before files
     beforeFiles.forEach((fileData, index) => {
-        uploadPromises.push(uploadFile(fileData.file, id || 'temp', 'before', index).then(fileInfo => ({ type: 'before', fileInfo })));
+        uploadPromises.push(uploadFile(fileData.file, uploadTicketId, 'before', index).then(fileInfo => ({ type: 'before', fileInfo })));
     });
     
     // Upload all after files
     afterFiles.forEach((fileData, index) => {
-        uploadPromises.push(uploadFile(fileData.file, id || 'temp', 'after', index).then(fileInfo => ({ type: 'after', fileInfo })));
+        uploadPromises.push(uploadFile(fileData.file, uploadTicketId, 'after', index).then(fileInfo => ({ type: 'after', fileInfo })));
     });
     
     // Wait for all uploads to complete
@@ -5848,8 +5858,21 @@ function handleTicketSubmit(e) {
         const allAfterFiles = [...afterFileUrls, ...newAfterFiles];
         
         if (id && editingTicketId) {
+            // Validate id before database call
+            const validId = String(id).trim();
+            if (!validId || validId === 'undefined') {
+                console.error('handleTicketSubmit: Invalid id for update', id);
+                alert('Error: Invalid ticket ID. Please try again.');
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Save Ticket';
+                    submitBtn.classList.remove('saving');
+                }
+                return;
+            }
+            
             // Update existing - preserve dateCreated and handle dateCompleted properly
-            db.collection('tickets').doc(id).get().then((doc) => {
+            db.collection('tickets').doc(validId).get().then((doc) => {
                 const existing = doc.data();
                 
                 // Check for custom dates
@@ -5947,7 +5970,7 @@ function handleTicketSubmit(e) {
                     }
                 }
 
-                return db.collection('tickets').doc(id).update(ticketData);
+                return db.collection('tickets').doc(validId).update(ticketData);
             }).then(() => {
                 // Hide loading modal
                 const loadingModal = document.getElementById('loadingModal');
@@ -6114,13 +6137,22 @@ window.openAdvanceWorkflowDropdown = function(ticketId) {
 
 // Advance workflow (Complete or Monitoring)
 window.advanceWorkflow = function(ticketId, targetStatus) {
+    // Validate ticketId
+    if (!ticketId || String(ticketId).trim() === '') {
+        console.error('advanceWorkflow: Invalid ticketId provided', ticketId);
+        alert('Error: Invalid ticket ID. Please try again.');
+        return;
+    }
+    
+    const validTicketId = String(ticketId).trim();
+    
     // Close dropdown
-    const dropdown = document.getElementById(`workflowDropdown-${ticketId}`);
+    const dropdown = document.getElementById(`workflowDropdown-${validTicketId}`);
     if (dropdown) dropdown.style.display = 'none';
     
     // For "Completed" status, check if time allocation is required
     if (targetStatus === 'Completed') {
-        db.collection('tickets').doc(ticketId).get().then((doc) => {
+        db.collection('tickets').doc(validTicketId).get().then((doc) => {
             const ticket = doc.data();
             const enableTimeAllocation = ticket?.enableTimeAllocation === true;
             const timeAllocated = ticket?.timeAllocated;
@@ -6133,19 +6165,26 @@ window.advanceWorkflow = function(ticketId, targetStatus) {
             }
             
             // Time allocation is set or not required, proceed with completion modal
-            openWorkflowModal(ticketId, targetStatus);
+            openWorkflowModal(validTicketId, targetStatus);
         }).catch((error) => {
             console.error('Error checking ticket:', error);
             alert('Error checking ticket: ' + error.message);
         });
     } else {
         // For Monitoring status, open modal directly
-        openWorkflowModal(ticketId, targetStatus);
+        openWorkflowModal(validTicketId, targetStatus);
     }
 };
 
 function openWorkflowModal(ticketId, targetStatus) {
-    editingTicketId = ticketId;
+    // Validate ticketId
+    if (!ticketId || String(ticketId).trim() === '') {
+        console.error('openWorkflowModal: Invalid ticketId provided', ticketId);
+        alert('Error: Invalid ticket ID. Please try again.');
+        return;
+    }
+    
+    editingTicketId = String(ticketId).trim();
     const workflowTargetStatus = document.getElementById('workflowTargetStatus');
     if (workflowTargetStatus) {
         workflowTargetStatus.value = targetStatus;
@@ -6177,7 +6216,9 @@ function openWorkflowModal(ticketId, targetStatus) {
     completionAfterFiles = [];
     
     // Load ticket data to check time allocation settings
-    db.collection('tickets').doc(ticketId).get().then((doc) => {
+    // Use the validated editingTicketId
+    const validTicketIdForModal = editingTicketId;
+    db.collection('tickets').doc(validTicketIdForModal).get().then((doc) => {
         const ticket = doc.data();
         const enableTimeAllocation = ticket?.enableTimeAllocation === true;
         const timeAllocated = ticket?.timeAllocated;
@@ -6290,8 +6331,19 @@ function handleTicketCompletion(e) {
     }
 
     // Check if timeAllocated is set - required before marking complete IF time allocation is enabled
-    if (!editingTicketId) {
-        alert('Error: Ticket ID not found');
+    if (!editingTicketId || editingTicketId.trim() === '') {
+        alert('Error: Ticket ID not found. Please try again.');
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = submitBtnText;
+        }
+        return;
+    }
+    
+    // Ensure editingTicketId is a valid string
+    const ticketId = String(editingTicketId).trim();
+    if (!ticketId) {
+        alert('Error: Invalid ticket ID. Please try again.');
         if (submitBtn) {
             submitBtn.disabled = false;
             submitBtn.textContent = submitBtnText;
@@ -6300,7 +6352,7 @@ function handleTicketCompletion(e) {
     }
     
     // Get the ticket to check timeAllocated and enableTimeAllocation setting
-    db.collection('tickets').doc(editingTicketId).get().then((doc) => {
+    db.collection('tickets').doc(ticketId).get().then((doc) => {
         const ticket = doc.data();
         const timeAllocated = ticket?.timeAllocated;
         const enableTimeAllocation = ticket?.enableTimeAllocation === true; // Default to false - must be explicitly enabled
@@ -6325,20 +6377,20 @@ function handleTicketCompletion(e) {
                 submitBtn.disabled = false;
                 submitBtn.textContent = submitBtnText;
             }
-            return;
+            return Promise.reject(new Error('Time allocation required'));
         }
         
-        // Upload after photo if provided
-        // Handle completion after files
+        // Upload after files if provided
         const uploadPromises = completionAfterFiles.map((fileData, index) => 
-            uploadFile(fileData.file, editingTicketId, 'after', index)
+            uploadFile(fileData.file, ticketId, 'after', index)
         );
         
-        Promise.all(uploadPromises.length > 0 ? uploadPromises : [Promise.resolve(null)]).then((uploadResults) => {
+        // Wait for uploads, then get ticket and update
+        return Promise.all(uploadPromises.length > 0 ? uploadPromises : [Promise.resolve(null)]).then((uploadResults) => {
             const newAfterFiles = uploadResults.filter(r => r !== null);
             
-            // Get existing after files
-            db.collection('tickets').doc(editingTicketId).get().then((doc) => {
+            // Get existing ticket data (we already have it from line 6303, but need fresh data for afterFiles)
+            return db.collection('tickets').doc(ticketId).get().then((doc) => {
                 const ticket = doc.data();
                 const existingAfterFiles = ticket?.afterFiles || (ticket?.afterPhotoUrl ? [{
                     fileName: 'After Photo',
@@ -6393,10 +6445,11 @@ function handleTicketCompletion(e) {
                     updateData.dateCompleted = firebase.firestore.FieldValue.serverTimestamp();
                 }
 
-                return db.collection('tickets').doc(editingTicketId).update(updateData);
+                return db.collection('tickets').doc(ticketId).update(updateData);
             });
         }).then(() => {
             closeCompletionModal();
+            loadTickets(); // Refresh the tickets list
         }).catch((error) => {
             console.error(`Error updating ticket to ${targetStatus}:`, error);
             alert(`Error updating ticket: ${error.message}`);
@@ -6423,7 +6476,14 @@ window.editTicket = function(ticketId) {
 let deletingTicketId = null;
 
 window.openDeleteTicketModal = function(ticketId) {
-    deletingTicketId = ticketId;
+    // Validate ticketId
+    if (!ticketId || String(ticketId).trim() === '') {
+        console.error('openDeleteTicketModal: Invalid ticketId provided', ticketId);
+        alert('Error: Invalid ticket ID. Please try again.');
+        return;
+    }
+    
+    deletingTicketId = String(ticketId).trim();
     document.getElementById('deleteTicketModal').classList.add('show');
     document.getElementById('deleteReason').value = '';
     document.getElementById('deleteReason').focus();
@@ -6446,8 +6506,15 @@ function handleDeleteTicket(e) {
         return;
     }
     
-    if (!deletingTicketId) {
+    if (!deletingTicketId || String(deletingTicketId).trim() === '') {
         alert('Error: Ticket ID not found');
+        return;
+    }
+    
+    // Validate and sanitize ticket ID
+    const validDeleteTicketId = String(deletingTicketId).trim();
+    if (!validDeleteTicketId || validDeleteTicketId === 'undefined') {
+        alert('Error: Invalid ticket ID');
         return;
     }
     
@@ -6459,7 +6526,7 @@ function handleDeleteTicket(e) {
     }
     
     // Mark ticket as deleted instead of actually deleting it
-    db.collection('tickets').doc(deletingTicketId).update({
+    db.collection('tickets').doc(validDeleteTicketId).update({
         deletedAt: firebase.firestore.FieldValue.serverTimestamp(),
         deletedReason: deleteReason,
         lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
@@ -16601,7 +16668,21 @@ function renderRentRollVertical(leasesByProperty, properties, tenants, units, bu
         
         html += `<div style="margin-bottom: 40px;">`;
         html += `<h3 style="margin-bottom: 20px; color: #1e293b; font-size: 1.5rem;">${escapeHtml(property.name)} Rent Roll</h3>`;
-        html += `<div style="font-size: 0.9em; color: #64748b; margin-bottom: 15px;">As of ${new Date().toLocaleDateString()}</div>`;
+        // Show "As of" date - for current year, show today's date; for past years, show end of year; for future years, show end of year
+        const currentYear = new Date().getFullYear();
+        const currentDate = new Date();
+        let asOfDate;
+        if (year === currentYear) {
+            // Current year: show today's date
+            asOfDate = currentDate;
+        } else if (year < currentYear) {
+            // Past year: show end of that year
+            asOfDate = new Date(year, 11, 31); // December 31
+        } else {
+            // Future year: show end of that year
+            asOfDate = new Date(year, 11, 31); // December 31
+        }
+        html += `<div style="font-size: 0.9em; color: #64748b; margin-bottom: 15px;">As of ${asOfDate.toLocaleDateString()}</div>`;
         
         if (breakoutByBuilding) {
             // Group tenants by building
@@ -16879,7 +16960,21 @@ function renderRentRollHorizontal(leasesByProperty, properties, tenants, units, 
         
         html += `<div style="margin-bottom: 40px;">`;
         html += `<h3 style="margin-bottom: 20px; color: #1e293b; font-size: 1.5rem;">${escapeHtml(property.name)} Rent Roll</h3>`;
-        html += `<div style="font-size: 0.9em; color: #64748b; margin-bottom: 15px;">As of ${new Date().toLocaleDateString()}</div>`;
+        // Show "As of" date - for current year, show today's date; for past years, show end of year; for future years, show end of year
+        const currentYear = new Date().getFullYear();
+        const currentDate = new Date();
+        let asOfDate;
+        if (year === currentYear) {
+            // Current year: show today's date
+            asOfDate = currentDate;
+        } else if (year < currentYear) {
+            // Past year: show end of that year
+            asOfDate = new Date(year, 11, 31); // December 31
+        } else {
+            // Future year: show end of that year
+            asOfDate = new Date(year, 11, 31); // December 31
+        }
+        html += `<div style="font-size: 0.9em; color: #64748b; margin-bottom: 15px;">As of ${asOfDate.toLocaleDateString()}</div>`;
         
         if (breakoutByBuilding) {
             // Group tenants by building
