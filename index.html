@@ -427,20 +427,19 @@
                                 </div>
                             </div>
                             <div class="form-group">
-                                <label>Before Photo (Optional)</label>
+                                <label>Before Photos/Files (Optional)</label>
                                 <div class="file-upload-section" style="grid-template-columns: 1fr;">
                                     <div class="file-upload-item" id="beforePhotoDropZone">
                                         <label for="beforePhoto" class="file-upload-label">
-                                            <span class="file-upload-icon">📷</span>
-                                            <span>Upload Before Photo</span>
+                                            <span class="file-upload-icon">📎</span>
+                                            <span>Upload Before Photos or Files</span>
                                             <span style="display: block; margin-top: 8px; font-size: 12px; color: #666;">or drag and drop files here</span>
                                         </label>
-                                        <input type="file" id="beforePhoto" accept="image/*" style="display: none;">
+                                        <input type="file" id="beforePhoto" multiple style="display: none;">
                                         <div id="beforePhotoPreview" class="file-preview"></div>
-                                        <button type="button" class="btn-remove-file" id="removeBeforePhoto" style="display: none;">Remove</button>
                                     </div>
                                 </div>
-                                <small style="color: #666; font-size: 12px;">Upload a photo showing the issue before work begins</small>
+                                <small style="color: #666; font-size: 12px;">Upload photos or files showing the issue before work begins (multiple files allowed)</small>
                             </div>
                             <div class="form-group" id="completedByGroup" style="display: none;">
                                 <label for="completedBy">Completed By *</label>
@@ -455,20 +454,19 @@
                                 <textarea id="howResolved" rows="3" placeholder="Describe how the issue was resolved..."></textarea>
                             </div>
                             <div class="form-group" id="afterPhotoGroup" style="display: none;">
-                                <label>After Photo (Optional)</label>
+                                <label>After Photos/Files (Optional)</label>
                                 <div class="file-upload-section" style="grid-template-columns: 1fr;">
                                     <div class="file-upload-item" id="afterPhotoDropZone">
                                         <label for="afterPhoto" class="file-upload-label">
-                                            <span class="file-upload-icon">📷</span>
-                                            <span>Upload After Photo</span>
+                                            <span class="file-upload-icon">📎</span>
+                                            <span>Upload After Photos or Files</span>
                                             <span style="display: block; margin-top: 8px; font-size: 12px; color: #666;">or drag and drop files here</span>
                                         </label>
-                                        <input type="file" id="afterPhoto" accept="image/*" style="display: none;">
+                                        <input type="file" id="afterPhoto" multiple style="display: none;">
                                         <div id="afterPhotoPreview" class="file-preview"></div>
-                                        <button type="button" class="btn-remove-file" id="removeAfterPhoto" style="display: none;">Remove</button>
                                     </div>
                                 </div>
-                                <small style="color: #666; font-size: 12px;">Upload a photo showing the completed work</small>
+                                <small style="color: #666; font-size: 12px;">Upload photos or files showing the completed work (multiple files allowed)</small>
                             </div>
                             <div class="form-actions">
                                 <button type="submit" class="btn-primary">Save Ticket</button>
@@ -569,16 +567,15 @@
                                 <div class="file-upload-section" style="grid-template-columns: 1fr;">
                                     <div class="file-upload-item" id="completionAfterPhotoDropZone">
                                         <label for="completionAfterPhoto" class="file-upload-label">
-                                            <span class="file-upload-icon">📷</span>
-                                            <span>Upload After Photo</span>
+                                            <span class="file-upload-icon">📎</span>
+                                            <span>Upload After Photos or Files</span>
                                             <span style="display: block; margin-top: 8px; font-size: 12px; color: #666;">or drag and drop files here</span>
                                         </label>
-                                        <input type="file" id="completionAfterPhoto" accept="image/*" style="display: none;">
+                                        <input type="file" id="completionAfterPhoto" multiple style="display: none;">
                                         <div id="completionAfterPhotoPreview" class="file-preview"></div>
-                                        <button type="button" class="btn-remove-file" id="removeCompletionAfterPhoto" style="display: none;">Remove</button>
                                     </div>
                                 </div>
-                                <small style="color: #666; font-size: 12px;">Upload a photo showing the completed work</small>
+                                <small style="color: #666; font-size: 12px;">Upload photos or files showing the completed work (multiple files allowed)</small>
                             </div>
                             <div class="form-actions">
                                 <button type="submit" class="btn-primary" id="workflowSubmitBtn">Advance Workflow</button>

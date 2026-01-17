@@ -4,11 +4,11 @@ let currentView = 'active'; // 'active' or 'completed'
 let currentPage = localStorage.getItem('currentPage') || 'maintenance'; // 'maintenance', 'properties', 'tenants'
 let editingTicketId = null;
 let editingPropertyId = null;
-let beforePhotoFile = null;
-let afterPhotoFile = null;
-let beforePhotoUrl = null;
-let afterPhotoUrl = null;
-let completionAfterPhotoFile = null;
+let beforeFiles = []; // Array of { file: File, preview: string }
+let afterFiles = []; // Array of { file: File, preview: string }
+let beforeFileUrls = []; // Array of existing file URLs from database
+let afterFileUrls = []; // Array of existing file URLs from database
+// completionAfterFiles is defined later with the function
 
 // Authentication state
 let currentUser = null;
@@ -1947,17 +1947,13 @@ function setupEventListeners() {
     // Completion modal file handlers (check if elements exist)
     const completionAfterPhoto = document.getElementById('completionAfterPhoto');
     const completionAfterPhotoDropZone = document.getElementById('completionAfterPhotoDropZone');
-    const removeCompletionAfterPhoto = document.getElementById('removeCompletionAfterPhoto');
     if (completionAfterPhoto) {
         completionAfterPhoto.addEventListener('change', (e) => handleCompletionFileSelect(e));
     }
     
-    // Drag and drop handler for completion after photo
+    // Drag and drop handler for completion after files
     if (completionAfterPhotoDropZone && completionAfterPhoto) {
-        setupDragAndDrop(completionAfterPhotoDropZone, completionAfterPhoto, 'completion');
-    }
-    if (removeCompletionAfterPhoto) {
-        removeCompletionAfterPhoto.addEventListener('click', () => removeCompletionFile());
+        setupDragAndDropForCompletion(completionAfterPhotoDropZone, completionAfterPhoto);
     }
     
     // Workflow modal time allocation toggle handler
@@ -4950,26 +4946,53 @@ function createTicketCard(ticket, isDeleted = false) {
                     <p style="white-space: pre-wrap;">${escapeHtml(ticket.workUpdates)}</p>
                 </div>
             ` : ''}
-            ${(ticket.beforePhotoUrl || ticket.afterPhotoUrl) ? `
-                <div class="expanded-detail-section">
-                    <h4>Photos</h4>
-                    <div class="ticket-photos-expanded">
-                        ${ticket.beforePhotoUrl ? `
-                            <div class="photo-item-expanded">
-                                <span class="photo-label">Before</span>
-                                <img src="${escapeHtml(ticket.beforePhotoUrl)}" alt="Before" class="ticket-photo-expanded" onclick="openPhotoModal('${escapeHtml(ticket.beforePhotoUrl)}')">
-                            </div>
-                        ` : ''}
-                        ${ticket.afterPhotoUrl ? `
-                            <div class="photo-item-expanded">
-                                <span class="photo-label">After</span>
-                                <img src="${escapeHtml(ticket.afterPhotoUrl)}" alt="After" class="ticket-photo-expanded" onclick="openPhotoModal('${escapeHtml(ticket.afterPhotoUrl)}')">
-                            </div>
-                        ` : ''}
-                    </div>
-                </div>
-            ` : ''}
-            ${!ticket.howResolved && !ticket.beforePhotoUrl && !ticket.afterPhotoUrl && !ticket.detailedDescription ? `
+            ${(function() {
+                // Support both old single URL format and new array format
+                const beforeFiles = ticket.beforeFiles || (ticket.beforePhotoUrl ? [{
+                    fileName: 'Before Photo',
+                    fileUrl: ticket.beforePhotoUrl,
+                    isImage: true
+                }] : []);
+                const afterFiles = ticket.afterFiles || (ticket.afterPhotoUrl ? [{
+                    fileName: 'After Photo',
+                    fileUrl: ticket.afterPhotoUrl,
+                    isImage: true
+                }] : []);
+                
+                if (beforeFiles.length === 0 && afterFiles.length === 0) {
+                    return '';
+                }
+                
+                let html = '<div class="expanded-detail-section"><h4>Before/After Files</h4><div class="ticket-photos-expanded" style="display: flex; flex-wrap: wrap; gap: 15px;">';
+                
+                if (beforeFiles.length > 0) {
+                    html += '<div style="flex: 1; min-width: 200px;"><div style="font-weight: 600; margin-bottom: 10px; color: #475569;">Before (' + beforeFiles.length + ')</div>';
+                    beforeFiles.forEach(function(fileData) {
+                        if (fileData.isImage) {
+                            html += '<div style="margin-bottom: 10px;"><img src="' + escapeHtml(fileData.fileUrl) + '" alt="' + escapeHtml(fileData.fileName || 'Before') + '" style="max-width: 200px; max-height: 200px; border-radius: 4px; border: 1px solid #ddd; cursor: pointer;" onclick="openPhotoModal(\'' + escapeHtml(fileData.fileUrl) + '\')"><div style="font-size: 0.75em; color: #666; margin-top: 4px;">' + escapeHtml(fileData.fileName || 'Before Photo') + '</div></div>';
+                        } else {
+                            html += '<div style="margin-bottom: 10px; padding: 12px; border: 1px solid #ddd; border-radius: 4px; background: #f8f9fa;"><div style="font-size: 1.5em; margin-bottom: 4px;">📄</div><div style="font-size: 0.85em; color: #1f2937; margin-bottom: 4px;">' + escapeHtml(fileData.fileName || 'File') + '</div><a href="' + escapeHtml(fileData.fileUrl) + '" target="_blank" style="font-size: 0.75em; color: #2563eb; text-decoration: none;">View File</a></div>';
+                        }
+                    });
+                    html += '</div>';
+                }
+                
+                if (afterFiles.length > 0) {
+                    html += '<div style="flex: 1; min-width: 200px;"><div style="font-weight: 600; margin-bottom: 10px; color: #475569;">After (' + afterFiles.length + ')</div>';
+                    afterFiles.forEach(function(fileData) {
+                        if (fileData.isImage) {
+                            html += '<div style="margin-bottom: 10px;"><img src="' + escapeHtml(fileData.fileUrl) + '" alt="' + escapeHtml(fileData.fileName || 'After') + '" style="max-width: 200px; max-height: 200px; border-radius: 4px; border: 1px solid #ddd; cursor: pointer;" onclick="openPhotoModal(\'' + escapeHtml(fileData.fileUrl) + '\')"><div style="font-size: 0.75em; color: #666; margin-top: 4px;">' + escapeHtml(fileData.fileName || 'After Photo') + '</div></div>';
+                        } else {
+                            html += '<div style="margin-bottom: 10px; padding: 12px; border: 1px solid #ddd; border-radius: 4px; background: #f8f9fa;"><div style="font-size: 1.5em; margin-bottom: 4px;">📄</div><div style="font-size: 0.85em; color: #1f2937; margin-bottom: 4px;">' + escapeHtml(fileData.fileName || 'File') + '</div><a href="' + escapeHtml(fileData.fileUrl) + '" target="_blank" style="font-size: 0.75em; color: #2563eb; text-decoration: none;">View File</a></div>';
+                        }
+                    });
+                    html += '</div>';
+                }
+                
+                html += '</div></div>';
+                return html;
+            })()}
+            ${!ticket.howResolved && !(ticket.beforeFiles && ticket.beforeFiles.length > 0) && !(ticket.afterFiles && ticket.afterFiles.length > 0) && !ticket.beforePhotoUrl && !ticket.afterPhotoUrl && !ticket.detailedDescription ? `
                 <div class="expanded-detail-section">
                     <p style="color: #999; text-align: center; padding: 20px;">No additional details available</p>
                 </div>
@@ -5141,16 +5164,16 @@ function openTicketModal(ticketId = null) {
     // Before photo is always visible, so no need to hide it
     
     // Reset file uploads
-    beforePhotoFile = null;
-    afterPhotoFile = null;
-    beforePhotoUrl = null;
-    afterPhotoUrl = null;
+    // Reset file arrays
+    beforeFiles = [];
+    afterFiles = [];
+    beforeFileUrls = [];
+    afterFileUrls = [];
+    
     document.getElementById('beforePhoto').value = '';
     document.getElementById('afterPhoto').value = '';
     document.getElementById('beforePhotoPreview').innerHTML = '';
     document.getElementById('afterPhotoPreview').innerHTML = '';
-    document.getElementById('removeBeforePhoto').style.display = 'none';
-    document.getElementById('removeAfterPhoto').style.display = 'none';
 
     // If editing, load ticket data
     if (ticketId) {
@@ -5362,10 +5385,19 @@ function loadTicketForEdit(ticketId) {
             }
             
             // Always show before photo if it exists
-            if (ticket.beforePhotoUrl) {
-                beforePhotoUrl = ticket.beforePhotoUrl;
-                showPhotoPreview(ticket.beforePhotoUrl, 'before');
+            // Load before files - support both old single URL and new array format
+            if (ticket.beforeFiles && Array.isArray(ticket.beforeFiles)) {
+                beforeFileUrls = ticket.beforeFiles;
+            } else if (ticket.beforePhotoUrl) {
+                // Migrate old single URL to array format
+                beforeFileUrls = [{
+                    fileName: 'Before Photo',
+                    fileUrl: ticket.beforePhotoUrl,
+                    isImage: true,
+                    uploadedAt: ticket.dateCreated || firebase.firestore.Timestamp.now()
+                }];
             }
+            updateFilePreview('before');
             
             if (ticket.status === 'Completed') {
                 // Populate completedBy dropdown
@@ -5378,11 +5410,19 @@ function loadTicketForEdit(ticketId) {
                 document.getElementById('afterPhotoGroup').style.display = 'block';
                 document.getElementById('retroactiveDatesGroup').style.display = 'block';
                 
-                // Load existing after photo if any
-                if (ticket.afterPhotoUrl) {
-                    afterPhotoUrl = ticket.afterPhotoUrl;
-                    showPhotoPreview(ticket.afterPhotoUrl, 'after');
+                // Load existing after files - support both old single URL and new array format
+                if (ticket.afterFiles && Array.isArray(ticket.afterFiles)) {
+                    afterFileUrls = ticket.afterFiles;
+                } else if (ticket.afterPhotoUrl) {
+                    // Migrate old single URL to array format
+                    afterFileUrls = [{
+                        fileName: 'After Photo',
+                        fileUrl: ticket.afterPhotoUrl,
+                        isImage: true,
+                        uploadedAt: ticket.dateCompleted || firebase.firestore.Timestamp.now()
+                    }];
                 }
+                updateFilePreview('after');
             }
             
             // Load custom dates if they exist (for retroactive tickets)
@@ -5785,20 +5825,27 @@ function handleTicketSubmit(e) {
         loadingModal.classList.add('show');
     }
 
-    // Upload photos first if any - track type with each upload
+    // Upload files first if any
     const uploadPromises = [];
     
-    if (beforePhotoFile) {
-        uploadPromises.push(uploadPhoto(beforePhotoFile, id || 'temp', 'before').then(url => ({ type: 'before', url })));
-    }
-    if (afterPhotoFile) {
-        uploadPromises.push(uploadPhoto(afterPhotoFile, id || 'temp', 'after').then(url => ({ type: 'after', url })));
-    }
+    // Upload all before files
+    beforeFiles.forEach((fileData, index) => {
+        uploadPromises.push(uploadFile(fileData.file, id || 'temp', 'before', index).then(fileInfo => ({ type: 'before', fileInfo })));
+    });
     
-    // If no new photos, use existing URLs
-    Promise.all(uploadPromises).then((photoResults) => {
-        const beforeUrl = photoResults.find(r => r && r.type === 'before')?.url || beforePhotoUrl;
-        const afterUrl = photoResults.find(r => r && r.type === 'after')?.url || afterPhotoUrl;
+    // Upload all after files
+    afterFiles.forEach((fileData, index) => {
+        uploadPromises.push(uploadFile(fileData.file, id || 'temp', 'after', index).then(fileInfo => ({ type: 'after', fileInfo })));
+    });
+    
+    // Wait for all uploads to complete
+    Promise.all(uploadPromises).then((uploadResults) => {
+        // Combine new uploads with existing files
+        const newBeforeFiles = uploadResults.filter(r => r && r.type === 'before').map(r => r.fileInfo);
+        const newAfterFiles = uploadResults.filter(r => r && r.type === 'after').map(r => r.fileInfo);
+        
+        const allBeforeFiles = [...beforeFileUrls, ...newBeforeFiles];
+        const allAfterFiles = [...afterFileUrls, ...newAfterFiles];
         
         if (id && editingTicketId) {
             // Update existing - preserve dateCreated and handle dateCompleted properly
@@ -5855,14 +5902,27 @@ function handleTicketSubmit(e) {
                 }
                 // If no custom date, we don't include dateCreated at all - Firestore will preserve existing value
 
-                // Always save before photo if it exists (can be uploaded for any status)
-                if (beforeUrl) ticketData.beforePhotoUrl = beforeUrl;
-                // Only save after photo if status is Completed
+                // Save before files array (can be uploaded for any status)
+                if (allBeforeFiles.length > 0) {
+                    ticketData.beforeFiles = allBeforeFiles;
+                }
+                // Keep old beforePhotoUrl for backward compatibility if no new files
+                if (allBeforeFiles.length === 0 && existing?.beforePhotoUrl) {
+                    ticketData.beforePhotoUrl = existing.beforePhotoUrl;
+                }
+                
+                // Only save after files if status is Completed
                 if (status === 'Completed') {
                     ticketData.completedBy = completedBy;
                     ticketData.completedByUserId = completedByUserId || null;
                     ticketData.howResolved = howResolved || null;
-                    if (afterUrl) ticketData.afterPhotoUrl = afterUrl;
+                    if (allAfterFiles.length > 0) {
+                        ticketData.afterFiles = allAfterFiles;
+                    }
+                    // Keep old afterPhotoUrl for backward compatibility if no new files
+                    if (allAfterFiles.length === 0 && existing?.afterPhotoUrl) {
+                        ticketData.afterPhotoUrl = existing.afterPhotoUrl;
+                    }
                     // Only set dateCompleted if it wasn't already completed
                     if (existing?.status !== 'Completed') {
                         ticketData.dateCompleted = customDateCompleted
@@ -5877,10 +5937,12 @@ function handleTicketSubmit(e) {
                 } else {
                     ticketData.completedBy = null;
                     ticketData.howResolved = null;
-                    ticketData.afterPhotoUrl = null;
+                    ticketData.afterFiles = null;
                     ticketData.dateCompleted = null;
-                    // Preserve existing afterPhotoUrl if status changed from Completed to something else
-                    if (existing?.afterPhotoUrl && !afterUrl) {
+                    // Preserve existing afterFiles/afterPhotoUrl if status changed from Completed to something else
+                    if (existing?.afterFiles && allAfterFiles.length === 0) {
+                        ticketData.afterFiles = existing.afterFiles;
+                    } else if (existing?.afterPhotoUrl && allAfterFiles.length === 0) {
                         ticketData.afterPhotoUrl = existing.afterPhotoUrl;
                     }
                 }
@@ -5972,13 +6034,17 @@ function handleTicketSubmit(e) {
             db.collection('tickets').add(ticketData).then((docRef) => {
                 const newTicketId = docRef.id;
                 
-                // If photos were uploaded with 'temp', we need to re-upload them with the real ID
-                // OR update the ticket with the URLs we already have
+                // If files were uploaded with 'temp', we need to re-upload them with the real ID
+                // OR update the ticket with the file info we already have
                 const updateData = {};
-                if (beforeUrl) updateData.beforePhotoUrl = beforeUrl;
-                if (afterUrl && status === 'Completed') updateData.afterPhotoUrl = afterUrl;
+                if (allBeforeFiles.length > 0) {
+                    updateData.beforeFiles = allBeforeFiles;
+                }
+                if (allAfterFiles.length > 0 && status === 'Completed') {
+                    updateData.afterFiles = allAfterFiles;
+                }
                 
-                // If we have photos to add, update the ticket
+                // If we have files to add, update the ticket
                 if (Object.keys(updateData).length > 0) {
                     return db.collection('tickets').doc(newTicketId).update(updateData);
                 }
@@ -6105,13 +6171,10 @@ function openWorkflowModal(ticketId, targetStatus) {
     const completionHowResolved = document.getElementById('completionHowResolved');
     const completionAfterPhoto = document.getElementById('completionAfterPhoto');
     const completionAfterPhotoPreview = document.getElementById('completionAfterPhotoPreview');
-    const removeCompletionAfterPhoto = document.getElementById('removeCompletionAfterPhoto');
-    
     if (completionHowResolved) completionHowResolved.value = '';
     if (completionAfterPhoto) completionAfterPhoto.value = '';
     if (completionAfterPhotoPreview) completionAfterPhotoPreview.innerHTML = '';
-    if (removeCompletionAfterPhoto) removeCompletionAfterPhoto.style.display = 'none';
-    completionAfterPhotoFile = null;
+    completionAfterFiles = [];
     
     // Load ticket data to check time allocation settings
     db.collection('tickets').doc(ticketId).get().then((doc) => {
@@ -6266,37 +6329,57 @@ function handleTicketCompletion(e) {
         }
         
         // Upload after photo if provided
-        const uploadPromise = completionAfterPhotoFile 
-            ? uploadPhoto(completionAfterPhotoFile, editingTicketId, 'after')
-            : Promise.resolve(null);
-
-        uploadPromise.then((afterPhotoUrl) => {
-            // Get workflow modal time allocation data if it exists
-            const workflowEnableTimeAllocation = document.getElementById('workflowEnableTimeAllocation');
-            const workflowTimeAllocated = document.getElementById('workflowTimeAllocated');
-            const workflowBillingRate = document.getElementById('workflowBillingRate');
-            const workflowBillingTypeHourly = document.getElementById('workflowBillingTypeHourly');
+        // Handle completion after files
+        const uploadPromises = completionAfterFiles.map((fileData, index) => 
+            uploadFile(fileData.file, editingTicketId, 'after', index)
+        );
+        
+        Promise.all(uploadPromises.length > 0 ? uploadPromises : [Promise.resolve(null)]).then((uploadResults) => {
+            const newAfterFiles = uploadResults.filter(r => r !== null);
             
-            const updateData = {
-                status: targetStatus,
-                completedBy: completedBy,
-                completedByUserId: completedByUserId || null,
-                howResolved: howResolved || null,
-                lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            };
-
-            // Update time allocation if it was edited in the workflow modal
-            if (workflowEnableTimeAllocation) {
-                updateData.enableTimeAllocation = workflowEnableTimeAllocation.checked;
+            // Get existing after files
+            db.collection('tickets').doc(editingTicketId).get().then((doc) => {
+                const ticket = doc.data();
+                const existingAfterFiles = ticket?.afterFiles || (ticket?.afterPhotoUrl ? [{
+                    fileName: 'After Photo',
+                    fileUrl: ticket.afterPhotoUrl,
+                    isImage: true
+                }] : []);
                 
-                if (workflowEnableTimeAllocation.checked) {
-                    if (workflowTimeAllocated && workflowTimeAllocated.value) {
-                        updateData.timeAllocated = parseFloat(workflowTimeAllocated.value);
-                    }
-                    if (workflowBillingRate && workflowBillingRate.value) {
-                        updateData.billingRate = parseFloat(workflowBillingRate.value);
-                        updateData.billingType = workflowBillingTypeHourly?.checked ? 'hourly' : 'flat';
+                const allAfterFiles = [...existingAfterFiles, ...newAfterFiles];
+                
+                // Get workflow modal time allocation data if it exists
+                const workflowEnableTimeAllocation = document.getElementById('workflowEnableTimeAllocation');
+                const workflowTimeAllocated = document.getElementById('workflowTimeAllocated');
+                const workflowBillingRate = document.getElementById('workflowBillingRate');
+                const workflowBillingTypeHourly = document.getElementById('workflowBillingTypeHourly');
+                
+                const updateData = {
+                    status: targetStatus,
+                    completedBy: completedBy,
+                    completedByUserId: completedByUserId || null,
+                    howResolved: howResolved || null,
+                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                
+                // Save after files if any
+                if (allAfterFiles.length > 0) {
+                    updateData.afterFiles = allAfterFiles;
+                }
+
+                // Update time allocation if it was edited in the workflow modal
+                if (workflowEnableTimeAllocation) {
+                    updateData.enableTimeAllocation = workflowEnableTimeAllocation.checked;
+                    
+                    if (workflowEnableTimeAllocation.checked) {
+                        if (workflowTimeAllocated && workflowTimeAllocated.value) {
+                            updateData.timeAllocated = parseFloat(workflowTimeAllocated.value);
+                        }
+                        if (workflowBillingRate && workflowBillingRate.value) {
+                            updateData.billingRate = parseFloat(workflowBillingRate.value);
+                            updateData.billingType = workflowBillingTypeHourly?.checked ? 'hourly' : 'flat';
+                        }
                     }
                 } else {
                     // If toggle is off, clear the fields
@@ -6304,18 +6387,14 @@ function handleTicketCompletion(e) {
                     updateData.billingRate = null;
                     updateData.billingType = null;
                 }
-            }
+                
+                // Only set dateCompleted for Completed status
+                if (targetStatus === 'Completed') {
+                    updateData.dateCompleted = firebase.firestore.FieldValue.serverTimestamp();
+                }
 
-            // Only set dateCompleted for Completed status
-            if (targetStatus === 'Completed') {
-                updateData.dateCompleted = firebase.firestore.FieldValue.serverTimestamp();
-            }
-
-            if (afterPhotoUrl) {
-                updateData.afterPhotoUrl = afterPhotoUrl;
-            }
-
-            return db.collection('tickets').doc(editingTicketId).update(updateData);
+                return db.collection('tickets').doc(editingTicketId).update(updateData);
+            });
         }).then(() => {
             closeCompletionModal();
         }).catch((error) => {
@@ -6481,93 +6560,218 @@ function formatDate(timestamp) {
 
 // File Upload Functions
 function handleFileSelect(event, type) {
-    const file = event.target.files[0];
-    if (!file) return;
+    const files = Array.from(event.target.files);
+    if (!files || files.length === 0) return;
     
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-        alert('Please select an image file');
-        return;
-    }
+    const fileArray = type === 'before' ? beforeFiles : afterFiles;
     
-    // Validate file size (max 20MB - Firebase Storage supports up to 32MB for web)
-    if (file.size > 20 * 1024 * 1024) {
-        alert('File size must be less than 20MB');
-        return;
-    }
+    files.forEach(file => {
+        // Validate file size (max 20MB - Firebase Storage supports up to 32MB for web)
+        if (file.size > 20 * 1024 * 1024) {
+            alert(`File "${file.name}" is too large. Maximum size is 20MB.`);
+            return;
+        }
+        
+        // Create preview for images, or file info for other files
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const fileData = {
+                file: file,
+                preview: e.target.result,
+                isImage: file.type.startsWith('image/')
+            };
+            fileArray.push(fileData);
+            updateFilePreview(type);
+        };
+        
+        if (file.type.startsWith('image/')) {
+            reader.readAsDataURL(file);
+        } else {
+            // For non-image files, create a placeholder
+            fileArray.push({
+                file: file,
+                preview: null,
+                isImage: false
+            });
+            updateFilePreview(type);
+        }
+    });
     
-    if (type === 'before') {
-        beforePhotoFile = file;
-    } else {
-        afterPhotoFile = file;
-    }
-    
-    // Show preview
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        showPhotoPreview(e.target.result, type);
-    };
-    reader.readAsDataURL(file);
+    // Reset input to allow selecting the same file again
+    event.target.value = '';
 }
 
-function showPhotoPreview(url, type) {
+function updateFilePreview(type) {
     const previewId = type === 'before' ? 'beforePhotoPreview' : 'afterPhotoPreview';
-    const removeBtnId = type === 'before' ? 'removeBeforePhoto' : 'removeAfterPhoto';
+    const fileArray = type === 'before' ? beforeFiles : afterFiles;
+    const existingUrls = type === 'before' ? beforeFileUrls : afterFileUrls;
     
     const preview = document.getElementById(previewId);
-    preview.innerHTML = `<img src="${url}" alt="${type} preview" style="max-width: 200px; max-height: 200px; border-radius: 4px; margin-top: 10px;">`;
-    document.getElementById(removeBtnId).style.display = 'inline-block';
+    if (!preview) return;
+    
+    let html = '';
+    
+    // Show existing files from database
+    existingUrls.forEach((fileData, index) => {
+        if (fileData.isImage) {
+            html += `
+                <div class="file-preview-item" style="display: inline-block; margin: 8px; position: relative;">
+                    <img src="${escapeHtml(fileData.fileUrl)}" alt="${escapeHtml(fileData.fileName)}" style="max-width: 150px; max-height: 150px; border-radius: 4px; border: 1px solid #ddd;">
+                    <button type="button" onclick="removeExistingFile('${type}', ${index})" style="position: absolute; top: -8px; right: -8px; background: #e74c3c; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 14px;">×</button>
+                    <div style="font-size: 0.75em; color: #666; margin-top: 4px; max-width: 150px; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(fileData.fileName)}</div>
+                </div>
+            `;
+        } else {
+            html += `
+                <div class="file-preview-item" style="display: inline-block; margin: 8px; position: relative; padding: 12px; border: 1px solid #ddd; border-radius: 4px; background: #f8f9fa;">
+                    <div style="font-size: 2em; margin-bottom: 4px;">📄</div>
+                    <button type="button" onclick="removeExistingFile('${type}', ${index})" style="position: absolute; top: -8px; right: -8px; background: #e74c3c; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 14px;">×</button>
+                    <div style="font-size: 0.75em; color: #666; max-width: 120px; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(fileData.fileName)}</div>
+                    <a href="${escapeHtml(fileData.fileUrl)}" target="_blank" style="font-size: 0.7em; color: #2563eb; text-decoration: none; margin-top: 4px; display: block;">View</a>
+                </div>
+            `;
+        }
+    });
+    
+    // Show new files being uploaded
+    fileArray.forEach((fileData, index) => {
+        if (fileData.isImage && fileData.preview) {
+            html += `
+                <div class="file-preview-item" style="display: inline-block; margin: 8px; position: relative;">
+                    <img src="${escapeHtml(fileData.preview)}" alt="${escapeHtml(fileData.file.name)}" style="max-width: 150px; max-height: 150px; border-radius: 4px; border: 1px solid #ddd;">
+                    <button type="button" onclick="removeNewFile('${type}', ${index})" style="position: absolute; top: -8px; right: -8px; background: #e74c3c; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 14px;">×</button>
+                    <div style="font-size: 0.75em; color: #666; margin-top: 4px; max-width: 150px; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(fileData.file.name)}</div>
+                </div>
+            `;
+        } else {
+            html += `
+                <div class="file-preview-item" style="display: inline-block; margin: 8px; position: relative; padding: 12px; border: 1px solid #ddd; border-radius: 4px; background: #f8f9fa;">
+                    <div style="font-size: 2em; margin-bottom: 4px;">📄</div>
+                    <button type="button" onclick="removeNewFile('${type}', ${index})" style="position: absolute; top: -8px; right: -8px; background: #e74c3c; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 14px;">×</button>
+                    <div style="font-size: 0.75em; color: #666; max-width: 120px; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(fileData.file.name)}</div>
+                    <div style="font-size: 0.65em; color: #999; margin-top: 2px;">${formatFileSize(fileData.file.size)}</div>
+                </div>
+            `;
+        }
+    });
+    
+    preview.innerHTML = html;
 }
 
-function removeFile(type) {
-    if (type === 'before') {
-        beforePhotoFile = null;
-        beforePhotoUrl = null;
-        document.getElementById('beforePhoto').value = '';
-        document.getElementById('beforePhotoPreview').innerHTML = '';
-        document.getElementById('removeBeforePhoto').style.display = 'none';
-    } else {
-        afterPhotoFile = null;
-        afterPhotoUrl = null;
-        document.getElementById('afterPhoto').value = '';
-        document.getElementById('afterPhotoPreview').innerHTML = '';
-        document.getElementById('removeAfterPhoto').style.display = 'none';
-    }
+function removeNewFile(type, index) {
+    const fileArray = type === 'before' ? beforeFiles : afterFiles;
+    fileArray.splice(index, 1);
+    updateFilePreview(type);
 }
+
+window.removeExistingFile = function(type, index) {
+    const urlArray = type === 'before' ? beforeFileUrls : afterFileUrls;
+    urlArray.splice(index, 1);
+    updateFilePreview(type);
+}
+
+// For workflow completion modal, we'll use a simple array approach
+let completionAfterFiles = [];
 
 function handleCompletionFileSelect(event) {
-    const file = event.target.files[0];
-    if (!file) return;
+    const files = Array.from(event.target.files);
+    if (!files || files.length === 0) return;
     
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-        alert('Please select an image file');
-        return;
-    }
+    files.forEach(file => {
+        // Validate file size (max 20MB)
+        if (file.size > 20 * 1024 * 1024) {
+            alert(`File "${file.name}" is too large. Maximum size is 20MB.`);
+            return;
+        }
+        
+        const fileData = {
+            file: file,
+            isImage: file.type.startsWith('image/')
+        };
+        
+        if (fileData.isImage) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                fileData.preview = e.target.result;
+                completionAfterFiles.push(fileData);
+                updateCompletionFilePreview();
+            };
+            reader.readAsDataURL(file);
+        } else {
+            completionAfterFiles.push(fileData);
+            updateCompletionFilePreview();
+        }
+    });
     
-    // Validate file size (max 20MB - Firebase Storage supports up to 32MB for web)
-    if (file.size > 20 * 1024 * 1024) {
-        alert('File size must be less than 20MB');
-        return;
-    }
-    
-    completionAfterPhotoFile = file;
-    
-    // Show preview
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        const preview = document.getElementById('completionAfterPhotoPreview');
-        preview.innerHTML = `<img src="${e.target.result}" alt="after preview" style="max-width: 200px; max-height: 200px; border-radius: 4px; margin-top: 10px;">`;
-        document.getElementById('removeCompletionAfterPhoto').style.display = 'inline-block';
-    };
-    reader.readAsDataURL(file);
+    event.target.value = '';
 }
 
-function removeCompletionFile() {
-    completionAfterPhotoFile = null;
-    document.getElementById('completionAfterPhoto').value = '';
-    document.getElementById('completionAfterPhotoPreview').innerHTML = '';
-    document.getElementById('removeCompletionAfterPhoto').style.display = 'none';
+function updateCompletionFilePreview() {
+    const preview = document.getElementById('completionAfterPhotoPreview');
+    if (!preview) return;
+    
+    let html = '';
+    completionAfterFiles.forEach((fileData, index) => {
+        if (fileData.isImage && fileData.preview) {
+            html += '<div class="file-preview-item" style="display: inline-block; margin: 8px; position: relative;"><img src="' + escapeHtml(fileData.preview) + '" alt="' + escapeHtml(fileData.file.name) + '" style="max-width: 150px; max-height: 150px; border-radius: 4px; border: 1px solid #ddd;"><button type="button" onclick="removeCompletionFile(' + index + ')" style="position: absolute; top: -8px; right: -8px; background: #e74c3c; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 14px;">×</button><div style="font-size: 0.75em; color: #666; margin-top: 4px; max-width: 150px; overflow: hidden; text-overflow: ellipsis;">' + escapeHtml(fileData.file.name) + '</div></div>';
+        } else {
+            html += '<div class="file-preview-item" style="display: inline-block; margin: 8px; position: relative; padding: 12px; border: 1px solid #ddd; border-radius: 4px; background: #f8f9fa;"><div style="font-size: 2em; margin-bottom: 4px;">📄</div><button type="button" onclick="removeCompletionFile(' + index + ')" style="position: absolute; top: -8px; right: -8px; background: #e74c3c; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 14px;">×</button><div style="font-size: 0.75em; color: #666; max-width: 120px; overflow: hidden; text-overflow: ellipsis;">' + escapeHtml(fileData.file.name) + '</div><div style="font-size: 0.65em; color: #999; margin-top: 2px;">' + formatFileSize(fileData.file.size) + '</div></div>';
+        }
+    });
+    
+    preview.innerHTML = html;
+}
+
+window.removeCompletionFile = function(index) {
+    completionAfterFiles.splice(index, 1);
+    updateCompletionFilePreview();
+}
+
+// Setup drag and drop for completion modal
+function setupDragAndDropForCompletion(dropZone, fileInput) {
+    if (!dropZone || !fileInput) return;
+    
+    // Prevent default drag behaviors
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, preventDefaults, false);
+        document.body.addEventListener(eventName, preventDefaults, false);
+    });
+    
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    
+    // Highlight drop zone when item is dragged over it
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+            dropZone.style.borderColor = '#2563EB';
+            dropZone.style.backgroundColor = '#EBF5FF';
+        }, false);
+    });
+    
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+            dropZone.style.borderColor = '';
+            dropZone.style.backgroundColor = '';
+        }, false);
+    });
+    
+    // Handle dropped files
+    dropZone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        
+        if (files.length > 0) {
+            // Create a fake event object to reuse handleCompletionFileSelect
+            const fakeEvent = {
+                target: {
+                    files: files
+                }
+            };
+            handleCompletionFileSelect(fakeEvent);
+        }
+    }, false);
 }
 
 // Setup drag and drop for ticket photo uploads
@@ -6606,21 +6810,13 @@ function setupDragAndDrop(dropZone, fileInput, type) {
         const files = dt.files;
         
         if (files.length > 0) {
-            const file = files[0];
-            
-            // Validate file type
-            if (!file.type.startsWith('image/')) {
-                alert('Please drop an image file');
-                return;
-            }
-            
-            // Validate file size (max 20MB)
-            if (file.size > 20 * 1024 * 1024) {
-                alert('File size must be less than 20MB');
-                return;
-            }
-            
-            // Set the file to the input
+            // Create a fake event object to reuse handleFileSelect
+            const fakeEvent = {
+                target: {
+                    files: files
+                }
+            };
+            handleFileSelect(fakeEvent, type);
             const dataTransfer = new DataTransfer();
             dataTransfer.items.add(file);
             fileInput.files = dataTransfer.files;
@@ -6631,13 +6827,13 @@ function setupDragAndDrop(dropZone, fileInput, type) {
     }, false);
 }
 
-function uploadPhoto(file, ticketId, type) {
+function uploadFile(file, ticketId, type, index) {
     return new Promise((resolve, reject) => {
         // Use a temporary ID if creating new ticket
         const fileName = ticketId === 'temp' 
-            ? `temp_${type}_${Date.now()}_${file.name}`
-            : `${ticketId}_${type}_${Date.now()}_${file.name}`;
-        const storageRef = storage.ref().child(`tickets/${fileName}`);
+            ? `temp_${type}_${Date.now()}_${index}_${file.name}`
+            : `${ticketId}_${type}_${Date.now()}_${index}_${file.name}`;
+        const storageRef = storage.ref().child(`tickets/${ticketId || 'temp'}/${fileName}`);
         
         const uploadTask = storageRef.put(file);
         
@@ -6645,7 +6841,7 @@ function uploadPhoto(file, ticketId, type) {
             (snapshot) => {
                 // Progress tracking (optional)
                 const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                console.log(`Upload ${type} is ${progress}% done`);
+                console.log(`Upload ${type} file ${index + 1} is ${progress}% done`);
             },
             (error) => {
                 console.error('Upload error:', error);
@@ -6653,7 +6849,13 @@ function uploadPhoto(file, ticketId, type) {
             },
             () => {
                 uploadTask.snapshot.ref.getDownloadURL().then((downloadURL) => {
-                    resolve(downloadURL);
+                    resolve({
+                        fileName: file.name,
+                        fileUrl: downloadURL,
+                        fileSize: file.size,
+                        isImage: file.type.startsWith('image/'),
+                        uploadedAt: firebase.firestore.Timestamp.now()
+                    });
                 }).catch(reject);
             }
         );
