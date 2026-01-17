@@ -3572,48 +3572,52 @@ hr {
 /* Year Navigation Widget */
 .year-navigation-widget {
     position: fixed;
-    bottom: 30px;
-    right: 30px;
+    bottom: 24px;
+    right: 24px;
     display: flex;
     align-items: center;
     gap: 0;
-    background: white;
-    border-radius: 50px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    background: #FFFFFF;
+    border-radius: 999px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     padding: 8px;
     z-index: 1000;
-    border: 2px solid #e2e8f0;
+    border: 1px solid #E5E7EB;
 }
 
 .year-nav-btn {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
     border: none;
-    background: #667eea;
+    background: #2563EB;
     color: white;
-    font-size: 20px;
+    font-size: 16px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s ease;
-    font-weight: bold;
+    transition: background-color 0.2s ease;
+    font-weight: 600;
 }
 
 .year-nav-btn:hover {
-    background: #5568d3;
-    transform: scale(1.05);
+    background: #1d4ed8;
+}
+
+.year-nav-btn:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px #2563EB;
 }
 
 .year-nav-btn:active {
-    transform: scale(0.95);
+    background: #1e40af;
 }
 
 .year-nav-btn:disabled {
-    background: #cbd5e1;
+    background: #F9FAFB;
+    color: #9CA3AF;
     cursor: not-allowed;
-    transform: none;
 }
 
 .year-nav-display {
@@ -3621,25 +3625,25 @@ hr {
     padding: 0 16px;
     text-align: center;
     font-weight: 600;
-    font-size: 16px;
-    color: #1e293b;
+    font-size: 14px;
+    color: #1F2937;
 }
 
 @media (max-width: 768px) {
     .year-navigation-widget {
-        bottom: 20px;
-        right: 20px;
+        bottom: 16px;
+        right: 16px;
     }
     
     .year-nav-btn {
         width: 40px;
         height: 40px;
-        font-size: 16px;
+        font-size: 14px;
     }
     
     .year-nav-display {
         min-width: 60px;
         padding: 0 12px;
-        font-size: 14px;
+        font-size: 12px;
     }
 }
