@@ -16431,9 +16431,10 @@ function setupYearNavigationWidget() {
             .filter(y => !isNaN(y))
             .sort((a, b) => a - b);
         
-        // Find the previous available year
-        const prevYear = availableYears.find(y => y < currentYear);
-        if (prevYear !== undefined) {
+        // Find the immediate previous year (largest year less than current)
+        const yearsLessThanCurrent = availableYears.filter(y => y < currentYear);
+        if (yearsLessThanCurrent.length > 0) {
+            const prevYear = Math.max(...yearsLessThanCurrent);
             yearFilter.value = prevYear.toString();
             updateYearNavigation();
             loadRentRoll();
@@ -16446,9 +16447,9 @@ function setupYearNavigationWidget() {
         const availableYears = Array.from(yearFilter.options)
             .map(opt => parseInt(opt.value))
             .filter(y => !isNaN(y))
-            .sort((a, b) => a - b);
+            .sort((a, b) => a - b); // Sort ascending to find immediate next
         
-        // Find the next available year
+        // Find the immediate next year (smallest year greater than current)
         const nextYear = availableYears.find(y => y > currentYear);
         if (nextYear !== undefined) {
             yearFilter.value = nextYear.toString();
