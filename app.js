@@ -15583,6 +15583,7 @@ function formatLeaseSummaries(leases, tenants, units = {}) {
         // Determine display status - if deprecated, show Deprecated status
         const displayStatus = isLeaseDeprecated(lease) ? 'Deprecated' : lease.status;
         const isExpired = isLeaseExpired(lease) && lease.status === 'Expired';
+        const isOperatingUnderLeaseTerms = lease.status === 'Expired' && lease.operatingUnderLeaseTerms === true;
         const statusClass = displayStatus === 'Active' ? 'status-active' : 
                            displayStatus === 'Expiring Soon' ? 'status-warning' : 
                            displayStatus === 'Expired' ? 'status-expired' :
