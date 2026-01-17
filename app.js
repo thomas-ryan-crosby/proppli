@@ -16625,50 +16625,72 @@ function setupYearNavigationWidget() {
     yearFilter.addEventListener('change', updateYearNavigation);
     
     // Previous year button - navigate to immediate previous year
-    prevYearBtn.addEventListener('click', () => {
+    prevYearBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
         const currentYear = parseInt(yearFilter.value);
         if (isNaN(currentYear)) return;
         
-        // Get available years, excluding current year
-        const availableYears = Array.from(yearFilter.options)
+        // Get ALL available years from dropdown
+        const allAvailableYears = Array.from(yearFilter.options)
             .map(opt => parseInt(opt.value))
-            .filter(y => !isNaN(y) && y !== currentYear)
-            .sort((a, b) => b - a); // Sort descending
+            .filter(y => !isNaN(y))
+            .sort((a, b) => a - b); // Sort ascending
         
-        // Find the immediate previous year (currentYear - 1, or closest available)
+        // Find the immediate previous year (exactly currentYear - 1)
         const targetPrevYear = currentYear - 1;
-        const prevYear = availableYears.includes(targetPrevYear) 
-            ? targetPrevYear 
-            : availableYears.find(y => y < currentYear);
         
-        if (prevYear !== undefined) {
-            yearFilter.value = prevYear.toString();
-            updateYearNavigation();
+        // Check if targetPrevYear exists in dropdown
+        if (allAvailableYears.includes(targetPrevYear)) {
+            yearFilter.value = targetPrevYear.toString();
+            // Trigger change event to update UI
+            yearFilter.dispatchEvent(new Event('change', { bubbles: true }));
             loadRentRoll();
+        } else {
+            // If exact previous year doesn't exist, find closest previous year
+            const prevYears = allAvailableYears.filter(y => y < currentYear);
+            if (prevYears.length > 0) {
+                const closestPrev = Math.max(...prevYears);
+                yearFilter.value = closestPrev.toString();
+                yearFilter.dispatchEvent(new Event('change', { bubbles: true }));
+                loadRentRoll();
+            }
         }
     });
     
     // Next year button - navigate to immediate next year
-    nextYearBtn.addEventListener('click', () => {
+    nextYearBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
         const currentYear = parseInt(yearFilter.value);
         if (isNaN(currentYear)) return;
         
-        // Get available years, excluding current year
-        const availableYears = Array.from(yearFilter.options)
+        // Get ALL available years from dropdown
+        const allAvailableYears = Array.from(yearFilter.options)
             .map(opt => parseInt(opt.value))
-            .filter(y => !isNaN(y) && y !== currentYear)
+            .filter(y => !isNaN(y))
             .sort((a, b) => a - b); // Sort ascending
         
-        // Find the immediate next year (currentYear + 1, or closest available)
+        // Find the immediate next year (exactly currentYear + 1)
         const targetNextYear = currentYear + 1;
-        const nextYear = availableYears.includes(targetNextYear)
-            ? targetNextYear
-            : availableYears.find(y => y > currentYear);
         
-        if (nextYear !== undefined) {
-            yearFilter.value = nextYear.toString();
-            updateYearNavigation();
+        // Check if targetNextYear exists in dropdown
+        if (allAvailableYears.includes(targetNextYear)) {
+            yearFilter.value = targetNextYear.toString();
+            // Trigger change event to update UI
+            yearFilter.dispatchEvent(new Event('change', { bubbles: true }));
             loadRentRoll();
+        } else {
+            // If exact next year doesn't exist, find closest next year
+            const nextYears = allAvailableYears.filter(y => y > currentYear);
+            if (nextYears.length > 0) {
+                const closestNext = Math.min(...nextYears);
+                yearFilter.value = closestNext.toString();
+                yearFilter.dispatchEvent(new Event('change', { bubbles: true }));
+                loadRentRoll();
+            }
         }
     });
 }
