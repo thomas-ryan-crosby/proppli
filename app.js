@@ -1587,7 +1587,7 @@ function initializeApp() {
     
     // Restore saved view state
     const savedView = localStorage.getItem('currentView');
-    if (savedView && ['active', 'monitoring', 'completed', 'deleted'].includes(savedView)) {
+    if (savedView && ['new', 'inProgress', 'active', 'monitoring', 'completed', 'deleted'].includes(savedView)) {
         currentView = savedView;
         switchView(savedView);
     }
@@ -2008,11 +2008,15 @@ function setupEventListeners() {
     }
 
     // View toggles
+    const viewNewBtn = document.getElementById('viewNewBtn');
+    const viewInProgressBtn = document.getElementById('viewInProgressBtn');
     const viewActiveBtn = document.getElementById('viewActiveBtn');
     const viewMonitoringBtn = document.getElementById('viewMonitoringBtn');
     const viewCompletedBtn = document.getElementById('viewCompletedBtn');
     const toggleMetricsBtn = document.getElementById('toggleMetricsBtn');
     
+    if (viewNewBtn) viewNewBtn.addEventListener('click', () => switchView('new'));
+    if (viewInProgressBtn) viewInProgressBtn.addEventListener('click', () => switchView('inProgress'));
     if (viewActiveBtn) viewActiveBtn.addEventListener('click', () => switchView('active'));
     if (viewMonitoringBtn) viewMonitoringBtn.addEventListener('click', () => switchView('monitoring'));
     if (viewCompletedBtn) viewCompletedBtn.addEventListener('click', () => switchView('completed'));
@@ -4666,16 +4670,22 @@ function updateMetrics(tickets) {
 }
 
 function renderTickets(tickets) {
+    const newList = document.getElementById('newTicketsList');
+    const inProgressList = document.getElementById('inProgressTicketsList');
     const activeList = document.getElementById('activeTicketsList');
     const monitoringList = document.getElementById('monitoringTicketsList');
     const completedList = document.getElementById('completedTicketsList');
     const deletedList = document.getElementById('deletedTicketsList');
     
+    if (newList) newList.innerHTML = '';
+    if (inProgressList) inProgressList.innerHTML = '';
     activeList.innerHTML = '';
     if (monitoringList) monitoringList.innerHTML = '';
     completedList.innerHTML = '';
     if (deletedList) deletedList.innerHTML = '';
 
+    let newTickets = [];
+    let inProgressTickets = [];
     let activeTickets = [];
     let monitoringTickets = [];
     let completedTickets = [];
@@ -4713,12 +4723,26 @@ function renderTickets(tickets) {
             completedTickets.push(ticket);
         } else if (ticket.status === 'Monitoring') {
             monitoringTickets.push(ticket);
+        } else if (ticket.status === 'Not Started') {
+            newTickets.push(ticket);
+        } else if (ticket.status === 'In Progress') {
+            inProgressTickets.push(ticket);
         } else {
             activeTickets.push(ticket);
         }
     });
 
     // Sort by date created (newest first)
+    newTickets.sort((a, b) => {
+        const aTime = a.dateCreated?.toMillis ? a.dateCreated.toMillis() : (a.dateCreated || 0);
+        const bTime = b.dateCreated?.toMillis ? b.dateCreated.toMillis() : (b.dateCreated || 0);
+        return bTime - aTime;
+    });
+    inProgressTickets.sort((a, b) => {
+        const aTime = a.dateCreated?.toMillis ? a.dateCreated.toMillis() : (a.dateCreated || 0);
+        const bTime = b.dateCreated?.toMillis ? b.dateCreated.toMillis() : (b.dateCreated || 0);
+        return bTime - aTime;
+    });
     activeTickets.sort((a, b) => {
         const aTime = a.dateCreated?.toMillis ? a.dateCreated.toMillis() : (a.dateCreated || 0);
         const bTime = b.dateCreated?.toMillis ? b.dateCreated.toMillis() : (b.dateCreated || 0);
@@ -4734,6 +4758,26 @@ function renderTickets(tickets) {
         const bTime = b.dateCompleted?.toMillis ? b.dateCompleted.toMillis() : (b.dateCompleted || 0);
         return bTime - aTime;
     });
+
+    if (newList) {
+        if (newTickets.length === 0) {
+            newList.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><p>No new tickets</p></div>';
+        } else {
+            newTickets.forEach(ticket => {
+                newList.appendChild(createTicketCard(ticket));
+            });
+        }
+    }
+
+    if (inProgressList) {
+        if (inProgressTickets.length === 0) {
+            inProgressList.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><p>No in progress tickets</p></div>';
+        } else {
+            inProgressTickets.forEach(ticket => {
+                inProgressList.appendChild(createTicketCard(ticket));
+            });
+        }
+    }
 
     if (activeTickets.length === 0) {
         activeList.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><p>No active tickets</p></div>';
@@ -4925,7 +4969,7 @@ function createTicketCard(ticket, isDeleted = false) {
             ` : ''}
         </div>
         <div class="ticket-actions">
-            ${!isDeleted ? `
+                ${!isDeleted ? `
                 ${!isCompleted && ticket.status !== 'Monitoring' ? `
                     <div class="btn-group" style="position: relative; display: inline-block;">
                         <button class="btn-primary btn-small" onclick="openAdvanceWorkflowDropdown('${ticket.id}')" style="position: relative;">
@@ -4933,7 +4977,17 @@ function createTicketCard(ticket, isDeleted = false) {
                             <span style="margin-left: 5px;">▼</span>
                         </button>
                         <div id="workflowDropdown-${ticket.id}" class="workflow-dropdown" style="display: none; position: absolute; top: 100%; left: 0; background: white; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 1000; margin-top: 4px; min-width: 180px;">
-                            <button class="workflow-option" onclick="advanceWorkflow('${ticket.id}', 'Completed')" style="display: block; width: 100%; padding: 10px 15px; text-align: left; border: none; background: none; cursor: pointer; border-radius: 8px 8px 0 0;">
+                            ${ticket.status !== 'Not Started' ? `
+                            <button class="workflow-option" onclick="changeTicketStatus('${ticket.id}', 'Not Started')" style="display: block; width: 100%; padding: 10px 15px; text-align: left; border: none; background: none; cursor: pointer; border-radius: 8px 8px 0 0;">
+                                Mark as New
+                            </button>
+                            ` : ''}
+                            ${ticket.status !== 'In Progress' ? `
+                            <button class="workflow-option" onclick="changeTicketStatus('${ticket.id}', 'In Progress')" style="display: block; width: 100%; padding: 10px 15px; text-align: left; border: none; background: none; cursor: pointer; ${ticket.status === 'Not Started' ? 'border-radius: 8px 8px 0 0;' : 'border-top: 1px solid #eee;'}">
+                                Mark as In Progress
+                            </button>
+                            ` : ''}
+                            <button class="workflow-option" onclick="advanceWorkflow('${ticket.id}', 'Completed')" style="display: block; width: 100%; padding: 10px 15px; text-align: left; border: none; background: none; cursor: pointer; border-top: 1px solid #eee; ${(ticket.status === 'Not Started' || ticket.status === 'In Progress') ? '' : 'border-radius: 8px 8px 0 0;'}">
                                 Complete
                             </button>
                             <button class="workflow-option" onclick="advanceWorkflow('${ticket.id}', 'Monitoring')" style="display: block; width: 100%; padding: 10px 15px; text-align: left; border: none; background: none; cursor: pointer; border-top: 1px solid #eee; border-radius: 0 0 8px 8px;">
@@ -6161,6 +6215,35 @@ window.openAdvanceWorkflowDropdown = function(ticketId) {
     }, 0);
 };
 
+// Change ticket status (for New and In Progress)
+window.changeTicketStatus = function(ticketId, newStatus) {
+    // Validate ticketId
+    if (!ticketId || String(ticketId).trim() === '') {
+        console.error('changeTicketStatus: Invalid ticketId provided', ticketId);
+        alert('Error: Invalid ticket ID. Please try again.');
+        return;
+    }
+    
+    const validTicketId = String(ticketId).trim();
+    
+    // Close dropdown
+    const dropdown = document.getElementById(`workflowDropdown-${validTicketId}`);
+    if (dropdown) dropdown.style.display = 'none';
+    
+    // Update ticket status
+    db.collection('tickets').doc(validTicketId).update({
+        status: newStatus,
+        lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }).then(() => {
+        console.log(`Ticket ${validTicketId} status changed to ${newStatus}`);
+        // Tickets will automatically refresh via the onSnapshot listener
+    }).catch((error) => {
+        console.error('Error changing ticket status:', error);
+        alert('Error changing ticket status: ' + error.message);
+    });
+};
+
 // Advance workflow (Complete or Monitoring)
 window.advanceWorkflow = function(ticketId, targetStatus) {
     // Validate ticketId
@@ -6675,29 +6758,43 @@ function handleDeleteTicket(e) {
 function switchView(view) {
     currentView = view;
     
+    const newView = document.getElementById('newTicketsView');
+    const inProgressView = document.getElementById('inProgressTicketsView');
     const activeView = document.getElementById('activeTicketsView');
     const monitoringView = document.getElementById('monitoringTicketsView');
     const completedView = document.getElementById('completedTicketsView');
     const deletedView = document.getElementById('deletedTicketsView');
+    const newBtn = document.getElementById('viewNewBtn');
+    const inProgressBtn = document.getElementById('viewInProgressBtn');
     const activeBtn = document.getElementById('viewActiveBtn');
     const monitoringBtn = document.getElementById('viewMonitoringBtn');
     const completedBtn = document.getElementById('viewCompletedBtn');
     const deletedBtn = document.getElementById('viewDeletedBtn');
     
     // Hide all views
+    if (newView) newView.style.display = 'none';
+    if (inProgressView) inProgressView.style.display = 'none';
     if (activeView) activeView.style.display = 'none';
     if (monitoringView) monitoringView.style.display = 'none';
     if (completedView) completedView.style.display = 'none';
     if (deletedView) deletedView.style.display = 'none';
     
     // Remove active class from all buttons
+    if (newBtn) newBtn.classList.remove('active');
+    if (inProgressBtn) inProgressBtn.classList.remove('active');
     if (activeBtn) activeBtn.classList.remove('active');
     if (monitoringBtn) monitoringBtn.classList.remove('active');
     if (completedBtn) completedBtn.classList.remove('active');
     if (deletedBtn) deletedBtn.classList.remove('active');
     
     // Show selected view and activate button
-    if (view === 'active') {
+    if (view === 'new') {
+        if (newView) newView.style.display = 'block';
+        if (newBtn) newBtn.classList.add('active');
+    } else if (view === 'inProgress') {
+        if (inProgressView) inProgressView.style.display = 'block';
+        if (inProgressBtn) inProgressBtn.classList.add('active');
+    } else if (view === 'active') {
         if (activeView) activeView.style.display = 'block';
         if (activeBtn) activeBtn.classList.add('active');
     } else if (view === 'monitoring') {

@@ -25,14 +25,14 @@
             <div class="auth-container">
                 <div class="auth-header">
                     <img src="assets/images/logos/Logo+Word.png" alt="proppli" class="auth-logo" height="40">
-                </div>
+            </div>
                 <div class="auth-card">
                     <h2>Sign In</h2>
                     <form id="loginForm">
                         <div class="form-group">
                             <label for="loginEmail">Email</label>
                             <input type="email" id="loginEmail" required autocomplete="email">
-                        </div>
+            </div>
                         <div class="form-group">
                             <label for="loginPassword">Password</label>
                             <div class="password-input-wrapper">
@@ -238,7 +238,7 @@
                     <span class="nav-icon">👤</span>
                     <span class="nav-label">Users</span>
                 </button>
-            </nav>
+        </nav>
         </aside>
 
         <!-- Main Content Area -->
@@ -341,23 +341,23 @@
                                     <span style="font-weight: 600;">Enable Time Allocation</span>
                                 </label>
                                 <div id="timeAllocationGroup" style="display: none;">
-                                    <label for="timeAllocated">Time Allocated (hours)</label>
-                                    <input type="number" id="timeAllocated" min="0" step="0.5" placeholder="Required before marking complete">
+                                <label for="timeAllocated">Time Allocated (hours)</label>
+                                <input type="number" id="timeAllocated" min="0" step="0.5" placeholder="Required before marking complete">
                                     <small style="color: #666; font-size: 12px;">Time allocation must be set before marking ticket as complete</small>
                                     <div style="margin-top: 15px;">
-                                        <label>Billing Type</label>
-                                        <div style="display: flex; gap: 20px; margin-bottom: 10px;">
-                                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: normal;">
-                                                <input type="radio" name="billingType" id="billingTypeHourly" value="hourly" checked>
-                                                <span>Hourly Rate</span>
-                                            </label>
-                                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: normal;">
-                                                <input type="radio" name="billingType" id="billingTypeFlat" value="flat">
-                                                <span>Flat Rate</span>
-                                            </label>
-                                        </div>
-                                        <label for="billingRate" id="billingRateLabel">Billing Rate ($/hour)</label>
-                                        <input type="number" id="billingRate" min="0" step="0.01" placeholder="e.g., 75.00">
+                                <label>Billing Type</label>
+                                <div style="display: flex; gap: 20px; margin-bottom: 10px;">
+                                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: normal;">
+                                        <input type="radio" name="billingType" id="billingTypeHourly" value="hourly" checked>
+                                        <span>Hourly Rate</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: normal;">
+                                        <input type="radio" name="billingType" id="billingTypeFlat" value="flat">
+                                        <span>Flat Rate</span>
+                                    </label>
+                                </div>
+                                <label for="billingRate" id="billingRateLabel">Billing Rate ($/hour)</label>
+                                <input type="number" id="billingRate" min="0" step="0.01" placeholder="e.g., 75.00">
                                     </div>
                                 </div>
                             </div>
@@ -524,31 +524,31 @@
                             
                             <!-- Fields for Completed status -->
                             <div id="completionFieldsGroup">
-                                <div class="form-group">
-                                    <label for="completionCompletedBy">Completed By *</label>
+                            <div class="form-group">
+                                <label for="completionCompletedBy">Completed By *</label>
                                     <select id="completionCompletedBy" required>
                                         <option value="">Select a user...</option>
                                         <option value="__other__">Other (enter manually)</option>
                                     </select>
                                     <input type="text" id="completionCompletedByOther" placeholder="Enter name manually" style="display: none; margin-top: 8px;">
-                                </div>
-                                <div class="form-group">
-                                    <label for="completionHowResolved">How Resolved</label>
-                                    <textarea id="completionHowResolved" rows="3" placeholder="Describe how the issue was resolved..."></textarea>
-                                </div>
-                                <div class="form-group">
+                            </div>
+                            <div class="form-group">
+                                <label for="completionHowResolved">How Resolved</label>
+                                <textarea id="completionHowResolved" rows="3" placeholder="Describe how the issue was resolved..."></textarea>
+                            </div>
+                            <div class="form-group">
                                     <label>After Photos/Files (Optional)</label>
-                                    <div class="file-upload-section" style="grid-template-columns: 1fr;">
+                                <div class="file-upload-section" style="grid-template-columns: 1fr;">
                                         <div class="file-upload-item" id="completionAfterPhotoDropZone">
-                                            <label for="completionAfterPhoto" class="file-upload-label">
+                                        <label for="completionAfterPhoto" class="file-upload-label">
                                                 <span class="file-upload-icon">📎</span>
                                                 <span>Upload After Photos or Files</span>
                                                 <span style="display: block; margin-top: 8px; font-size: 12px; color: #666;">or drag and drop files here</span>
-                                            </label>
+                                        </label>
                                             <input type="file" id="completionAfterPhoto" multiple style="display: none;">
-                                            <div id="completionAfterPhotoPreview" class="file-preview"></div>
-                                        </div>
+                                        <div id="completionAfterPhotoPreview" class="file-preview"></div>
                                     </div>
+                                </div>
                                     <small style="color: #666; font-size: 12px;">Upload photos or files showing the completed work (multiple files allowed)</small>
                                 </div>
                             </div>
@@ -668,11 +668,25 @@
                 <div class="dashboard-header">
                     <button id="createTicketBtn" class="btn-primary btn-large">+ Create New Ticket</button>
                     <div class="view-toggle">
+                        <button id="viewNewBtn" class="btn-toggle">New</button>
+                        <button id="viewInProgressBtn" class="btn-toggle">In Progress</button>
                         <button id="viewActiveBtn" class="btn-toggle active">Active Tickets</button>
                         <button id="viewMonitoringBtn" class="btn-toggle">Monitoring</button>
                         <button id="viewCompletedBtn" class="btn-toggle">Completed Tickets</button>
                         <button id="viewDeletedBtn" class="btn-toggle">Deleted Tickets</button>
                     </div>
+                </div>
+
+                <div id="newTicketsView" class="tickets-view" style="display: none;">
+                    <h2>New Tickets</h2>
+                    <p style="color: #6B7280; margin-bottom: 20px; font-size: 14px;">Tickets that have not been started yet.</p>
+                    <div id="newTicketsList" class="tickets-list"></div>
+                </div>
+
+                <div id="inProgressTicketsView" class="tickets-view" style="display: none;">
+                    <h2>In Progress Tickets</h2>
+                    <p style="color: #6B7280; margin-bottom: 20px; font-size: 14px;">Tickets that are currently being worked on.</p>
+                    <div id="inProgressTicketsList" class="tickets-list"></div>
                 </div>
 
                 <div id="activeTicketsView" class="tickets-view">
