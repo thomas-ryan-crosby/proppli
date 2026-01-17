@@ -16123,12 +16123,12 @@ async function populateRentRollFilters() {
                         // Load buildings for selected property
                         buildingsSnapshot = await db.collection('buildings')
                             .where('propertyId', '==', selectedPropertyId)
-                            .orderBy('name')
+                            .orderBy('buildingName')
                             .get();
                     } else {
                         // Load all buildings when "All Properties" is selected
                         buildingsSnapshot = await db.collection('buildings')
-                            .orderBy('name')
+                            .orderBy('buildingName')
                             .get();
                     }
                     
@@ -16137,7 +16137,7 @@ async function populateRentRollFilters() {
                         const building = doc.data();
                         const option = document.createElement('option');
                         option.value = doc.id;
-                        option.textContent = building.name || 'Unnamed Building';
+                        option.textContent = building.buildingName || 'Unnamed Building';
                         buildingFilterEl.appendChild(option);
                     });
                 } catch (error) {
@@ -16158,12 +16158,12 @@ async function populateRentRollFilters() {
                         buildingsSnapshot.forEach(doc => {
                             buildingsArray.push({ id: doc.id, ...doc.data() });
                         });
-                        buildingsArray.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+                        buildingsArray.sort((a, b) => (a.buildingName || '').localeCompare(b.buildingName || ''));
                         
                         buildingsArray.forEach(building => {
                             const option = document.createElement('option');
                             option.value = building.id;
-                            option.textContent = building.name || 'Unnamed Building';
+                            option.textContent = building.buildingName || 'Unnamed Building';
                             buildingFilterEl.appendChild(option);
                         });
                         console.log(`✅ Loaded ${buildingsArray.length} buildings (without orderBy)`);
@@ -16187,12 +16187,12 @@ async function populateRentRollFilters() {
                     // Load buildings for selected property
                     buildingsSnapshot = await db.collection('buildings')
                         .where('propertyId', '==', selectedPropertyId)
-                        .orderBy('name')
+                        .orderBy('buildingName')
                         .get();
                 } else {
                     // Load all buildings when "All Properties" is selected
                     buildingsSnapshot = await db.collection('buildings')
-                        .orderBy('name')
+                        .orderBy('buildingName')
                         .get();
                 }
                 
@@ -16201,7 +16201,7 @@ async function populateRentRollFilters() {
                     const building = doc.data();
                     const option = document.createElement('option');
                     option.value = doc.id;
-                    option.textContent = building.name || 'Unnamed Building';
+                    option.textContent = building.buildingName || 'Unnamed Building';
                     buildingFilterEl.appendChild(option);
                 });
             } catch (error) {
@@ -16222,12 +16222,12 @@ async function populateRentRollFilters() {
                     buildingsSnapshot.forEach(doc => {
                         buildingsArray.push({ id: doc.id, ...doc.data() });
                     });
-                    buildingsArray.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+                    buildingsArray.sort((a, b) => (a.buildingName || '').localeCompare(b.buildingName || ''));
                     
                     buildingsArray.forEach(building => {
                         const option = document.createElement('option');
                         option.value = building.id;
-                        option.textContent = building.name || 'Unnamed Building';
+                        option.textContent = building.buildingName || 'Unnamed Building';
                         buildingFilterEl.appendChild(option);
                     });
                     console.log(`✅ Initial load: Loaded ${buildingsArray.length} buildings (without orderBy)`);
