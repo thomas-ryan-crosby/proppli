@@ -1956,6 +1956,16 @@ function setupEventListeners() {
         setupDragAndDropForCompletion(completionAfterPhotoDropZone, completionAfterPhoto);
     }
     
+    // Monitoring documents upload handler
+    const completionMonitoringDocuments = document.getElementById('completionMonitoringDocuments');
+    const completionMonitoringDocumentsDropZone = document.getElementById('completionMonitoringDocumentsDropZone');
+    if (completionMonitoringDocuments) {
+        completionMonitoringDocuments.addEventListener('change', (e) => handleMonitoringDocumentsSelect(e));
+    }
+    if (completionMonitoringDocumentsDropZone && completionMonitoringDocuments) {
+        setupDragAndDropForMonitoring(completionMonitoringDocumentsDropZone, completionMonitoringDocuments);
+    }
+    
     // Workflow modal time allocation toggle handler
     const workflowEnableTimeAllocationToggle = document.getElementById('workflowEnableTimeAllocation');
     const workflowTimeAllocationFields = document.getElementById('workflowTimeAllocationFields');
@@ -4802,7 +4812,7 @@ function createTicketCard(ticket, isDeleted = false) {
                 <span style="font-size: 0.85rem; color: #2563EB; font-weight: 600;">👤 Assigned to: ${escapeHtml(assignedToDisplay)}</span>
             </div>
         ` : ''}
-        ${isMonitoring && (ticket.invoiceUrl || ticket.invoiceNotes) ? `
+        ${isMonitoring && (ticket.invoiceUrl || ticket.invoiceNotes || (ticket.monitoringFiles && ticket.monitoringFiles.length > 0)) ? `
             <div class="monitoring-info" style="background: #F9FAFB; border-left: 3px solid #F59E0B; padding: 12px; margin: 12px 0; border-radius: 8px;">
                 <div style="font-size: 0.85rem; color: #6B7280; font-weight: 600; margin-bottom: 8px;">📄 Monitoring Information:</div>
                 ${ticket.invoiceUrl ? `
@@ -4811,7 +4821,21 @@ function createTicketCard(ticket, isDeleted = false) {
                     </div>
                 ` : ''}
                 ${ticket.invoiceNotes ? `
-                    <div style="font-size: 0.85rem; color: #1F2937; line-height: 1.5;">${escapeHtml(ticket.invoiceNotes)}</div>
+                    <div style="font-size: 0.85rem; color: #1F2937; line-height: 1.5; margin-bottom: 8px;">${escapeHtml(ticket.invoiceNotes)}</div>
+                ` : ''}
+                ${ticket.monitoringFiles && ticket.monitoringFiles.length > 0 ? `
+                    <div style="margin-top: 8px;">
+                        <div style="font-size: 0.8rem; color: #6B7280; font-weight: 600; margin-bottom: 4px;">Monitoring Documents:</div>
+                        <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                            ${ticket.monitoringFiles.map((file, idx) => {
+                                if (file.isImage) {
+                                    return `<a href="${escapeHtml(file.fileUrl)}" target="_blank" style="display: inline-block; margin: 4px;"><img src="${escapeHtml(file.fileUrl)}" alt="${escapeHtml(file.fileName || 'Document')}" style="max-width: 80px; max-height: 80px; border-radius: 4px; border: 1px solid #ddd; cursor: pointer;"></a>`;
+                                } else {
+                                    return `<a href="${escapeHtml(file.fileUrl)}" target="_blank" style="display: inline-block; padding: 8px 12px; background: #E5E7EB; border-radius: 4px; text-decoration: none; color: #1F2937; font-size: 0.75rem; margin: 4px;">📄 ${escapeHtml(file.fileName || 'Document')}</a>`;
+                                }
+                            }).join('')}
+                        </div>
+                    </div>
                 ` : ''}
             </div>
         ` : ''}
@@ -6206,14 +6230,40 @@ function openWorkflowModal(ticketId, targetStatus) {
         if (modalTitle) modalTitle.textContent = 'Move Ticket to Monitoring';
     }
     
-    // Reset form
+    // Show/hide appropriate fields based on target status
+    const completionFieldsGroup = document.getElementById('completionFieldsGroup');
+    const monitoringFieldsGroup = document.getElementById('monitoringFieldsGroup');
+    const completionCompletedBy = document.getElementById('completionCompletedBy');
+    
+    if (targetStatus === 'Completed') {
+        if (completionFieldsGroup) completionFieldsGroup.style.display = 'block';
+        if (monitoringFieldsGroup) monitoringFieldsGroup.style.display = 'none';
+        if (completionCompletedBy) completionCompletedBy.required = true;
+    } else if (targetStatus === 'Monitoring') {
+        if (completionFieldsGroup) completionFieldsGroup.style.display = 'none';
+        if (monitoringFieldsGroup) monitoringFieldsGroup.style.display = 'block';
+        if (completionCompletedBy) completionCompletedBy.required = false;
+    }
+    
+    // Reset form fields
     const completionHowResolved = document.getElementById('completionHowResolved');
     const completionAfterPhoto = document.getElementById('completionAfterPhoto');
     const completionAfterPhotoPreview = document.getElementById('completionAfterPhotoPreview');
+    const workflowInvoiceUrl = document.getElementById('workflowInvoiceUrl');
+    const workflowInvoiceNotes = document.getElementById('workflowInvoiceNotes');
+    const completionMonitoringDocuments = document.getElementById('completionMonitoringDocuments');
+    const completionMonitoringDocumentsPreview = document.getElementById('completionMonitoringDocumentsPreview');
+    
     if (completionHowResolved) completionHowResolved.value = '';
     if (completionAfterPhoto) completionAfterPhoto.value = '';
     if (completionAfterPhotoPreview) completionAfterPhotoPreview.innerHTML = '';
+    if (workflowInvoiceUrl) workflowInvoiceUrl.value = '';
+    if (workflowInvoiceNotes) workflowInvoiceNotes.value = '';
+    if (completionMonitoringDocuments) completionMonitoringDocuments.value = '';
+    if (completionMonitoringDocumentsPreview) completionMonitoringDocumentsPreview.innerHTML = '';
+    
     completionAfterFiles = [];
+    completionMonitoringFiles = [];
     
     // Load ticket data to check time allocation settings
     // Use the validated editingTicketId
@@ -6262,27 +6312,56 @@ function openWorkflowModal(ticketId, targetStatus) {
             }
         }
         
-        // Load and populate completion dropdown, default to current user
-        return loadUsersForDropdowns();
-    }).then(() => {
-        populateUserDropdown('completionCompletedBy', currentUserProfile?.id || '');
-        // Set default to current user if available
-        const completionCompletedBy = document.getElementById('completionCompletedBy');
-        if (completionCompletedBy && currentUserProfile?.id) {
-            completionCompletedBy.value = currentUserProfile.id;
+        // Load existing monitoring data if moving to monitoring
+        if (targetStatus === 'Monitoring') {
+            const workflowInvoiceUrl = document.getElementById('workflowInvoiceUrl');
+            const workflowInvoiceNotes = document.getElementById('workflowInvoiceNotes');
+            if (workflowInvoiceUrl) workflowInvoiceUrl.value = ticket.invoiceUrl || '';
+            if (workflowInvoiceNotes) workflowInvoiceNotes.value = ticket.invoiceNotes || '';
+            
+            // Load existing monitoring files if any
+            if (ticket.monitoringFiles && Array.isArray(ticket.monitoringFiles)) {
+                completionMonitoringFiles = ticket.monitoringFiles.map(fileData => ({
+                    file: null, // Existing file, not a new upload
+                    preview: fileData.isImage ? fileData.fileUrl : null,
+                    isImage: fileData.isImage,
+                    fileUrl: fileData.fileUrl,
+                    fileName: fileData.fileName,
+                    existing: true
+                }));
+                updateMonitoringDocumentsPreview();
+            }
         }
-        if (completionCompletedBy) completionCompletedBy.focus();
-    }).catch((error) => {
-        console.error('Error loading ticket data:', error);
-        // Still show modal even if ticket load fails
-        loadUsersForDropdowns().then(() => {
+        
+        // Load and populate completion dropdown, default to current user (only for Completed status)
+        if (targetStatus === 'Completed') {
+            return loadUsersForDropdowns();
+        } else {
+            return Promise.resolve();
+        }
+    }).then(() => {
+        if (targetStatus === 'Completed') {
             populateUserDropdown('completionCompletedBy', currentUserProfile?.id || '');
+            // Set default to current user if available
             const completionCompletedBy = document.getElementById('completionCompletedBy');
             if (completionCompletedBy && currentUserProfile?.id) {
                 completionCompletedBy.value = currentUserProfile.id;
             }
             if (completionCompletedBy) completionCompletedBy.focus();
-        });
+        }
+    }).catch((error) => {
+        console.error('Error loading ticket data:', error);
+        // Still show modal even if ticket load fails
+        if (targetStatus === 'Completed') {
+            loadUsersForDropdowns().then(() => {
+                populateUserDropdown('completionCompletedBy', currentUserProfile?.id || '');
+                const completionCompletedBy = document.getElementById('completionCompletedBy');
+                if (completionCompletedBy && currentUserProfile?.id) {
+                    completionCompletedBy.value = currentUserProfile.id;
+                }
+                if (completionCompletedBy) completionCompletedBy.focus();
+            });
+        }
     });
     
     // Show modal
@@ -6316,8 +6395,15 @@ function handleTicketCompletion(e) {
     const completedByUserId = completedBySelect?.value && completedBySelect.value !== '__other__' ? completedBySelect.value : null;
     const howResolvedEl = document.getElementById('completionHowResolved');
     const howResolved = howResolvedEl?.value.trim() || '';
+    
+    // Monitoring fields
+    const workflowInvoiceUrl = document.getElementById('workflowInvoiceUrl');
+    const workflowInvoiceNotes = document.getElementById('workflowInvoiceNotes');
+    const invoiceUrl = workflowInvoiceUrl?.value.trim() || null;
+    const invoiceNotes = workflowInvoiceNotes?.value.trim() || null;
 
-    if (!completedBy) {
+    // Only require completedBy for Completed status
+    if (targetStatus === 'Completed' && !completedBy) {
         alert('Please enter who completed the work');
         return;
     }
@@ -6380,25 +6466,52 @@ function handleTicketCompletion(e) {
             return Promise.reject(new Error('Time allocation required'));
         }
         
-        // Upload after files if provided
-        const uploadPromises = completionAfterFiles.map((fileData, index) => 
-            uploadFile(fileData.file, ticketId, 'after', index)
-        );
+        // Upload files based on status
+        let uploadPromises = [];
+        if (targetStatus === 'Completed') {
+            // Upload after files for completed tickets
+            uploadPromises = completionAfterFiles.map((fileData, index) => 
+                uploadFile(fileData.file, ticketId, 'after', index)
+            );
+        } else if (targetStatus === 'Monitoring') {
+            // Upload monitoring documents for monitoring tickets
+            uploadPromises = completionMonitoringFiles
+                .filter(fileData => !fileData.existing && fileData.file) // Only new files
+                .map((fileData, index) => 
+                    uploadFile(fileData.file, ticketId, 'monitoring', index)
+                );
+        }
         
         // Wait for uploads, then get ticket and update
         return Promise.all(uploadPromises.length > 0 ? uploadPromises : [Promise.resolve(null)]).then((uploadResults) => {
-            const newAfterFiles = uploadResults.filter(r => r !== null);
+            const newUploadedFiles = uploadResults.filter(r => r !== null);
             
-            // Get existing ticket data (we already have it from line 6303, but need fresh data for afterFiles)
+            // Get existing ticket data
             return db.collection('tickets').doc(ticketId).get().then((doc) => {
                 const ticket = doc.data();
-                const existingAfterFiles = ticket?.afterFiles || (ticket?.afterPhotoUrl ? [{
-                    fileName: 'After Photo',
-                    fileUrl: ticket.afterPhotoUrl,
-                    isImage: true
-                }] : []);
                 
-                const allAfterFiles = [...existingAfterFiles, ...newAfterFiles];
+                // Handle files based on status
+                let allFiles = [];
+                if (targetStatus === 'Completed') {
+                    const existingAfterFiles = ticket?.afterFiles || (ticket?.afterPhotoUrl ? [{
+                        fileName: 'After Photo',
+                        fileUrl: ticket.afterPhotoUrl,
+                        isImage: true
+                    }] : []);
+                    allFiles = [...existingAfterFiles, ...newUploadedFiles];
+                } else if (targetStatus === 'Monitoring') {
+                    // Combine existing monitoring files with new uploads
+                    const existingMonitoringFiles = ticket?.monitoringFiles || [];
+                    // Keep existing files that weren't removed
+                    const keptExistingFiles = completionMonitoringFiles
+                        .filter(fileData => fileData.existing)
+                        .map(fileData => ({
+                            fileName: fileData.fileName,
+                            fileUrl: fileData.fileUrl,
+                            isImage: fileData.isImage
+                        }));
+                    allFiles = [...keptExistingFiles, ...newUploadedFiles];
+                }
                 
                 // Get workflow modal time allocation data if it exists
                 const workflowEnableTimeAllocation = document.getElementById('workflowEnableTimeAllocation');
@@ -6408,16 +6521,27 @@ function handleTicketCompletion(e) {
                 
                 const updateData = {
                     status: targetStatus,
-                    completedBy: completedBy,
-                    completedByUserId: completedByUserId || null,
-                    howResolved: howResolved || null,
                     lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 };
                 
-                // Save after files if any
-                if (allAfterFiles.length > 0) {
-                    updateData.afterFiles = allAfterFiles;
+                // Set completion fields only for Completed status
+                if (targetStatus === 'Completed') {
+                    updateData.completedBy = completedBy;
+                    updateData.completedByUserId = completedByUserId || null;
+                    updateData.howResolved = howResolved || null;
+                    // Save after files if any
+                    if (allFiles.length > 0) {
+                        updateData.afterFiles = allFiles;
+                    }
+                } else if (targetStatus === 'Monitoring') {
+                    // Set monitoring fields
+                    updateData.invoiceUrl = invoiceUrl;
+                    updateData.invoiceNotes = invoiceNotes;
+                    // Save monitoring files if any
+                    if (allFiles.length > 0) {
+                        updateData.monitoringFiles = allFiles;
+                    }
                 }
 
                 // Update time allocation if it was edited in the workflow modal
@@ -6739,6 +6863,7 @@ window.removeExistingFile = function(type, index) {
 
 // For workflow completion modal, we'll use a simple array approach
 let completionAfterFiles = [];
+let completionMonitoringFiles = [];
 
 function handleCompletionFileSelect(event) {
     const files = Array.from(event.target.files);
@@ -6792,6 +6917,115 @@ function updateCompletionFilePreview() {
 window.removeCompletionFile = function(index) {
     completionAfterFiles.splice(index, 1);
     updateCompletionFilePreview();
+}
+
+// Monitoring documents handling
+function handleMonitoringDocumentsSelect(event) {
+    const files = Array.from(event.target.files);
+    if (!files || files.length === 0) return;
+    
+    files.forEach(file => {
+        // Validate file size (max 20MB)
+        if (file.size > 20 * 1024 * 1024) {
+            alert(`File "${file.name}" is too large. Maximum size is 20MB.`);
+            return;
+        }
+        
+        const fileData = {
+            file: file,
+            isImage: file.type.startsWith('image/')
+        };
+        
+        if (fileData.isImage) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                fileData.preview = e.target.result;
+                completionMonitoringFiles.push(fileData);
+                updateMonitoringDocumentsPreview();
+            };
+            reader.readAsDataURL(file);
+        } else {
+            completionMonitoringFiles.push(fileData);
+            updateMonitoringDocumentsPreview();
+        }
+    });
+    
+    event.target.value = '';
+}
+
+function updateMonitoringDocumentsPreview() {
+    const preview = document.getElementById('completionMonitoringDocumentsPreview');
+    if (!preview) return;
+    
+    let html = '';
+    completionMonitoringFiles.forEach((fileData, index) => {
+        if (fileData.existing) {
+            // Existing file from database
+            if (fileData.isImage && fileData.fileUrl) {
+                html += '<div class="file-preview-item" style="display: inline-block; margin: 8px; position: relative;"><img src="' + escapeHtml(fileData.fileUrl) + '" alt="' + escapeHtml(fileData.fileName || 'Document') + '" style="max-width: 150px; max-height: 150px; border-radius: 4px; border: 1px solid #ddd;"><button type="button" onclick="removeMonitoringFile(' + index + ')" style="position: absolute; top: -8px; right: -8px; background: #e74c3c; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 14px;">×</button><div style="font-size: 0.75em; color: #666; margin-top: 4px; max-width: 150px; overflow: hidden; text-overflow: ellipsis;">' + escapeHtml(fileData.fileName || 'Document') + '</div></div>';
+            } else {
+                html += '<div class="file-preview-item" style="display: inline-block; margin: 8px; position: relative; padding: 12px; border: 1px solid #ddd; border-radius: 4px; background: #f8f9fa;"><div style="font-size: 2em; margin-bottom: 4px;">📄</div><button type="button" onclick="removeMonitoringFile(' + index + ')" style="position: absolute; top: -8px; right: -8px; background: #e74c3c; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 14px;">×</button><div style="font-size: 0.75em; color: #666; max-width: 120px; overflow: hidden; text-overflow: ellipsis;">' + escapeHtml(fileData.fileName || 'Document') + '</div><a href="' + escapeHtml(fileData.fileUrl) + '" target="_blank" style="font-size: 0.7em; color: #2563eb; text-decoration: none; margin-top: 4px; display: block;">View</a></div>';
+            }
+        } else if (fileData.isImage && fileData.preview) {
+            html += '<div class="file-preview-item" style="display: inline-block; margin: 8px; position: relative;"><img src="' + escapeHtml(fileData.preview) + '" alt="' + escapeHtml(fileData.file.name) + '" style="max-width: 150px; max-height: 150px; border-radius: 4px; border: 1px solid #ddd;"><button type="button" onclick="removeMonitoringFile(' + index + ')" style="position: absolute; top: -8px; right: -8px; background: #e74c3c; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 14px;">×</button><div style="font-size: 0.75em; color: #666; margin-top: 4px; max-width: 150px; overflow: hidden; text-overflow: ellipsis;">' + escapeHtml(fileData.file.name) + '</div></div>';
+        } else {
+            html += '<div class="file-preview-item" style="display: inline-block; margin: 8px; position: relative; padding: 12px; border: 1px solid #ddd; border-radius: 4px; background: #f8f9fa;"><div style="font-size: 2em; margin-bottom: 4px;">📄</div><button type="button" onclick="removeMonitoringFile(' + index + ')" style="position: absolute; top: -8px; right: -8px; background: #e74c3c; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 14px;">×</button><div style="font-size: 0.75em; color: #666; max-width: 120px; overflow: hidden; text-overflow: ellipsis;">' + escapeHtml(fileData.file.name) + '</div><div style="font-size: 0.65em; color: #999; margin-top: 2px;">' + formatFileSize(fileData.file.size) + '</div></div>';
+        }
+    });
+    
+    preview.innerHTML = html;
+}
+
+window.removeMonitoringFile = function(index) {
+    completionMonitoringFiles.splice(index, 1);
+    updateMonitoringDocumentsPreview();
+}
+
+// Setup drag and drop for monitoring documents
+function setupDragAndDropForMonitoring(dropZone, fileInput) {
+    if (!dropZone || !fileInput) return;
+    
+    // Prevent default drag behaviors
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, preventDefaults, false);
+        document.body.addEventListener(eventName, preventDefaults, false);
+    });
+    
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    
+    // Highlight drop zone when item is dragged over it
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+            dropZone.style.borderColor = '#2563EB';
+            dropZone.style.backgroundColor = '#EBF5FF';
+        }, false);
+    });
+    
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+            dropZone.style.borderColor = '';
+            dropZone.style.backgroundColor = '';
+        }, false);
+    });
+    
+    // Handle dropped files
+    dropZone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        
+        if (files.length > 0) {
+            // Create a fake event object to reuse handleMonitoringDocumentsSelect
+            const fakeEvent = {
+                target: {
+                    files: files
+                }
+            };
+            handleMonitoringDocumentsSelect(fakeEvent);
+        }
+    }, false);
 }
 
 // Setup drag and drop for completion modal

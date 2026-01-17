@@ -521,18 +521,71 @@
                     <div class="modal-body">
                         <form id="completionForm">
                             <input type="hidden" id="workflowTargetStatus" value="">
-                            <div class="form-group">
-                                <label for="completionCompletedBy">Completed By *</label>
-                                <select id="completionCompletedBy" required>
-                                    <option value="">Select a user...</option>
-                                    <option value="__other__">Other (enter manually)</option>
-                                </select>
-                                <input type="text" id="completionCompletedByOther" placeholder="Enter name manually" style="display: none; margin-top: 8px;">
+                            
+                            <!-- Fields for Completed status -->
+                            <div id="completionFieldsGroup">
+                                <div class="form-group">
+                                    <label for="completionCompletedBy">Completed By *</label>
+                                    <select id="completionCompletedBy" required>
+                                        <option value="">Select a user...</option>
+                                        <option value="__other__">Other (enter manually)</option>
+                                    </select>
+                                    <input type="text" id="completionCompletedByOther" placeholder="Enter name manually" style="display: none; margin-top: 8px;">
+                                </div>
+                                <div class="form-group">
+                                    <label for="completionHowResolved">How Resolved</label>
+                                    <textarea id="completionHowResolved" rows="3" placeholder="Describe how the issue was resolved..."></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label>After Photos/Files (Optional)</label>
+                                    <div class="file-upload-section" style="grid-template-columns: 1fr;">
+                                        <div class="file-upload-item" id="completionAfterPhotoDropZone">
+                                            <label for="completionAfterPhoto" class="file-upload-label">
+                                                <span class="file-upload-icon">📎</span>
+                                                <span>Upload After Photos or Files</span>
+                                                <span style="display: block; margin-top: 8px; font-size: 12px; color: #666;">or drag and drop files here</span>
+                                            </label>
+                                            <input type="file" id="completionAfterPhoto" multiple style="display: none;">
+                                            <div id="completionAfterPhotoPreview" class="file-preview"></div>
+                                        </div>
+                                    </div>
+                                    <small style="color: #666; font-size: 12px;">Upload photos or files showing the completed work (multiple files allowed)</small>
+                                </div>
                             </div>
-                            <div class="form-group">
-                                <label for="completionHowResolved">How Resolved</label>
-                                <textarea id="completionHowResolved" rows="3" placeholder="Describe how the issue was resolved..."></textarea>
+                            
+                            <!-- Fields for Monitoring status -->
+                            <div id="monitoringFieldsGroup" style="display: none;">
+                                <div class="form-group">
+                                    <label style="font-weight: 600; color: #2563EB;">Monitoring Information</label>
+                                    <small style="display: block; color: #6B7280; margin-bottom: 12px;">Add invoices, proposals, or documents for future work on this ticket</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="workflowInvoiceUrl">Invoice/Proposal URL (Optional)</label>
+                                    <input type="url" id="workflowInvoiceUrl" placeholder="https://...">
+                                    <small style="color: #6B7280; font-size: 12px;">Link to invoice or proposal document</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="workflowInvoiceNotes">Invoice/Proposal Notes (Optional)</label>
+                                    <textarea id="workflowInvoiceNotes" rows="3" placeholder="Notes about the invoice or proposal, estimated costs, timeline, etc."></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label>Monitoring Documents (Optional)</label>
+                                    <div class="file-upload-section" style="grid-template-columns: 1fr;">
+                                        <div class="file-upload-item" id="completionMonitoringDocumentsDropZone">
+                                            <label for="completionMonitoringDocuments" class="file-upload-label">
+                                                <span class="file-upload-icon">📎</span>
+                                                <span>Upload Monitoring Documents</span>
+                                                <span style="display: block; margin-top: 8px; font-size: 12px; color: #666;">or drag and drop files here</span>
+                                            </label>
+                                            <input type="file" id="completionMonitoringDocuments" multiple style="display: none;">
+                                            <div id="completionMonitoringDocumentsPreview" class="file-preview"></div>
+                                        </div>
+                                    </div>
+                                    <small style="color: #666; font-size: 12px;">Upload invoices, proposals, or other documents related to monitoring this ticket (multiple files allowed)</small>
+                                </div>
                             </div>
+                            
+                            <!-- Time allocation (shown for both Completed and Monitoring) -->
                             <div class="form-group" id="workflowTimeAllocationGroup" style="display: none;">
                                 <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin-bottom: 8px;">
                                     <label class="toggle-switch">
@@ -561,21 +614,6 @@
                                         <input type="number" id="workflowBillingRate" min="0" step="0.01" placeholder="e.g., 75.00">
                                     </div>
                                 </div>
-                            </div>
-                            <div class="form-group">
-                                <label>After Photo (Optional)</label>
-                                <div class="file-upload-section" style="grid-template-columns: 1fr;">
-                                    <div class="file-upload-item" id="completionAfterPhotoDropZone">
-                                        <label for="completionAfterPhoto" class="file-upload-label">
-                                            <span class="file-upload-icon">📎</span>
-                                            <span>Upload After Photos or Files</span>
-                                            <span style="display: block; margin-top: 8px; font-size: 12px; color: #666;">or drag and drop files here</span>
-                                        </label>
-                                        <input type="file" id="completionAfterPhoto" multiple style="display: none;">
-                                        <div id="completionAfterPhotoPreview" class="file-preview"></div>
-                                    </div>
-                                </div>
-                                <small style="color: #666; font-size: 12px;">Upload photos or files showing the completed work (multiple files allowed)</small>
                             </div>
                             <div class="form-actions">
                                 <button type="submit" class="btn-primary" id="workflowSubmitBtn">Advance Workflow</button>
