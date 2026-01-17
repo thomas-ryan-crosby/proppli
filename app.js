@@ -1587,9 +1587,13 @@ function initializeApp() {
     
     // Restore saved view state
     const savedView = localStorage.getItem('currentView');
-    if (savedView && ['new', 'inProgress', 'active', 'monitoring', 'completed', 'deleted'].includes(savedView)) {
+    if (savedView && ['new', 'inProgress', 'monitoring', 'completed', 'deleted'].includes(savedView)) {
         currentView = savedView;
         switchView(savedView);
+    } else {
+        // Default to 'new' view if no saved view or invalid saved view
+        currentView = 'new';
+        switchView('new');
     }
     
     // Only load data if user is authenticated
@@ -2010,14 +2014,12 @@ function setupEventListeners() {
     // View toggles
     const viewNewBtn = document.getElementById('viewNewBtn');
     const viewInProgressBtn = document.getElementById('viewInProgressBtn');
-    const viewActiveBtn = document.getElementById('viewActiveBtn');
     const viewMonitoringBtn = document.getElementById('viewMonitoringBtn');
     const viewCompletedBtn = document.getElementById('viewCompletedBtn');
     const toggleMetricsBtn = document.getElementById('toggleMetricsBtn');
     
     if (viewNewBtn) viewNewBtn.addEventListener('click', () => switchView('new'));
     if (viewInProgressBtn) viewInProgressBtn.addEventListener('click', () => switchView('inProgress'));
-    if (viewActiveBtn) viewActiveBtn.addEventListener('click', () => switchView('active'));
     if (viewMonitoringBtn) viewMonitoringBtn.addEventListener('click', () => switchView('monitoring'));
     if (viewCompletedBtn) viewCompletedBtn.addEventListener('click', () => switchView('completed'));
     if (toggleMetricsBtn) toggleMetricsBtn.addEventListener('click', toggleMetrics);
@@ -4672,21 +4674,18 @@ function updateMetrics(tickets) {
 function renderTickets(tickets) {
     const newList = document.getElementById('newTicketsList');
     const inProgressList = document.getElementById('inProgressTicketsList');
-    const activeList = document.getElementById('activeTicketsList');
     const monitoringList = document.getElementById('monitoringTicketsList');
     const completedList = document.getElementById('completedTicketsList');
     const deletedList = document.getElementById('deletedTicketsList');
     
     if (newList) newList.innerHTML = '';
     if (inProgressList) inProgressList.innerHTML = '';
-    activeList.innerHTML = '';
     if (monitoringList) monitoringList.innerHTML = '';
     completedList.innerHTML = '';
     if (deletedList) deletedList.innerHTML = '';
 
     let newTickets = [];
     let inProgressTickets = [];
-    let activeTickets = [];
     let monitoringTickets = [];
     let completedTickets = [];
     let deletedTickets = [];
@@ -4727,9 +4726,8 @@ function renderTickets(tickets) {
             newTickets.push(ticket);
         } else if (ticket.status === 'In Progress') {
             inProgressTickets.push(ticket);
-        } else {
-            activeTickets.push(ticket);
         }
+        // Any other statuses will be ignored (or could be added to a catch-all view if needed)
     });
 
     // Sort by date created (newest first)
@@ -4739,11 +4737,6 @@ function renderTickets(tickets) {
         return bTime - aTime;
     });
     inProgressTickets.sort((a, b) => {
-        const aTime = a.dateCreated?.toMillis ? a.dateCreated.toMillis() : (a.dateCreated || 0);
-        const bTime = b.dateCreated?.toMillis ? b.dateCreated.toMillis() : (b.dateCreated || 0);
-        return bTime - aTime;
-    });
-    activeTickets.sort((a, b) => {
         const aTime = a.dateCreated?.toMillis ? a.dateCreated.toMillis() : (a.dateCreated || 0);
         const bTime = b.dateCreated?.toMillis ? b.dateCreated.toMillis() : (b.dateCreated || 0);
         return bTime - aTime;
@@ -4777,14 +4770,6 @@ function renderTickets(tickets) {
                 inProgressList.appendChild(createTicketCard(ticket));
             });
         }
-    }
-
-    if (activeTickets.length === 0) {
-        activeList.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><p>No active tickets</p></div>';
-    } else {
-        activeTickets.forEach(ticket => {
-            activeList.appendChild(createTicketCard(ticket));
-        });
     }
 
     if (monitoringList) {
@@ -6760,13 +6745,11 @@ function switchView(view) {
     
     const newView = document.getElementById('newTicketsView');
     const inProgressView = document.getElementById('inProgressTicketsView');
-    const activeView = document.getElementById('activeTicketsView');
     const monitoringView = document.getElementById('monitoringTicketsView');
     const completedView = document.getElementById('completedTicketsView');
     const deletedView = document.getElementById('deletedTicketsView');
     const newBtn = document.getElementById('viewNewBtn');
     const inProgressBtn = document.getElementById('viewInProgressBtn');
-    const activeBtn = document.getElementById('viewActiveBtn');
     const monitoringBtn = document.getElementById('viewMonitoringBtn');
     const completedBtn = document.getElementById('viewCompletedBtn');
     const deletedBtn = document.getElementById('viewDeletedBtn');
@@ -6774,7 +6757,6 @@ function switchView(view) {
     // Hide all views
     if (newView) newView.style.display = 'none';
     if (inProgressView) inProgressView.style.display = 'none';
-    if (activeView) activeView.style.display = 'none';
     if (monitoringView) monitoringView.style.display = 'none';
     if (completedView) completedView.style.display = 'none';
     if (deletedView) deletedView.style.display = 'none';
@@ -6782,7 +6764,6 @@ function switchView(view) {
     // Remove active class from all buttons
     if (newBtn) newBtn.classList.remove('active');
     if (inProgressBtn) inProgressBtn.classList.remove('active');
-    if (activeBtn) activeBtn.classList.remove('active');
     if (monitoringBtn) monitoringBtn.classList.remove('active');
     if (completedBtn) completedBtn.classList.remove('active');
     if (deletedBtn) deletedBtn.classList.remove('active');
@@ -6794,9 +6775,6 @@ function switchView(view) {
     } else if (view === 'inProgress') {
         if (inProgressView) inProgressView.style.display = 'block';
         if (inProgressBtn) inProgressBtn.classList.add('active');
-    } else if (view === 'active') {
-        if (activeView) activeView.style.display = 'block';
-        if (activeBtn) activeBtn.classList.add('active');
     } else if (view === 'monitoring') {
         if (monitoringView) monitoringView.style.display = 'block';
         if (monitoringBtn) monitoringBtn.classList.add('active');

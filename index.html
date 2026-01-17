@@ -668,16 +668,15 @@
                 <div class="dashboard-header">
                     <button id="createTicketBtn" class="btn-primary btn-large">+ Create New Ticket</button>
                     <div class="view-toggle">
-                        <button id="viewNewBtn" class="btn-toggle">New</button>
+                        <button id="viewNewBtn" class="btn-toggle active">New</button>
                         <button id="viewInProgressBtn" class="btn-toggle">In Progress</button>
-                        <button id="viewActiveBtn" class="btn-toggle active">Active Tickets</button>
                         <button id="viewMonitoringBtn" class="btn-toggle">Monitoring</button>
                         <button id="viewCompletedBtn" class="btn-toggle">Completed Tickets</button>
                         <button id="viewDeletedBtn" class="btn-toggle">Deleted Tickets</button>
                     </div>
                 </div>
 
-                <div id="newTicketsView" class="tickets-view" style="display: none;">
+                <div id="newTicketsView" class="tickets-view">
                     <h2>New Tickets</h2>
                     <p style="color: #6B7280; margin-bottom: 20px; font-size: 14px;">Tickets that have not been started yet.</p>
                     <div id="newTicketsList" class="tickets-list"></div>
@@ -687,11 +686,6 @@
                     <h2>In Progress Tickets</h2>
                     <p style="color: #6B7280; margin-bottom: 20px; font-size: 14px;">Tickets that are currently being worked on.</p>
                     <div id="inProgressTicketsList" class="tickets-list"></div>
-                </div>
-
-                <div id="activeTicketsView" class="tickets-view">
-                    <h2>Active Tickets</h2>
-                    <div id="activeTicketsList" class="tickets-list"></div>
                 </div>
 
                 <div id="monitoringTicketsView" class="tickets-view" style="display: none;">
