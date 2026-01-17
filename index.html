@@ -1980,6 +1980,19 @@
                 <h2>Finance</h2>
             </header>
 
+            <!-- Floating Year Navigation Widget -->
+            <div id="yearNavigationWidget" class="year-navigation-widget" style="display: none;">
+                <button id="prevYearBtn" class="year-nav-btn" title="Previous Year">
+                    <span>◀</span>
+                </button>
+                <div class="year-nav-display">
+                    <span id="currentYearDisplay">2024</span>
+                </div>
+                <button id="nextYearBtn" class="year-nav-btn" title="Next Year">
+                    <span>▶</span>
+                </button>
+            </div>
+
             <main>
                 <div class="finance-page-content">
                     <!-- Finance Sub-tabs -->
@@ -2657,6 +2670,83 @@
         })();
     </script>
     </div> <!-- End app-container -->
+    
+    <style>
+        /* Year Navigation Widget */
+        .year-navigation-widget {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            display: flex;
+            align-items: center;
+            gap: 0;
+            background: white;
+            border-radius: 50px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            padding: 8px;
+            z-index: 1000;
+            border: 2px solid #e2e8f0;
+        }
+        
+        .year-nav-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: none;
+            background: #667eea;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            font-weight: bold;
+        }
+        
+        .year-nav-btn:hover {
+            background: #5568d3;
+            transform: scale(1.05);
+        }
+        
+        .year-nav-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .year-nav-btn:disabled {
+            background: #cbd5e1;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .year-nav-display {
+            min-width: 80px;
+            padding: 0 16px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 16px;
+            color: #1e293b;
+        }
+        
+        @media (max-width: 768px) {
+            .year-navigation-widget {
+                bottom: 20px;
+                right: 20px;
+            }
+            
+            .year-nav-btn {
+                width: 40px;
+                height: 40px;
+                font-size: 16px;
+            }
+            
+            .year-nav-display {
+                min-width: 60px;
+                padding: 0 12px;
+                font-size: 14px;
+            }
+        }
+    </style>
 </body>
 </html>
 

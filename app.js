@@ -1750,6 +1750,7 @@ function showPage(page) {
         loadLeases();
     } else if (page === 'finance') {
         loadFinance();
+        setupYearNavigationWidget();
     } else if (page === 'users') {
         loadUsers();
     } else if (page === 'profile') {
@@ -16382,6 +16383,80 @@ async function loadFinance() {
     
     // Setup finance tab switching
     setupFinanceTabs();
+    
+    // Setup year navigation widget
+    setupYearNavigationWidget();
+}
+
+// Setup year navigation widget
+function setupYearNavigationWidget() {
+    const yearNavWidget = document.getElementById('yearNavigationWidget');
+    const prevYearBtn = document.getElementById('prevYearBtn');
+    const nextYearBtn = document.getElementById('nextYearBtn');
+    const currentYearDisplay = document.getElementById('currentYearDisplay');
+    const yearFilter = document.getElementById('rentRollYearFilter');
+    
+    if (!yearNavWidget || !prevYearBtn || !nextYearBtn || !currentYearDisplay || !yearFilter) {
+        return;
+    }
+    
+    // Show widget on finance page
+    yearNavWidget.style.display = 'flex';
+    
+    // Update display and button states
+    function updateYearNavigation() {
+        const selectedYear = parseInt(yearFilter.value) || new Date().getFullYear();
+        currentYearDisplay.textContent = selectedYear;
+        
+        // Get available years from dropdown
+        const availableYears = Array.from(yearFilter.options).map(opt => parseInt(opt.value)).filter(y => !isNaN(y));
+        const minYear = Math.min(...availableYears);
+        const maxYear = Math.max(...availableYears);
+        
+        // Enable/disable buttons based on available years
+        prevYearBtn.disabled = selectedYear <= minYear;
+        nextYearBtn.disabled = selectedYear >= maxYear;
+    }
+    
+    // Update on initial load
+    updateYearNavigation();
+    
+    // Update when year filter changes
+    yearFilter.addEventListener('change', updateYearNavigation);
+    
+    // Previous year button
+    prevYearBtn.addEventListener('click', () => {
+        const currentYear = parseInt(yearFilter.value) || new Date().getFullYear();
+        const availableYears = Array.from(yearFilter.options)
+            .map(opt => parseInt(opt.value))
+            .filter(y => !isNaN(y))
+            .sort((a, b) => a - b);
+        
+        // Find the previous available year
+        const prevYear = availableYears.find(y => y < currentYear);
+        if (prevYear !== undefined) {
+            yearFilter.value = prevYear.toString();
+            updateYearNavigation();
+            loadRentRoll();
+        }
+    });
+    
+    // Next year button
+    nextYearBtn.addEventListener('click', () => {
+        const currentYear = parseInt(yearFilter.value) || new Date().getFullYear();
+        const availableYears = Array.from(yearFilter.options)
+            .map(opt => parseInt(opt.value))
+            .filter(y => !isNaN(y))
+            .sort((a, b) => a - b);
+        
+        // Find the next available year
+        const nextYear = availableYears.find(y => y > currentYear);
+        if (nextYear !== undefined) {
+            yearFilter.value = nextYear.toString();
+            updateYearNavigation();
+            loadRentRoll();
+        }
+    });
 }
 
 // Populate rent roll filters
