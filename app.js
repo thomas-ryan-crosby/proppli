@@ -13475,9 +13475,11 @@ function renderLeases(leases, properties, tenants, units) {
     // Filter by view (current vs previous)
     const filteredLeases = Object.values(leases).filter(lease => {
         if (currentLeaseView === 'current') {
-            return ['Active', 'Expiring Soon'].includes(lease.status);
+            // Include Active, Expiring Soon, and Expired (expired leases still show as active with indicator)
+            return ['Active', 'Expiring Soon', 'Expired'].includes(lease.status) || isLeaseActive(lease);
         } else {
-            return ['Expired', 'Terminated', 'Renewed'].includes(lease.status);
+            // Previous view: only show Terminated and Renewed (expired leases stay in current view)
+            return ['Terminated', 'Renewed'].includes(lease.status);
         }
     });
     
@@ -13537,6 +13539,7 @@ function renderLeases(leases, properties, tenants, units) {
         
         // Determine display status - if deprecated, show Deprecated status
         const displayStatus = isLeaseDeprecated(lease) ? 'Deprecated' : lease.status;
+        const isExpired = isLeaseExpired(lease) && lease.status === 'Expired';
         const statusClass = displayStatus === 'Active' ? 'status-active' : 
                            displayStatus === 'Expiring Soon' ? 'status-warning' : 
                            displayStatus === 'Expired' ? 'status-expired' :
@@ -13549,6 +13552,9 @@ function renderLeases(leases, properties, tenants, units) {
         // Calculate rent to display - calculateCurrentRent automatically uses deprecatedDate if lease is deprecated
         const rentToDisplay = calculateCurrentRent(lease) ?? lease.monthlyRent;
         
+        // Add expired notice if lease is expired
+        const expiredNotice = isExpired ? '<span class="status-badge status-warning" style="margin-left: 8px; font-size: 0.85em;">⚠️ Lease Term Expired</span>' : '';
+        
         html += `
             <tr>
                 <td>${lease.leaseNumber || lease.id.substring(0, 8)}</td>
@@ -13559,7 +13565,7 @@ function renderLeases(leases, properties, tenants, units) {
                 <td>${startDate}</td>
                 <td>${endDate}</td>
                 <td>$${rentToDisplay?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}</td>
-                <td><span class="status-badge ${statusClass}">${displayStatus}</span></td>
+                <td><span class="status-badge ${statusClass}">${displayStatus}</span>${expiredNotice}</td>
                 <td>${daysUntilExpiration !== 'N/A' ? (daysUntilExpiration < 0 ? `Expired ${Math.abs(daysUntilExpiration)} days ago` : `${daysUntilExpiration} days`) : 'N/A'}</td>
                 <td>
                     <button class="btn-sm btn-primary" onclick="window.openLeaseModal('${lease.id}')">View</button>
@@ -15351,6 +15357,20 @@ function isLeaseDeprecated(lease) {
     return lease.isDeprecated === true || lease.isDeprecated === 'true' || lease.isDeprecated === 1;
 }
 
+// Helper function to check if a lease's end date has passed
+function isLeaseExpired(lease) {
+    if (!lease.leaseEndDate) {
+        return false;
+    }
+    
+    const endDate = lease.leaseEndDate.toDate ? lease.leaseEndDate.toDate() : new Date(lease.leaseEndDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    endDate.setHours(0, 0, 0, 0);
+    
+    return endDate < today;
+}
+
 // Helper function to determine if a lease should be considered active
 function isLeaseActive(lease) {
     // If deleted, never active
@@ -15378,10 +15398,10 @@ function isLeaseActive(lease) {
         return true;
     }
     
-    // If status is Expired but no auto-renewal, check if end date has passed
+    // If status is Expired, still consider it active (tenant may be in holdover)
+    // This allows expired leases to show in active sections with an expired indicator
     if (lease.status === 'Expired') {
-        // If explicitly marked as expired and no auto-renewal, not active
-        return false;
+        return true;
     }
     
     // Default: if no explicit status or status is unclear, consider active (unless deleted or deprecated)
@@ -15522,6 +15542,7 @@ function formatLeaseSummaries(leases, tenants, units = {}) {
         
         // Determine display status - if deprecated, show Deprecated status
         const displayStatus = isLeaseDeprecated(lease) ? 'Deprecated' : lease.status;
+        const isExpired = isLeaseExpired(lease) && lease.status === 'Expired';
         const statusClass = displayStatus === 'Active' ? 'status-active' : 
                            displayStatus === 'Expiring Soon' ? 'status-warning' : 
                            displayStatus === 'Expired' ? 'status-expired' :
@@ -15590,6 +15611,7 @@ function formatLeaseSummaries(leases, tenants, units = {}) {
                                 ${escapeHtml(tenantName)}
                             </div>
                             <span class="status-badge ${statusClass}" style="font-size: 0.75em; padding: 3px 8px;">${displayStatus}</span>
+                            ${isExpired ? '<span class="status-badge status-warning" style="font-size: 0.75em; padding: 3px 8px;">⚠️ Lease Term Expired</span>' : ''}
                             <span style="font-size: 0.75em; color: #94a3b8; font-weight: 400;">ID: ${lease.id.substring(0, 8)}</span>
                         </div>
                         
