@@ -66,6 +66,45 @@ function getStandardDay(date) {
 }
 
 /**
+ * Parse a YYYY-MM-DD input value as a local date
+ * @param {string} dateString - Date input value
+ * @returns {Date|null} Date object or null if invalid
+ */
+function parseDateInputValue(dateString) {
+    if (!dateString || typeof dateString !== 'string') return null;
+    const parts = dateString.split('-').map(part => parseInt(part, 10));
+    if (parts.length !== 3 || parts.some(Number.isNaN)) return null;
+    const [year, month, day] = parts;
+    return new Date(year, month - 1, day);
+}
+
+/**
+ * Format a date for date input fields (YYYY-MM-DD)
+ * @param {Date|firebase.firestore.Timestamp|string|number} dateValue
+ * @returns {string} Date string or empty string if invalid
+ */
+function formatDateForInput(dateValue) {
+    const standardDate = toStandardDate(dateValue);
+    if (!standardDate) return '';
+    const year = standardDate.getFullYear();
+    const month = String(standardDate.getMonth() + 1).padStart(2, '0');
+    const day = String(standardDate.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+/**
+ * Format a date for display using locale formatting
+ * @param {Date|firebase.firestore.Timestamp|string|number} dateValue
+ * @param {string} fallback - Value to return when date is invalid
+ * @returns {string}
+ */
+function formatDateForDisplay(dateValue, fallback = 'N/A') {
+    const standardDate = toStandardDate(dateValue);
+    if (!standardDate) return fallback;
+    return standardDate.toLocaleDateString();
+}
+
+/**
  * Create a date for the first day of a month (normalized to start of day, UTC)
  * @param {number} year - Year (e.g., 2024)
  * @param {number} month - Month (1-based: 1 = January, 12 = December)
@@ -4880,8 +4919,8 @@ function renderTickets(tickets) {
 
         // Check if ticket is deleted and older than 30 days - permanently delete it
         if (ticket.deletedAt) {
-            const deletedDate = ticket.deletedAt.toDate ? ticket.deletedAt.toDate() : new Date(ticket.deletedAt);
-            if (deletedDate < thirtyDaysAgo) {
+            const deletedDate = toStandardDate(ticket.deletedAt);
+            if (deletedDate && deletedDate < thirtyDaysAgo) {
                 // Permanently delete this ticket
                 db.collection('tickets').doc(id).delete().catch((error) => {
                     console.error('Error permanently deleting ticket:', error);
@@ -5672,15 +5711,11 @@ function loadTicketForEdit(ticketId) {
             
             // Load custom dates if they exist (for retroactive tickets)
             // Note: Firestore timestamps need to be converted to date input format
-            if (ticket.dateCreated && ticket.dateCreated.toDate) {
-                const createdDate = ticket.dateCreated.toDate();
-                const createdDateStr = createdDate.toISOString().split('T')[0];
-                document.getElementById('customDateCreated').value = createdDateStr;
+            if (ticket.dateCreated) {
+                document.getElementById('customDateCreated').value = formatDateForInput(ticket.dateCreated);
             }
-            if (ticket.dateCompleted && ticket.dateCompleted.toDate) {
-                const completedDate = ticket.dateCompleted.toDate();
-                const completedDateStr = completedDate.toISOString().split('T')[0];
-                document.getElementById('customDateCompleted').value = completedDateStr;
+            if (ticket.dateCompleted) {
+                document.getElementById('customDateCompleted').value = formatDateForInput(ticket.dateCompleted);
             }
         }
     });
@@ -6166,7 +6201,10 @@ function handleTicketSubmit(e) {
                 // ONLY include dateCreated if a custom date is explicitly provided
                 // Otherwise, DO NOT include it in the update to preserve the existing value
                 if (customDateCreated) {
-                    ticketData.dateCreated = firebase.firestore.Timestamp.fromDate(new Date(customDateCreated));
+                    const createdDateValue = parseDateInputValue(customDateCreated);
+                    if (createdDateValue) {
+                        ticketData.dateCreated = firebase.firestore.Timestamp.fromDate(createdDateValue);
+                    }
                 }
                 // If no custom date, we don't include dateCreated at all - Firestore will preserve existing value
 
@@ -6193,14 +6231,24 @@ function handleTicketSubmit(e) {
                     }
                     // Only set dateCompleted if it wasn't already completed
                     if (existing?.status !== 'Completed') {
-                        ticketData.dateCompleted = customDateCompleted
-                            ? firebase.firestore.Timestamp.fromDate(new Date(customDateCompleted))
-                            : firebase.firestore.FieldValue.serverTimestamp();
+                        if (customDateCompleted) {
+                            const completedDateValue = parseDateInputValue(customDateCompleted);
+                            ticketData.dateCompleted = completedDateValue
+                                ? firebase.firestore.Timestamp.fromDate(completedDateValue)
+                                : firebase.firestore.FieldValue.serverTimestamp();
+                        } else {
+                            ticketData.dateCompleted = firebase.firestore.FieldValue.serverTimestamp();
+                        }
                     } else {
                         // If already completed, use custom date if provided, otherwise keep existing
-                        ticketData.dateCompleted = customDateCompleted
-                            ? firebase.firestore.Timestamp.fromDate(new Date(customDateCompleted))
-                            : existing.dateCompleted;
+                        if (customDateCompleted) {
+                            const completedDateValue = parseDateInputValue(customDateCompleted);
+                            ticketData.dateCompleted = completedDateValue
+                                ? firebase.firestore.Timestamp.fromDate(completedDateValue)
+                                : existing.dateCompleted;
+                        } else {
+                            ticketData.dateCompleted = existing.dateCompleted;
+                        }
                     }
                 } else {
                     ticketData.completedBy = null;
@@ -6269,7 +6317,10 @@ function handleTicketSubmit(e) {
             const customDateCompleted = document.getElementById('customDateCompleted')?.value;
             
             if (customDateCreated) {
-                ticketData.dateCreated = firebase.firestore.Timestamp.fromDate(new Date(customDateCreated));
+                const createdDateValue = parseDateInputValue(customDateCreated);
+                if (createdDateValue) {
+                    ticketData.dateCreated = firebase.firestore.Timestamp.fromDate(createdDateValue);
+                }
             }
             
             if (status === 'Completed') {
@@ -6277,7 +6328,12 @@ function handleTicketSubmit(e) {
                 ticketData.completedByUserId = completedByUserId || null;
                 ticketData.howResolved = howResolved || null;
                 if (customDateCompleted) {
-                    ticketData.dateCompleted = firebase.firestore.Timestamp.fromDate(new Date(customDateCompleted));
+                    const completedDateValue = parseDateInputValue(customDateCompleted);
+                    if (completedDateValue) {
+                        ticketData.dateCompleted = firebase.firestore.Timestamp.fromDate(completedDateValue);
+                    } else {
+                        ticketData.dateCompleted = firebase.firestore.FieldValue.serverTimestamp();
+                    }
                 } else {
                     ticketData.dateCompleted = firebase.firestore.FieldValue.serverTimestamp();
                 }
@@ -6996,16 +7052,8 @@ function escapeHtml(text) {
 
 function formatDate(timestamp) {
     if (!timestamp) return 'N/A';
-    
-    // Handle Firestore Timestamp objects
-    let date;
-    if (timestamp.toDate) {
-        date = timestamp.toDate();
-    } else if (timestamp.toMillis) {
-        date = new Date(timestamp.toMillis());
-    } else {
-        date = new Date(timestamp);
-    }
+    const date = toStandardDate(timestamp);
+    if (!date) return 'N/A';
     
     return date.toLocaleDateString('en-US', {
         year: 'numeric',
@@ -8090,11 +8138,9 @@ function getStatusBadge(isActive) {
 
 function formatDate(timestamp) {
     if (!timestamp) return 'Never';
-    if (timestamp.toDate) {
-        const date = timestamp.toDate();
-        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
-    return 'Unknown';
+    const date = toStandardDate(timestamp);
+    if (!date) return 'Unknown';
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 // User detail modal functions
@@ -10433,8 +10479,9 @@ async function loadMovedOutTenantsSection(movedOutTenants, occupanciesMap, units
                         }
                         // Show move-out date if available
                         if (occ.moveOutDate) {
-                            const moveOut = occ.moveOutDate.toDate ? occ.moveOutDate.toDate() : new Date(occ.moveOutDate);
-                            unitDisplay += ` <span style="color: #9ca3af; font-size: 0.7rem;">(Moved out: ${moveOut.toLocaleDateString()})</span>`;
+                            const moveOut = toStandardDate(occ.moveOutDate);
+                            const moveOutDisplay = formatDateForDisplay(moveOut, 'N/A');
+                            unitDisplay += ` <span style="color: #9ca3af; font-size: 0.7rem;">(Moved out: ${moveOutDisplay})</span>`;
                         }
                         return `<div style="display: flex; align-items: center; gap: 4px; padding: 2px 0;">
                             <span class="occupancy-info" style="font-size: 0.8rem; flex: 1;">${unitDisplay}</span>
@@ -11821,8 +11868,7 @@ window.editTenant = function(tenantId) {
             if (tenantDateOfBirthField) {
                 if (tenant.dateOfBirth) {
                 try {
-                    const dob = tenant.dateOfBirth.toDate ? tenant.dateOfBirth.toDate() : new Date(tenant.dateOfBirth);
-                    tenantDateOfBirthField.value = dob.toISOString().split('T')[0];
+                    tenantDateOfBirthField.value = formatDateForInput(tenant.dateOfBirth);
                 } catch (e) {
                     console.error('Error parsing date of birth:', e);
                     tenantDateOfBirthField.value = '';
@@ -11918,7 +11964,8 @@ function handleTenantSubmit(e) {
     
     // Residential specific fields
     const dateOfBirthStr = tenantForm.querySelector('#tenantDateOfBirth')?.value || null;
-    const dateOfBirth = dateOfBirthStr ? firebase.firestore.Timestamp.fromDate(new Date(dateOfBirthStr)) : null;
+    const dateOfBirthValue = dateOfBirthStr ? parseDateInputValue(dateOfBirthStr) : null;
+    const dateOfBirth = dateOfBirthValue ? firebase.firestore.Timestamp.fromDate(dateOfBirthValue) : null;
     
     // Validation - check if field exists and has value
     if (!tenantNameField) {
@@ -12577,8 +12624,10 @@ function loadOccupancies(tenantId) {
                     const propertyName = property ? property.name : 'Unknown Property';
                     const unitName = unit ? unit.unitNumber : null;
                     
-                    const moveInDate = occupancy.moveInDate?.toDate ? occupancy.moveInDate.toDate().toLocaleDateString() : 'N/A';
-                    const moveOutDate = occupancy.moveOutDate?.toDate ? occupancy.moveOutDate.toDate().toLocaleDateString() : (occupancy.status === 'Active' ? 'Current' : 'N/A');
+                    const moveInDate = formatDateForDisplay(occupancy.moveInDate, 'N/A');
+                    const moveOutDate = occupancy.moveOutDate
+                        ? formatDateForDisplay(occupancy.moveOutDate, 'N/A')
+                        : (occupancy.status === 'Active' ? 'Current' : 'N/A');
                     const statusBadge = occupancy.status ? `<span class="status-badge status-${occupancy.status.toLowerCase()}">${occupancy.status}</span>` : '';
                     
                     occupancyItem.innerHTML = `
@@ -12804,8 +12853,8 @@ function loadTenantDocuments(tenantId) {
         
         // Sort documents by upload date (newest first)
         const sortedDocuments = [...documents].sort((a, b) => {
-            const dateA = a.uploadedAt?.toDate ? a.uploadedAt.toDate() : new Date(a.uploadedAt || 0);
-            const dateB = b.uploadedAt?.toDate ? b.uploadedAt.toDate() : new Date(b.uploadedAt || 0);
+            const dateA = toStandardDate(a.uploadedAt) || new Date(0);
+            const dateB = toStandardDate(b.uploadedAt) || new Date(0);
             return dateB - dateA;
         });
         
@@ -12814,9 +12863,7 @@ function loadTenantDocuments(tenantId) {
             documentItem.className = 'unit-item';
             documentItem.style.marginBottom = '15px';
             
-            const uploadedDate = docItem.uploadedAt?.toDate 
-                ? docItem.uploadedAt.toDate().toLocaleDateString() 
-                : 'Unknown date';
+            const uploadedDate = formatDateForDisplay(docItem.uploadedAt, 'Unknown date');
             
             const fileIcon = getFileIcon(docItem.fileName);
             const fileSize = docItem.fileSize ? formatFileSize(docItem.fileSize) : '';
@@ -12984,12 +13031,10 @@ window.editOccupancy = function(occupancyId) {
             document.getElementById('occupancyNotes').value = occupancy.notes || '';
             
             if (occupancy.moveInDate) {
-                const moveIn = occupancy.moveInDate.toDate ? occupancy.moveInDate.toDate() : new Date(occupancy.moveInDate);
-                document.getElementById('occupancyMoveInDate').value = moveIn.toISOString().split('T')[0];
+                document.getElementById('occupancyMoveInDate').value = formatDateForInput(occupancy.moveInDate);
             }
             if (occupancy.moveOutDate) {
-                const moveOut = occupancy.moveOutDate.toDate ? occupancy.moveOutDate.toDate() : new Date(occupancy.moveOutDate);
-                document.getElementById('occupancyMoveOutDate').value = moveOut.toISOString().split('T')[0];
+                document.getElementById('occupancyMoveOutDate').value = formatDateForInput(occupancy.moveOutDate);
             }
             
             loadPropertiesForOccupancy().then(() => {
@@ -13128,7 +13173,7 @@ window.unlinkDeletedUnit = function(occupancyId, tenantId) {
 // Mark tenant as moved out
 window.markTenantAsMovedOut = function(tenantId) {
     // Prompt for move-out date
-    const moveOutDateStr = prompt('Enter the move-out date (YYYY-MM-DD) or leave blank for today:', new Date().toISOString().split('T')[0]);
+    const moveOutDateStr = prompt('Enter the move-out date (YYYY-MM-DD) or leave blank for today:', formatDateForInput(new Date()));
     
     if (moveOutDateStr === null) {
         // User cancelled
@@ -13138,7 +13183,11 @@ window.markTenantAsMovedOut = function(tenantId) {
     let moveOutDate = null;
     if (moveOutDateStr) {
         try {
-            moveOutDate = firebase.firestore.Timestamp.fromDate(new Date(moveOutDateStr));
+            const moveOutDateValue = parseDateInputValue(moveOutDateStr);
+            if (!moveOutDateValue) {
+                throw new Error('Invalid move-out date');
+            }
+            moveOutDate = firebase.firestore.Timestamp.fromDate(moveOutDateValue);
         } catch (error) {
             alert('Invalid date format. Please use YYYY-MM-DD format.');
             return;
@@ -13215,8 +13264,14 @@ function handleTenantOccupancySave() {
         return;
     }
     
-    const moveInDate = firebase.firestore.Timestamp.fromDate(new Date(moveInDateStr));
-    const moveOutDate = moveOutDateStr ? firebase.firestore.Timestamp.fromDate(new Date(moveOutDateStr)) : null;
+    const moveInDateValue = parseDateInputValue(moveInDateStr);
+    if (!moveInDateValue) {
+        alert('Invalid move-in date format. Please use YYYY-MM-DD format.');
+        return;
+    }
+    const moveInDate = firebase.firestore.Timestamp.fromDate(moveInDateValue);
+    const moveOutDateValue = moveOutDateStr ? parseDateInputValue(moveOutDateStr) : null;
+    const moveOutDate = moveOutDateValue ? firebase.firestore.Timestamp.fromDate(moveOutDateValue) : null;
     
     // Check if occupancy already exists for this tenant/property/unit combination
     let occupancyQuery = db.collection('occupancies')
@@ -13345,8 +13400,16 @@ function handleOccupancySubmit(e) {
         alert('The save operation is taking longer than expected. Please check your connection and try again.');
     }, 30000);
     
-    const moveInDate = firebase.firestore.Timestamp.fromDate(new Date(moveInDateStr));
-    const moveOutDate = moveOutDateStr ? firebase.firestore.Timestamp.fromDate(new Date(moveOutDateStr)) : null;
+    const moveInDateValue = parseDateInputValue(moveInDateStr);
+    if (!moveInDateValue) {
+        clearTimeout(timeoutId);
+        alert('Invalid move-in date format. Please use YYYY-MM-DD format.');
+        resetButtonState();
+        return;
+    }
+    const moveInDate = firebase.firestore.Timestamp.fromDate(moveInDateValue);
+    const moveOutDateValue = moveOutDateStr ? parseDateInputValue(moveOutDateStr) : null;
+    const moveOutDate = moveOutDateValue ? firebase.firestore.Timestamp.fromDate(moveOutDateValue) : null;
     
     const occupancyData = {
         tenantId,
@@ -13432,7 +13495,8 @@ function isLeaseDeleted(lease) {
 function shouldPermanentlyRemoveLease(lease) {
     if (!isLeaseDeleted(lease)) return false;
     
-    const deletedDate = lease.deletedAt.toDate ? lease.deletedAt.toDate() : new Date(lease.deletedAt);
+    const deletedDate = toStandardDate(lease.deletedAt);
+    if (!deletedDate) return false;
     const today = new Date();
     const daysSinceDeletion = Math.floor((today - deletedDate) / (1000 * 60 * 60 * 24));
     
@@ -13490,7 +13554,8 @@ async function loadLeases() {
             
             // Calculate days until expiration
             if (leaseData.leaseEndDate) {
-                const endDate = leaseData.leaseEndDate.toDate();
+                const endDate = toStandardDate(leaseData.leaseEndDate);
+                if (endDate) {
                 const daysUntilExpiration = Math.ceil((endDate - today) / (1000 * 60 * 60 * 24));
                 leaseData.daysUntilExpiration = daysUntilExpiration;
                 
@@ -13514,6 +13579,7 @@ async function loadLeases() {
                         db.collection('leases').doc(doc.id).update({ status: 'Active' });
                     }
                 }
+                }
             }
             
             // Store in array for sorting if needed, otherwise directly in object
@@ -13527,8 +13593,8 @@ async function loadLeases() {
         // Sort client-side if needed (for maintenance users with whereIn query)
         if (needsClientSideSort && leasesArray.length > 0) {
             leasesArray.sort((a, b) => {
-                const dateA = a.leaseStartDate?.toDate ? a.leaseStartDate.toDate() : (a.leaseStartDate ? new Date(a.leaseStartDate) : new Date(0));
-                const dateB = b.leaseStartDate?.toDate ? b.leaseStartDate.toDate() : (b.leaseStartDate ? new Date(b.leaseStartDate) : new Date(0));
+                const dateA = toStandardDate(a.leaseStartDate) || new Date(0);
+                const dateB = toStandardDate(b.leaseStartDate) || new Date(0);
                 return dateB - dateA; // Descending order
             });
             // Convert back to object
@@ -13713,8 +13779,8 @@ function renderLeases(leases, properties, tenants, units) {
         const property = properties[lease.propertyId];
         const unit = lease.unitId ? units[lease.unitId] : null;
         
-        const startDate = lease.leaseStartDate ? lease.leaseStartDate.toDate().toLocaleDateString() : 'N/A';
-        const endDate = lease.leaseEndDate ? lease.leaseEndDate.toDate().toLocaleDateString() : 'N/A';
+        const startDate = formatDateForDisplay(lease.leaseStartDate, 'N/A');
+        const endDate = formatDateForDisplay(lease.leaseEndDate, 'N/A');
         const daysUntilExpiration = lease.daysUntilExpiration !== undefined ? lease.daysUntilExpiration : 'N/A';
         
         // Determine display status - if deprecated, show Deprecated status
@@ -14229,7 +14295,8 @@ async function populateLeaseFormDropdowns() {
         
         const calculateEndDateFromTerm = () => {
             if (startDateInput.value && termInputField.value) {
-                const start = new Date(startDateInput.value);
+                const start = parseDateInputValue(startDateInput.value);
+                if (!start) return;
                 const termValue = parseFloat(termInputField.value) || 0;
                 const unit = termUnitSelect.value;
                 
@@ -14245,7 +14312,7 @@ async function populateLeaseFormDropdowns() {
                     end.setMonth(end.getMonth() + months);
                     // Adjust to last day of month if needed
                     end.setDate(end.getDate() - 1);
-                    endDateInput.value = end.toISOString().split('T')[0];
+                    endDateInput.value = formatDateForInput(end);
                     termInput.value = months;
                 }
             }
@@ -14553,8 +14620,7 @@ function populateLeaseForm(lease) {
     
     // Populate deprecated date if it exists (in lease form)
     if (lease.deprecatedDate && document.getElementById('deprecatedDate')) {
-        const deprecatedDate = lease.deprecatedDate.toDate ? lease.deprecatedDate.toDate() : new Date(lease.deprecatedDate);
-        document.getElementById('deprecatedDate').value = deprecatedDate.toISOString().split('T')[0];
+        document.getElementById('deprecatedDate').value = formatDateForInput(lease.deprecatedDate);
     }
     
     // Populate deprecated reason if it exists (in lease form)
@@ -14563,12 +14629,10 @@ function populateLeaseForm(lease) {
     }
     
     if (lease.leaseStartDate) {
-        const startDate = lease.leaseStartDate.toDate().toISOString().split('T')[0];
-        if (document.getElementById('leaseStartDate')) document.getElementById('leaseStartDate').value = startDate;
+        if (document.getElementById('leaseStartDate')) document.getElementById('leaseStartDate').value = formatDateForInput(lease.leaseStartDate);
     }
     if (lease.leaseEndDate) {
-        const endDate = lease.leaseEndDate.toDate().toISOString().split('T')[0];
-        if (document.getElementById('leaseEndDate')) document.getElementById('leaseEndDate').value = endDate;
+        if (document.getElementById('leaseEndDate')) document.getElementById('leaseEndDate').value = formatDateForInput(lease.leaseEndDate);
     }
     
     if (document.getElementById('leaseTerm')) {
@@ -14622,8 +14686,7 @@ function populateLeaseForm(lease) {
             }
             
             if (noticeType === 'date' && lease.autoRenewalNoticeDate && document.getElementById('autoRenewalNoticeDate')) {
-                const noticeDate = lease.autoRenewalNoticeDate.toDate ? lease.autoRenewalNoticeDate.toDate() : new Date(lease.autoRenewalNoticeDate);
-                document.getElementById('autoRenewalNoticeDate').value = noticeDate.toISOString().split('T')[0];
+                document.getElementById('autoRenewalNoticeDate').value = formatDateForInput(lease.autoRenewalNoticeDate);
             } else if ((noticeType === 'months' || noticeType === 'days') && lease.autoRenewalNoticePeriod) {
                 const noticePeriodInput = document.getElementById('autoRenewalNoticePeriod');
                 const noticeUnitSelect = document.getElementById('autoRenewalNoticeUnit');
@@ -14706,8 +14769,7 @@ function populateLeaseForm(lease) {
             if (document.getElementById('escalationPercentage')) document.getElementById('escalationPercentage').value = esc.escalationPercentage || '';
             if (document.getElementById('escalationFrequency')) document.getElementById('escalationFrequency').value = esc.escalationFrequency || '';
             if (esc.firstEscalationDate && document.getElementById('firstEscalationDate')) {
-                const firstEscDate = esc.firstEscalationDate.toDate().toISOString().split('T')[0];
-                document.getElementById('firstEscalationDate').value = firstEscDate;
+                document.getElementById('firstEscalationDate').value = formatDateForInput(esc.firstEscalationDate);
             }
             
             // Populate escalation notice
@@ -14720,8 +14782,7 @@ function populateLeaseForm(lease) {
                 }
                 
                 if (noticeType === 'date' && esc.noticeDate && document.getElementById('escalationNoticeDate')) {
-                    const noticeDate = esc.noticeDate.toDate ? esc.noticeDate.toDate() : new Date(esc.noticeDate);
-                    document.getElementById('escalationNoticeDate').value = noticeDate.toISOString().split('T')[0];
+                    document.getElementById('escalationNoticeDate').value = formatDateForInput(esc.noticeDate);
                 } else if ((noticeType === 'months' || noticeType === 'days') && esc.noticePeriod) {
                     const noticePeriodInput = document.getElementById('escalationNoticePeriod');
                     const noticeUnitSelect = document.getElementById('escalationNoticeUnit');
@@ -14858,7 +14919,8 @@ async function handleLeaseSubmit(e) {
             deprecatedDate: (() => {
                 const deprecatedDateInput = document.getElementById('deprecatedDate');
                 if (deprecatedDateInput && deprecatedDateInput.value) {
-                    return firebase.firestore.Timestamp.fromDate(new Date(deprecatedDateInput.value));
+                    const deprecatedDateValue = parseDateInputValue(deprecatedDateInput.value);
+                    return deprecatedDateValue ? firebase.firestore.Timestamp.fromDate(deprecatedDateValue) : null;
                 }
                 // If marking as deprecated but no date set, use current date
                 if (document.getElementById('isDeprecated') && document.getElementById('isDeprecated').checked) {
@@ -14870,14 +14932,21 @@ async function handleLeaseSubmit(e) {
                 const deprecatedReasonInput = document.getElementById('deprecatedReasonInForm');
                 return deprecatedReasonInput && deprecatedReasonInput.value ? deprecatedReasonInput.value.trim() : null;
             })(),
-            leaseStartDate: firebase.firestore.Timestamp.fromDate(new Date(document.getElementById('leaseStartDate').value)),
+            leaseStartDate: (() => {
+                const startDateValue = parseDateInputValue(document.getElementById('leaseStartDate').value);
+                return startDateValue ? firebase.firestore.Timestamp.fromDate(startDateValue) : null;
+            })(),
             leaseEndDate: (() => {
                 const endDateInput = document.getElementById('leaseEndDate');
                 if (endDateInput && endDateInput.value) {
-                    return firebase.firestore.Timestamp.fromDate(new Date(endDateInput.value));
+                    const endDateValue = parseDateInputValue(endDateInput.value);
+                    return endDateValue ? firebase.firestore.Timestamp.fromDate(endDateValue) : null;
                 }
                 // Calculate from term if end date not provided
-                const startDate = new Date(document.getElementById('leaseStartDate').value);
+                const startDate = parseDateInputValue(document.getElementById('leaseStartDate').value);
+                if (!startDate) {
+                    return null;
+                }
                 const termInput = document.getElementById('leaseTermInput');
                 const termUnit = document.getElementById('leaseTermUnit');
                 if (termInput && termInput.value) {
@@ -14966,7 +15035,13 @@ async function handleLeaseSubmit(e) {
             })(),
             autoRenewalTermUnit: document.getElementById('autoRenewal').checked ? (document.getElementById('autoRenewalTermUnit')?.value || 'months') : null,
             autoRenewalNoticeType: document.getElementById('autoRenewal').checked ? (document.getElementById('autoRenewalNoticeType')?.value || null) : null,
-            autoRenewalNoticeDate: document.getElementById('autoRenewal').checked && document.getElementById('autoRenewalNoticeDate')?.value ? firebase.firestore.Timestamp.fromDate(new Date(document.getElementById('autoRenewalNoticeDate').value)) : null,
+            autoRenewalNoticeDate: (() => {
+                if (!document.getElementById('autoRenewal').checked) return null;
+                const noticeValue = document.getElementById('autoRenewalNoticeDate')?.value;
+                if (!noticeValue) return null;
+                const noticeDate = parseDateInputValue(noticeValue);
+                return noticeDate ? firebase.firestore.Timestamp.fromDate(noticeDate) : null;
+            })(),
             autoRenewalNoticePeriod: document.getElementById('autoRenewal').checked && document.getElementById('autoRenewalNoticePeriod')?.value ? parseFloat(document.getElementById('autoRenewalNoticePeriod').value) : null,
             autoRenewalNoticeUnit: document.getElementById('autoRenewal').checked ? (document.getElementById('autoRenewalNoticeUnit')?.value || null) : null,
             squareFootage: document.getElementById('leaseSquareFootage').value ? parseFloat(document.getElementById('leaseSquareFootage').value) : null,
@@ -14988,9 +15063,19 @@ async function handleLeaseSubmit(e) {
                     escalationAmount: document.getElementById('escalationAmount').value ? parseFloat(document.getElementById('escalationAmount').value) : null,
                     escalationPercentage: document.getElementById('escalationPercentage').value ? parseFloat(document.getElementById('escalationPercentage').value) : null,
                     escalationFrequency: document.getElementById('escalationFrequency').value || null,
-                    firstEscalationDate: document.getElementById('firstEscalationDate').value ? firebase.firestore.Timestamp.fromDate(new Date(document.getElementById('firstEscalationDate').value)) : null,
+                    firstEscalationDate: (() => {
+                        const firstEscValue = document.getElementById('firstEscalationDate').value;
+                        if (!firstEscValue) return null;
+                        const firstEscDate = parseDateInputValue(firstEscValue);
+                        return firstEscDate ? firebase.firestore.Timestamp.fromDate(firstEscDate) : null;
+                    })(),
                     noticeType: document.getElementById('escalationNoticeType')?.value || null,
-                    noticeDate: document.getElementById('escalationNoticeDate')?.value ? firebase.firestore.Timestamp.fromDate(new Date(document.getElementById('escalationNoticeDate').value)) : null,
+                    noticeDate: (() => {
+                        const noticeValue = document.getElementById('escalationNoticeDate')?.value;
+                        if (!noticeValue) return null;
+                        const noticeDate = parseDateInputValue(noticeValue);
+                        return noticeDate ? firebase.firestore.Timestamp.fromDate(noticeDate) : null;
+                    })(),
                     noticePeriod: document.getElementById('escalationNoticePeriod')?.value ? parseFloat(document.getElementById('escalationNoticePeriod').value) : null,
                     noticeUnit: document.getElementById('escalationNoticeUnit')?.value || null
                 },
@@ -15522,12 +15607,15 @@ async function renderLeasesTableView(leases, properties, tenants, units, buildin
                 const unitDisplay = unit ? `Unit ${escapeHtml(unit.unitNumber || 'N/A')}` : 'Property Level';
                 
                 // Calculate days until permanent removal
-                const deletedDate = lease.deletedAt.toDate ? lease.deletedAt.toDate() : new Date(lease.deletedAt);
+                const deletedDate = toStandardDate(lease.deletedAt);
+                if (!deletedDate) {
+                    return;
+                }
                 const today = new Date();
                 const daysSinceDeletion = Math.floor((today - deletedDate) / (1000 * 60 * 60 * 24));
                 const daysRemaining = 30 - daysSinceDeletion;
                 
-                const deletedDateFormatted = deletedDate.toLocaleDateString();
+                const deletedDateFormatted = formatDateForDisplay(deletedDate, 'N/A');
                 const daysRemainingText = daysRemaining > 0 ? `${daysRemaining} days remaining` : 'Will be removed soon';
                 
                 html += `<tr style="opacity: 0.7;">
@@ -15579,7 +15667,8 @@ function isLeaseExpired(lease) {
         return false;
     }
     
-    const endDate = lease.leaseEndDate.toDate ? lease.leaseEndDate.toDate() : new Date(lease.leaseEndDate);
+    const endDate = toStandardDate(lease.leaseEndDate);
+    if (!endDate) return false;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     endDate.setHours(0, 0, 0, 0);
@@ -15768,10 +15857,10 @@ function formatLeaseSummaries(leases, tenants, units = {}) {
     return leases.map(lease => {
         const tenant = tenants[lease.tenantId];
         const tenantName = tenant?.tenantName || 'Unknown Tenant';
-        const startDate = lease.leaseStartDate ? lease.leaseStartDate.toDate().toLocaleDateString() : 'N/A';
-        const endDate = lease.leaseEndDate ? lease.leaseEndDate.toDate().toLocaleDateString() : 'N/A';
+        const startDate = formatDateForDisplay(lease.leaseStartDate, 'N/A');
+        const endDate = formatDateForDisplay(lease.leaseEndDate, 'N/A');
         const leaseTerm = `${startDate} - ${endDate}`;
-        const deprecatedDate = lease.deprecatedDate ? (lease.deprecatedDate.toDate ? lease.deprecatedDate.toDate().toLocaleDateString() : new Date(lease.deprecatedDate).toLocaleDateString()) : null;
+        const deprecatedDate = lease.deprecatedDate ? formatDateForDisplay(lease.deprecatedDate, null) : null;
         
         const initialRent = lease.monthlyRent ? lease.monthlyRent : 0;
         // If deprecated, calculate rent as of deprecation date
@@ -16262,10 +16351,10 @@ function renderLeaseDetailList(leases, tenants, container, units = {}) {
     leases.forEach(lease => {
         const tenant = tenants[lease.tenantId];
         const tenantName = tenant?.tenantName || 'Unknown Tenant';
-        const startDate = lease.leaseStartDate ? lease.leaseStartDate.toDate().toLocaleDateString() : 'N/A';
-        const endDate = lease.leaseEndDate ? lease.leaseEndDate.toDate().toLocaleDateString() : 'N/A';
+        const startDate = formatDateForDisplay(lease.leaseStartDate, 'N/A');
+        const endDate = formatDateForDisplay(lease.leaseEndDate, 'N/A');
         const leaseTerm = `${startDate} - ${endDate}`;
-        const deprecatedDate = lease.deprecatedDate ? (lease.deprecatedDate.toDate ? lease.deprecatedDate.toDate().toLocaleDateString() : new Date(lease.deprecatedDate).toLocaleDateString()) : null;
+        const deprecatedDate = lease.deprecatedDate ? formatDateForDisplay(lease.deprecatedDate, null) : null;
         const initialRent = lease.monthlyRent ? lease.monthlyRent : 0;
         const currentRent = calculateCurrentRent(lease);
         const hasEscalation = lease.rentEscalation && lease.rentEscalation.escalationType && lease.rentEscalation.escalationType !== 'None';
@@ -16420,7 +16509,7 @@ window.openDeprecatedModal = function(leaseId) {
     leaseIdInput.value = leaseId;
     
     // Set default date to today
-    dateInput.value = new Date().toISOString().split('T')[0];
+    dateInput.value = formatDateForInput(new Date());
     
     // Clear reason
     const reasonInput = document.getElementById('deprecatedReason');
@@ -16522,7 +16611,11 @@ window.handleDeprecatedLeaseSubmit = async function(e) {
     }
     
     try {
-        const deprecatedDate = firebase.firestore.Timestamp.fromDate(new Date(dateInput.value));
+        const deprecatedDateValue = parseDateInputValue(dateInput.value);
+        if (!deprecatedDateValue) {
+            throw new Error('Invalid deprecated date');
+        }
+        const deprecatedDate = firebase.firestore.Timestamp.fromDate(deprecatedDateValue);
         const deprecatedReason = reasonInput ? reasonInput.value.trim() : null;
         
         await db.collection('leases').doc(leaseId).update({
@@ -16610,6 +16703,11 @@ function setupYearNavigationWidget() {
         
         // Get available years from dropdown
         const availableYears = Array.from(yearFilter.options).map(opt => parseInt(opt.value)).filter(y => !isNaN(y));
+        if (availableYears.length === 0) {
+            prevYearBtn.disabled = true;
+            nextYearBtn.disabled = true;
+            return;
+        }
         const minYear = Math.min(...availableYears);
         const maxYear = Math.max(...availableYears);
         
@@ -16622,10 +16720,17 @@ function setupYearNavigationWidget() {
     updateYearNavigation();
     
     // Update when year filter changes
-    yearFilter.addEventListener('change', updateYearNavigation);
+    if (yearFilter._yearNavUpdateHandler) {
+        yearFilter.removeEventListener('change', yearFilter._yearNavUpdateHandler);
+    }
+    yearFilter._yearNavUpdateHandler = updateYearNavigation;
+    yearFilter.addEventListener('change', yearFilter._yearNavUpdateHandler);
     
     // Previous year button - navigate to immediate previous year
-    prevYearBtn.addEventListener('click', (e) => {
+    if (prevYearBtn._yearNavClickHandler) {
+        prevYearBtn.removeEventListener('click', prevYearBtn._yearNavClickHandler);
+    }
+    prevYearBtn._yearNavClickHandler = (e) => {
         e.preventDefault();
         e.stopPropagation();
         
@@ -16657,10 +16762,14 @@ function setupYearNavigationWidget() {
                 loadRentRoll();
             }
         }
-    });
+    };
+    prevYearBtn.addEventListener('click', prevYearBtn._yearNavClickHandler);
     
     // Next year button - navigate to immediate next year
-    nextYearBtn.addEventListener('click', (e) => {
+    if (nextYearBtn._yearNavClickHandler) {
+        nextYearBtn.removeEventListener('click', nextYearBtn._yearNavClickHandler);
+    }
+    nextYearBtn._yearNavClickHandler = (e) => {
         e.preventDefault();
         e.stopPropagation();
         
@@ -16692,7 +16801,8 @@ function setupYearNavigationWidget() {
                 loadRentRoll();
             }
         }
-    });
+    };
+    nextYearBtn.addEventListener('click', nextYearBtn._yearNavClickHandler);
 }
 
 // Populate rent roll filters
@@ -16759,27 +16869,27 @@ async function populateRentRollFilters() {
                 
                 // Add years from lease start date
                 if (lease.leaseStartDate) {
-                    const startDate = lease.leaseStartDate.toDate ? lease.leaseStartDate.toDate() : new Date(lease.leaseStartDate);
-                    years.add(startDate.getFullYear());
+                    const startYear = getStandardYear(lease.leaseStartDate);
+                    if (startYear) years.add(startYear);
                 }
                 
                 // Add years from lease end date
                 if (lease.leaseEndDate) {
-                    const endDate = lease.leaseEndDate.toDate ? lease.leaseEndDate.toDate() : new Date(lease.leaseEndDate);
-                    years.add(endDate.getFullYear());
+                    const endYear = getStandardYear(lease.leaseEndDate);
+                    if (endYear) years.add(endYear);
                 }
                 
                 // Add years from deprecation date (important for deprecated leases)
                 if (lease.deprecatedDate) {
-                    const deprecatedDate = lease.deprecatedDate.toDate ? lease.deprecatedDate.toDate() : new Date(lease.deprecatedDate);
-                    years.add(deprecatedDate.getFullYear());
+                    const deprecatedYear = getStandardYear(lease.deprecatedDate);
+                    if (deprecatedYear) years.add(deprecatedYear);
                 }
                 
                 // For deprecated leases, also check if they have historical data
                 // Add a few years before deprecation date to show historical context
                 if (lease.isDeprecated && lease.deprecatedDate) {
-                    const deprecatedDate = lease.deprecatedDate.toDate ? lease.deprecatedDate.toDate() : new Date(lease.deprecatedDate);
-                    const depYear = deprecatedDate.getFullYear();
+                    const depYear = getStandardYear(lease.deprecatedDate);
+                    if (!depYear) return;
                     // Add 2 years before deprecation for historical context
                     for (let y = depYear - 2; y <= depYear; y++) {
                         years.add(y);
@@ -17510,9 +17620,9 @@ function renderVerticalTable(tenantsData, tenants, units, buildings, year, month
                     // Check if month is after deprecation date
                     let shouldShowRent = result.rent > 0;
                     if (isDeprecated && lease.deprecatedDate) {
-                        const deprecatedDate = lease.deprecatedDate.toDate ? lease.deprecatedDate.toDate() : new Date(lease.deprecatedDate);
-                        const targetDate = new Date(year, month - 1, 1);
-                        if (targetDate > deprecatedDate) {
+                        const deprecatedDate = toStandardDate(lease.deprecatedDate);
+                        const targetDate = getMonthStartDate(year, month);
+                        if (deprecatedDate && targetDate > deprecatedDate) {
                             shouldShowRent = false;
                         }
                     }
@@ -17798,9 +17908,9 @@ function renderHorizontalTable(tenantsData, tenants, units, buildings, year, mon
                     // Check if month is after deprecation date
                     let shouldShowRent = result.rent > 0;
                     if (isDeprecated && lease.deprecatedDate) {
-                        const deprecatedDate = lease.deprecatedDate.toDate ? lease.deprecatedDate.toDate() : new Date(lease.deprecatedDate);
-                        const targetDate = new Date(year, month - 1, 1);
-                        if (targetDate > deprecatedDate) {
+                        const deprecatedDate = toStandardDate(lease.deprecatedDate);
+                        const targetDate = getMonthStartDate(year, month);
+                        if (deprecatedDate && targetDate > deprecatedDate) {
                             shouldShowRent = false;
                         }
                     }
