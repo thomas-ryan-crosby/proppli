@@ -1750,7 +1750,6 @@ function showPage(page) {
         loadLeases();
     } else if (page === 'finance') {
         loadFinance();
-        setupYearNavigationWidget();
     } else if (page === 'users') {
         loadUsers();
     } else if (page === 'profile') {
