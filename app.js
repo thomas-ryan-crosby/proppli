@@ -2009,10 +2009,12 @@ function setupEventListeners() {
 
     // View toggles
     const viewActiveBtn = document.getElementById('viewActiveBtn');
+    const viewMonitoringBtn = document.getElementById('viewMonitoringBtn');
     const viewCompletedBtn = document.getElementById('viewCompletedBtn');
     const toggleMetricsBtn = document.getElementById('toggleMetricsBtn');
     
     if (viewActiveBtn) viewActiveBtn.addEventListener('click', () => switchView('active'));
+    if (viewMonitoringBtn) viewMonitoringBtn.addEventListener('click', () => switchView('monitoring'));
     if (viewCompletedBtn) viewCompletedBtn.addEventListener('click', () => switchView('completed'));
     if (toggleMetricsBtn) toggleMetricsBtn.addEventListener('click', toggleMetrics);
 
@@ -6674,33 +6676,43 @@ function switchView(view) {
     currentView = view;
     
     const activeView = document.getElementById('activeTicketsView');
+    const monitoringView = document.getElementById('monitoringTicketsView');
     const completedView = document.getElementById('completedTicketsView');
     const deletedView = document.getElementById('deletedTicketsView');
     const activeBtn = document.getElementById('viewActiveBtn');
+    const monitoringBtn = document.getElementById('viewMonitoringBtn');
     const completedBtn = document.getElementById('viewCompletedBtn');
     const deletedBtn = document.getElementById('viewDeletedBtn');
     
     // Hide all views
-    activeView.style.display = 'none';
-    completedView.style.display = 'none';
+    if (activeView) activeView.style.display = 'none';
+    if (monitoringView) monitoringView.style.display = 'none';
+    if (completedView) completedView.style.display = 'none';
     if (deletedView) deletedView.style.display = 'none';
     
     // Remove active class from all buttons
-    activeBtn.classList.remove('active');
-    completedBtn.classList.remove('active');
+    if (activeBtn) activeBtn.classList.remove('active');
+    if (monitoringBtn) monitoringBtn.classList.remove('active');
+    if (completedBtn) completedBtn.classList.remove('active');
     if (deletedBtn) deletedBtn.classList.remove('active');
     
     // Show selected view and activate button
     if (view === 'active') {
-        activeView.style.display = 'block';
-        activeBtn.classList.add('active');
+        if (activeView) activeView.style.display = 'block';
+        if (activeBtn) activeBtn.classList.add('active');
+    } else if (view === 'monitoring') {
+        if (monitoringView) monitoringView.style.display = 'block';
+        if (monitoringBtn) monitoringBtn.classList.add('active');
     } else if (view === 'completed') {
-        completedView.style.display = 'block';
-        completedBtn.classList.add('active');
+        if (completedView) completedView.style.display = 'block';
+        if (completedBtn) completedBtn.classList.add('active');
     } else if (view === 'deleted') {
         if (deletedView) deletedView.style.display = 'block';
         if (deletedBtn) deletedBtn.classList.add('active');
     }
+    
+    // Save view preference
+    localStorage.setItem('currentView', view);
 }
 
 // Metrics Dashboard Toggle
