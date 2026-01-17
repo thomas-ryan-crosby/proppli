@@ -13540,6 +13540,7 @@ function renderLeases(leases, properties, tenants, units) {
         // Determine display status - if deprecated, show Deprecated status
         const displayStatus = isLeaseDeprecated(lease) ? 'Deprecated' : lease.status;
         const isExpired = isLeaseExpired(lease) && lease.status === 'Expired';
+        const isOperatingUnderLeaseTerms = lease.status === 'Expired' && lease.operatingUnderLeaseTerms === true;
         const statusClass = displayStatus === 'Active' ? 'status-active' : 
                            displayStatus === 'Expiring Soon' ? 'status-warning' : 
                            displayStatus === 'Expired' ? 'status-expired' :
@@ -13553,7 +13554,14 @@ function renderLeases(leases, properties, tenants, units) {
         const rentToDisplay = calculateCurrentRent(lease) ?? lease.monthlyRent;
         
         // Add expired notice if lease is expired
-        const expiredNotice = isExpired ? '<span class="status-badge status-warning" style="margin-left: 8px; font-size: 0.85em;">⚠️ Lease Term Expired</span>' : '';
+        let expiredNotice = '';
+        if (isExpired) {
+            if (isOperatingUnderLeaseTerms) {
+                expiredNotice = '<span class="status-badge status-active" style="margin-left: 8px; font-size: 0.85em;">✓ Operating Under Lease Terms</span>';
+            } else {
+                expiredNotice = '<span class="status-badge status-warning" style="margin-left: 8px; font-size: 0.85em;">⚠️ Lease Term Expired</span>';
+            }
+        }
         
         html += `
             <tr>
@@ -13659,6 +13667,8 @@ window.openLeaseModal = async function(leaseId = null, editMode = false, unitId 
             }
         } else {
             title.textContent = 'Add Lease';
+            // Reset operating under lease terms field visibility
+            updateOperatingUnderLeaseTermsVisibility();
             // Auto-generate lease number
             const leaseNumberInput = document.getElementById('leaseNumber');
             if (leaseNumberInput) {
@@ -14308,6 +14318,17 @@ function handleLeaseDocumentFile(file) {
     }
 }
 
+// Update visibility of operating under lease terms field based on status
+function updateOperatingUnderLeaseTermsVisibility() {
+    const leaseStatusField = document.getElementById('leaseStatus');
+    const operatingUnderLeaseTermsGroup = document.getElementById('operatingUnderLeaseTermsGroup');
+    
+    if (leaseStatusField && operatingUnderLeaseTermsGroup) {
+        const status = leaseStatusField.value;
+        operatingUnderLeaseTermsGroup.style.display = (status === 'Expired') ? 'block' : 'none';
+    }
+}
+
 // Populate lease form with data
 function populateLeaseForm(lease) {
     document.getElementById('leaseId').value = lease.id;
@@ -14324,6 +14345,14 @@ function populateLeaseForm(lease) {
         } else {
             leaseStatusField.value = lease.status || 'Active';
         }
+        // Show/hide operating under lease terms field based on status
+        updateOperatingUnderLeaseTermsVisibility();
+    }
+    
+    // Populate operating under lease terms checkbox
+    const operatingUnderLeaseTermsCheckbox = document.getElementById('operatingUnderLeaseTerms');
+    if (operatingUnderLeaseTermsCheckbox) {
+        operatingUnderLeaseTermsCheckbox.checked = lease.operatingUnderLeaseTerms || false;
     }
     
     // Set deprecated toggle and show/hide fields
@@ -14644,6 +14673,7 @@ async function handleLeaseSubmit(e) {
             unitId: document.getElementById('leaseUnitId').value || null,
             leaseType: document.getElementById('leaseType').value,
             status: document.getElementById('leaseStatus').value,
+            operatingUnderLeaseTerms: document.getElementById('operatingUnderLeaseTerms')?.checked || false,
             isDeprecated: document.getElementById('isDeprecated').checked || false,
             deprecatedDate: (() => {
                 const deprecatedDateInput = document.getElementById('deprecatedDate');
@@ -14947,6 +14977,12 @@ function setupLeaseEventListeners() {
                 deprecatedReasonGroup.style.display = this.checked ? 'block' : 'none';
             }
         });
+    }
+    
+    // Show/hide operating under lease terms field based on status
+    const leaseStatusField = document.getElementById('leaseStatus');
+    if (leaseStatusField) {
+        leaseStatusField.addEventListener('change', updateOperatingUnderLeaseTermsVisibility);
     }
     
     // Show/hide additional monthly charges based on toggle
@@ -15398,10 +15434,14 @@ function isLeaseActive(lease) {
         return true;
     }
     
-    // If status is Expired, still consider it active (tenant may be in holdover)
-    // This allows expired leases to show in active sections with an expired indicator
+    // If status is Expired, check if operating under lease terms
     if (lease.status === 'Expired') {
-        return true;
+        // If operating under lease terms, treat as active for financial purposes
+        if (lease.operatingUnderLeaseTerms === true) {
+            return true;
+        }
+        // Otherwise, still show in active sections but not for financial calculations
+        return true; // Keep showing in active sections with expired indicator
     }
     
     // Default: if no explicit status or status is unclear, consider active (unless deleted or deprecated)
@@ -15611,7 +15651,7 @@ function formatLeaseSummaries(leases, tenants, units = {}) {
                                 ${escapeHtml(tenantName)}
                             </div>
                             <span class="status-badge ${statusClass}" style="font-size: 0.75em; padding: 3px 8px;">${displayStatus}</span>
-                            ${isExpired ? '<span class="status-badge status-warning" style="font-size: 0.75em; padding: 3px 8px;">⚠️ Lease Term Expired</span>' : ''}
+                            ${isExpired ? (isOperatingUnderLeaseTerms ? '<span class="status-badge status-active" style="font-size: 0.75em; padding: 3px 8px;">✓ Operating Under Lease Terms</span>' : '<span class="status-badge status-warning" style="font-size: 0.75em; padding: 3px 8px;">⚠️ Lease Term Expired</span>') : ''}
                             <span style="font-size: 0.75em; color: #94a3b8; font-weight: 400;">ID: ${lease.id.substring(0, 8)}</span>
                         </div>
                         
