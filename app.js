@@ -105,6 +105,83 @@ function formatDateForDisplay(dateValue, fallback = 'N/A') {
 }
 
 /**
+ * Check if a lease escalation applies to a given month
+ * @param {Object} lease
+ * @param {number} year
+ * @param {number} month - 1-based
+ * @returns {boolean}
+ */
+function isEscalationMonth(lease, year, month) {
+    const esc = lease?.rentEscalation;
+    if (!esc || !esc.firstEscalationDate || !esc.escalationFrequency) return false;
+    if (!esc.escalationType || esc.escalationType === 'None') return false;
+
+    const firstEscDate = toStandardDate(esc.firstEscalationDate);
+    if (!firstEscDate) return false;
+
+    const firstYear = getStandardYear(firstEscDate);
+    const firstMonth = getStandardMonth(firstEscDate);
+    if (!firstYear || !firstMonth) return false;
+
+    if (year < firstYear || (year === firstYear && month < firstMonth)) return false;
+
+    const monthsDiff = (year - firstYear) * 12 + (month - firstMonth);
+    const frequency = esc.escalationFrequency;
+
+    if (frequency === 'Monthly') return true;
+    if (frequency === 'Quarterly') return monthsDiff % 3 === 0;
+    if (frequency === 'Annually') return month === firstMonth;
+
+    return false;
+}
+
+/**
+ * Calculate a lease renewal notice date from lease settings
+ * @param {Object} lease
+ * @returns {Date|null}
+ */
+function getRenewalNoticeDate(lease) {
+    if (!lease) return null;
+
+    const noticeType = lease.autoRenewalNoticeType || lease.autoRenewalNoticeUnit || null;
+    if (noticeType === 'date') {
+        return toStandardDate(lease.autoRenewalNoticeDate);
+    }
+
+    if ((noticeType === 'months' || noticeType === 'days') && lease.autoRenewalNoticePeriod && lease.leaseEndDate) {
+        const endDate = toStandardDate(lease.leaseEndDate);
+        if (!endDate) return null;
+        const noticeDate = new Date(endDate.getTime());
+        if (noticeType === 'months') {
+            noticeDate.setMonth(noticeDate.getMonth() - Number(lease.autoRenewalNoticePeriod));
+        } else {
+            noticeDate.setDate(noticeDate.getDate() - Number(lease.autoRenewalNoticePeriod));
+        }
+        return noticeDate;
+    }
+
+    // Fallback if date is provided without type
+    if (lease.autoRenewalNoticeDate) {
+        return toStandardDate(lease.autoRenewalNoticeDate);
+    }
+
+    return null;
+}
+
+/**
+ * Check if renewal notice is required in a given month
+ * @param {Object} lease
+ * @param {number} year
+ * @param {number} month - 1-based
+ * @returns {boolean}
+ */
+function isRenewalNoticeMonth(lease, year, month) {
+    const noticeDate = getRenewalNoticeDate(lease);
+    if (!noticeDate) return false;
+    return getStandardYear(noticeDate) === year && getStandardMonth(noticeDate) === month;
+}
+
+/**
  * Create a date for the first day of a month (normalized to start of day, UTC)
  * @param {number} year - Year (e.g., 2024)
  * @param {number} month - Month (1-based: 1 = January, 12 = December)
@@ -17596,18 +17673,27 @@ function renderVerticalTable(tenantsData, tenants, units, buildings, year, month
         sortedTenantIds.forEach(tenantId => {
             const tenantLeases = tenantsData[tenantId];
             const allLeasesForMonth = [];
+            let cellHasEscalation = false;
+            let cellHasNotice = false;
             
             // Process active leases
             tenantLeases.activeLeases.forEach(lease => {
                 const result = calculateRentForMonth(lease, year, month);
                 if (result.rent > 0) {
+                    const hasEscalation = isEscalationMonth(lease, year, month);
+                    const hasNotice = isRenewalNoticeMonth(lease, year, month);
                     allLeasesForMonth.push({
                         lease,
                         rent: result.rent,
                         isDeprecated: false,
-                        leaseId: lease.id
+                        leaseId: lease.id,
+                        squareFootage: lease.squareFootage || null,
+                        hasEscalation,
+                        hasNotice
                     });
                     monthTotal += result.rent;
+                    cellHasEscalation = cellHasEscalation || hasEscalation;
+                    cellHasNotice = cellHasNotice || hasNotice;
                 }
             });
             
@@ -17628,19 +17714,32 @@ function renderVerticalTable(tenantsData, tenants, units, buildings, year, month
                     }
                     
                     if (shouldShowRent) {
+                        const hasEscalation = isEscalationMonth(lease, year, month);
+                        const hasNotice = isRenewalNoticeMonth(lease, year, month);
                         allLeasesForMonth.push({
                             lease,
                             rent: result.rent,
                             isDeprecated: true,
-                            leaseId: lease.id
+                            leaseId: lease.id,
+                            squareFootage: lease.squareFootage || null,
+                            hasEscalation,
+                            hasNotice
                         });
                         monthTotal += result.rent;
+                        cellHasEscalation = cellHasEscalation || hasEscalation;
+                        cellHasNotice = cellHasNotice || hasNotice;
                     }
                 });
             }
             
             // Render cell with all rents for this tenant
             html += `<td style="padding: 10px; text-align: right; font-variant-numeric: tabular-nums; position: relative; vertical-align: top;">`;
+            if (cellHasEscalation || cellHasNotice) {
+                html += `<span style="position: absolute; top: 4px; right: 4px; display: inline-flex; gap: 4px; font-size: 0.7em;">` +
+                    `${cellHasEscalation ? '<span style="color: #64748b;">↗</span>' : ''}` +
+                    `${cellHasNotice ? '<span style="color: #f59e0b;">!</span>' : ''}` +
+                    `</span>`;
+            }
             
             if (allLeasesForMonth.length === 0) {
                 html += `<span style="color: #cbd5e1;">—</span>`;
@@ -17650,10 +17749,14 @@ function renderVerticalTable(tenantsData, tenants, units, buildings, year, month
                     const cellColor = leaseData.isDeprecated ? '#f87171' : '#1e293b';
                     const cellBgColor = leaseData.isDeprecated ? 'background-color: #fef2f2;' : '';
                     const leaseIdShort = leaseData.leaseId.substring(0, 8);
+                    const squareFootageDisplay = leaseData.squareFootage ? `${leaseData.squareFootage.toLocaleString()} SF` : '';
                     
                     html += `<div style="margin-bottom: ${idx < allLeasesForMonth.length - 1 ? '4px' : '0'}; color: ${cellColor}; ${cellBgColor} padding: 2px 4px; border-radius: 3px;">`;
                     html += `<div style="font-weight: 500;">${rentDisplay}</div>`;
                     html += `<div style="font-size: 0.65em; opacity: 0.7; margin-top: 1px;">${leaseIdShort}</div>`;
+                    if (squareFootageDisplay) {
+                        html += `<div style="font-size: 0.6em; opacity: 0.7;">${squareFootageDisplay}</div>`;
+                    }
                     html += `</div>`;
                 });
             }
@@ -17879,23 +17982,33 @@ function renderHorizontalTable(tenantsData, tenants, units, buildings, year, mon
         
         // Calculate monthly rents for all leases (active + deprecated)
         const monthlyRentsByLease = [];
+        const monthlyIndicators = [];
         let annualRent = 0;
         
         for (let month = 1; month <= 12; month++) {
             const allLeasesForMonth = [];
+            let cellHasEscalation = false;
+            let cellHasNotice = false;
             
             // Process active leases
             tenantLeases.activeLeases.forEach(lease => {
                 const result = calculateRentForMonth(lease, year, month);
                 if (result.rent > 0) {
+                    const hasEscalation = isEscalationMonth(lease, year, month);
+                    const hasNotice = isRenewalNoticeMonth(lease, year, month);
                     allLeasesForMonth.push({
                         lease,
                         rent: result.rent,
                         isDeprecated: false,
-                        leaseId: lease.id
+                        leaseId: lease.id,
+                        squareFootage: lease.squareFootage || null,
+                        hasEscalation,
+                        hasNotice
                     });
                     annualRent += result.rent;
                     monthlyTotals[month - 1] += result.rent;
+                    cellHasEscalation = cellHasEscalation || hasEscalation;
+                    cellHasNotice = cellHasNotice || hasNotice;
                 }
             });
             
@@ -17916,19 +18029,27 @@ function renderHorizontalTable(tenantsData, tenants, units, buildings, year, mon
                     }
                     
                     if (shouldShowRent) {
+                        const hasEscalation = isEscalationMonth(lease, year, month);
+                        const hasNotice = isRenewalNoticeMonth(lease, year, month);
                         allLeasesForMonth.push({
                             lease,
                             rent: result.rent,
                             isDeprecated: true,
-                            leaseId: lease.id
+                            leaseId: lease.id,
+                            squareFootage: lease.squareFootage || null,
+                            hasEscalation,
+                            hasNotice
                         });
                         annualRent += result.rent;
                         monthlyTotals[month - 1] += result.rent;
+                        cellHasEscalation = cellHasEscalation || hasEscalation;
+                        cellHasNotice = cellHasNotice || hasNotice;
                     }
                 });
             }
             
             monthlyRentsByLease.push(allLeasesForMonth);
+            monthlyIndicators.push({ hasEscalation: cellHasEscalation, hasNotice: cellHasNotice });
         }
         
         totalAnnualRent += annualRent;
@@ -17940,7 +18061,14 @@ function renderHorizontalTable(tenantsData, tenants, units, buildings, year, mon
         html += `<td style="padding: 10px; text-align: right; color: #64748b; font-variant-numeric: tabular-nums;">${squareFootage ? squareFootage.toLocaleString() : '—'}</td>`;
         
         monthlyRentsByLease.forEach((allLeasesForMonth, idx) => {
+            const indicators = monthlyIndicators[idx] || { hasEscalation: false, hasNotice: false };
             html += `<td style="padding: 10px; text-align: right; font-variant-numeric: tabular-nums; position: relative; vertical-align: top;">`;
+            if (indicators.hasEscalation || indicators.hasNotice) {
+                html += `<span style="position: absolute; top: 4px; right: 4px; display: inline-flex; gap: 4px; font-size: 0.7em;">` +
+                    `${indicators.hasEscalation ? '<span style="color: #64748b;">↗</span>' : ''}` +
+                    `${indicators.hasNotice ? '<span style="color: #f59e0b;">!</span>' : ''}` +
+                    `</span>`;
+            }
             
             if (allLeasesForMonth.length === 0) {
                 html += `<span style="color: #cbd5e1;">—</span>`;
@@ -17950,10 +18078,14 @@ function renderHorizontalTable(tenantsData, tenants, units, buildings, year, mon
                     const cellColor = leaseData.isDeprecated ? '#f87171' : '#1e293b';
                     const cellBgColor = leaseData.isDeprecated ? 'background-color: #fef2f2;' : '';
                     const leaseIdShort = leaseData.leaseId.substring(0, 8);
+                    const squareFootageDisplay = leaseData.squareFootage ? `${leaseData.squareFootage.toLocaleString()} SF` : '';
                     
                     html += `<div style="margin-bottom: ${leaseIdx < allLeasesForMonth.length - 1 ? '4px' : '0'}; color: ${cellColor}; ${cellBgColor} padding: 2px 4px; border-radius: 3px;">`;
                     html += `<div style="font-weight: 500;">${rentDisplay}</div>`;
                     html += `<div style="font-size: 0.65em; opacity: 0.7; margin-top: 1px;">${leaseIdShort}</div>`;
+                    if (squareFootageDisplay) {
+                        html += `<div style="font-size: 0.6em; opacity: 0.7;">${squareFootageDisplay}</div>`;
+                    }
                     html += `</div>`;
                 });
             }
