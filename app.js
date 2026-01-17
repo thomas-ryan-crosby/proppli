@@ -10,6 +10,186 @@ let beforeFileUrls = []; // Array of existing file URLs from database
 let afterFileUrls = []; // Array of existing file URLs from database
 // completionAfterFiles is defined later with the function
 
+// ============================================
+// STANDARDIZED DATE/TIME UTILITIES
+// ============================================
+// This section provides consistent date handling across the entire platform
+// to prevent timezone issues, month off-by-one errors, and inconsistent date calculations
+
+/**
+ * Convert Firestore Timestamp to JavaScript Date
+ * Handles both Timestamp objects and plain Date objects
+ * @param {firebase.firestore.Timestamp|Date|string|number} timestamp - Firestore timestamp or date
+ * @returns {Date} JavaScript Date object
+ */
+function toStandardDate(timestamp) {
+    if (!timestamp) return null;
+    if (timestamp instanceof Date) return timestamp;
+    if (timestamp.toDate && typeof timestamp.toDate === 'function') return timestamp.toDate();
+    if (timestamp.toMillis && typeof timestamp.toMillis === 'function') return new Date(timestamp.toMillis());
+    if (typeof timestamp === 'string' || typeof timestamp === 'number') return new Date(timestamp);
+    return null;
+}
+
+/**
+ * Get year from a date (standardized)
+ * @param {Date|firebase.firestore.Timestamp} date - Date object or Firestore timestamp
+ * @returns {number} Year (e.g., 2024)
+ */
+function getStandardYear(date) {
+    const standardDate = toStandardDate(date);
+    if (!standardDate) return null;
+    return standardDate.getFullYear();
+}
+
+/**
+ * Get month from a date (1-based: 1 = January, 12 = December)
+ * This is the standard for display and calculations across the platform
+ * @param {Date|firebase.firestore.Timestamp} date - Date object or Firestore timestamp
+ * @returns {number} Month (1-12)
+ */
+function getStandardMonth(date) {
+    const standardDate = toStandardDate(date);
+    if (!standardDate) return null;
+    return standardDate.getMonth() + 1; // Convert from 0-based to 1-based
+}
+
+/**
+ * Get day from a date
+ * @param {Date|firebase.firestore.Timestamp} date - Date object or Firestore timestamp
+ * @returns {number} Day of month (1-31)
+ */
+function getStandardDay(date) {
+    const standardDate = toStandardDate(date);
+    if (!standardDate) return null;
+    return standardDate.getDate();
+}
+
+/**
+ * Create a date for the first day of a month (normalized to start of day, UTC)
+ * @param {number} year - Year (e.g., 2024)
+ * @param {number} month - Month (1-based: 1 = January, 12 = December)
+ * @returns {Date} Date object for first day of month at 00:00:00 UTC
+ */
+function getMonthStartDate(year, month) {
+    // month is 1-based, JavaScript Date uses 0-based, so subtract 1
+    return new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
+}
+
+/**
+ * Create a date for the last day of a month (normalized to end of day, UTC)
+ * @param {number} year - Year (e.g., 2024)
+ * @param {number} month - Month (1-based: 1 = January, 12 = December)
+ * @returns {Date} Date object for last day of month at 23:59:59.999 UTC
+ */
+function getMonthEndDate(year, month) {
+    // Get first day of next month, then subtract 1ms
+    const nextMonth = month === 12 ? 1 : month + 1;
+    const nextYear = month === 12 ? year + 1 : year;
+    const firstOfNextMonth = new Date(Date.UTC(nextYear, nextMonth - 1, 1, 0, 0, 0, 0));
+    return new Date(firstOfNextMonth.getTime() - 1);
+}
+
+/**
+ * Check if a date falls within a specific month
+ * @param {Date|firebase.firestore.Timestamp} date - Date to check
+ * @param {number} year - Year (e.g., 2024)
+ * @param {number} month - Month (1-based: 1 = January, 12 = December)
+ * @returns {boolean} True if date is in the specified month
+ */
+function isDateInMonth(date, year, month) {
+    const standardDate = toStandardDate(date);
+    if (!standardDate) return false;
+    const dateYear = standardDate.getFullYear();
+    const dateMonth = standardDate.getMonth() + 1; // Convert to 1-based
+    return dateYear === year && dateMonth === month;
+}
+
+/**
+ * Check if a date is before a specific month (strictly before)
+ * @param {Date|firebase.firestore.Timestamp} date - Date to check
+ * @param {number} year - Year (e.g., 2024)
+ * @param {number} month - Month (1-based: 1 = January, 12 = December)
+ * @returns {boolean} True if date is before the first day of the month
+ */
+function isDateBeforeMonth(date, year, month) {
+    const standardDate = toStandardDate(date);
+    if (!standardDate) return false;
+    const monthStart = getMonthStartDate(year, month);
+    return standardDate < monthStart;
+}
+
+/**
+ * Check if a date is after a specific month (strictly after)
+ * @param {Date|firebase.firestore.Timestamp} date - Date to check
+ * @param {number} year - Year (e.g., 2024)
+ * @param {number} month - Month (1-based: 1 = January, 12 = December)
+ * @returns {boolean} True if date is after the last day of the month
+ */
+function isDateAfterMonth(date, year, month) {
+    const standardDate = toStandardDate(date);
+    if (!standardDate) return false;
+    const monthEnd = getMonthEndDate(year, month);
+    return standardDate > monthEnd;
+}
+
+/**
+ * Calculate number of months between two dates
+ * @param {Date|firebase.firestore.Timestamp} startDate - Start date
+ * @param {Date|firebase.firestore.Timestamp} endDate - End date
+ * @returns {number} Number of months (can be negative if endDate < startDate)
+ */
+function getMonthsBetween(startDate, endDate) {
+    const start = toStandardDate(startDate);
+    const end = toStandardDate(endDate);
+    if (!start || !end) return 0;
+    
+    const startYear = start.getFullYear();
+    const startMonth = start.getMonth();
+    const endYear = end.getFullYear();
+    const endMonth = end.getMonth();
+    
+    return (endYear - startYear) * 12 + (endMonth - startMonth);
+}
+
+/**
+ * Check if a lease is active during a specific month
+ * @param {Object} lease - Lease object
+ * @param {number} year - Year (e.g., 2024)
+ * @param {number} month - Month (1-based: 1 = January, 12 = December)
+ * @returns {boolean} True if lease is active during the month
+ */
+function isLeaseActiveInMonth(lease, year, month) {
+    const monthStart = getMonthStartDate(year, month);
+    const monthEnd = getMonthEndDate(year, month);
+    
+    // Check start date
+    if (lease.leaseStartDate) {
+        const startDate = toStandardDate(lease.leaseStartDate);
+        if (startDate && monthEnd < startDate) {
+            return false; // Month is before lease starts
+        }
+    }
+    
+    // Check end date (unless auto-renewal or operating under lease terms)
+    if (lease.leaseEndDate && !lease.autoRenewal && !lease.operatingUnderLeaseTerms) {
+        const endDate = toStandardDate(lease.leaseEndDate);
+        if (endDate && monthStart > endDate) {
+            return false; // Month is after lease ends
+        }
+    }
+    
+    // Check deprecated date
+    if (lease.deprecatedDate) {
+        const deprecatedDate = toStandardDate(lease.deprecatedDate);
+        if (deprecatedDate && monthStart > deprecatedDate) {
+            return false; // Month is after deprecation
+        }
+    }
+    
+    return true;
+}
+
 // Authentication state
 let currentUser = null;
 let currentUserProfile = null;
@@ -15493,6 +15673,8 @@ function buildUnitLeaseRow(unit, activeLeases, legacyLeases, tenants, occupancie
 }
 
 // Calculate current rent based on escalations
+// Calculate current rent based on escalations
+// Uses standardized date utilities for consistent calculations
 function calculateCurrentRent(lease, asOfDate = null) {
     if (!lease.monthlyRent) return null;
     
@@ -15501,21 +15683,23 @@ function calculateCurrentRent(lease, asOfDate = null) {
     // If deprecated, calculate rent as of deprecation date instead of today
     const isDeprecated = isLeaseDeprecated(lease);
     const calculationDate = isDeprecated && lease.deprecatedDate 
-        ? (lease.deprecatedDate.toDate ? lease.deprecatedDate.toDate() : new Date(lease.deprecatedDate))
+        ? toStandardDate(lease.deprecatedDate)
         : (asOfDate || new Date());
+    
+    if (!calculationDate) return initialRent;
     
     // If no escalations, current rent is initial rent
     if (!lease.rentEscalation || !lease.rentEscalation.escalationType || lease.rentEscalation.escalationType === 'None') {
         return initialRent;
     }
     
-    // Need lease start date and first escalation date to calculate
-    if (!lease.leaseStartDate || !lease.rentEscalation.firstEscalationDate) {
+    // Need first escalation date to calculate
+    if (!lease.rentEscalation.firstEscalationDate) {
         return initialRent;
     }
     
-    const startDate = lease.leaseStartDate.toDate();
-    const firstEscDate = lease.rentEscalation.firstEscalationDate.toDate();
+    const firstEscDate = toStandardDate(lease.rentEscalation.firstEscalationDate);
+    if (!firstEscDate) return initialRent;
     
     // If we haven't reached the first escalation date, return initial rent
     if (calculationDate < firstEscDate) {
@@ -15525,22 +15709,39 @@ function calculateCurrentRent(lease, asOfDate = null) {
     const esc = lease.rentEscalation;
     let currentRent = initialRent;
     
-    // Calculate number of escalation periods
+    // Calculate number of escalation periods using standardized date utilities
     let periods = 0;
     const frequency = esc.escalationFrequency;
     
+    const calcYear = getStandardYear(calculationDate);
+    const calcMonth = getStandardMonth(calculationDate);
+    const firstEscYear = getStandardYear(firstEscDate);
+    const firstEscMonth = getStandardMonth(firstEscDate);
+    
     if (frequency === 'Monthly') {
-        const monthsDiff = (calculationDate.getFullYear() - firstEscDate.getFullYear()) * 12 + (calculationDate.getMonth() - firstEscDate.getMonth());
-        periods = Math.floor(monthsDiff);
+        const monthsDiff = (calcYear - firstEscYear) * 12 + (calcMonth - firstEscMonth);
+        periods = Math.max(1, monthsDiff + 1); // +1 because the first month itself is period 1
     } else if (frequency === 'Quarterly') {
-        const monthsDiff = (calculationDate.getFullYear() - firstEscDate.getFullYear()) * 12 + (calculationDate.getMonth() - firstEscDate.getMonth());
-        periods = Math.floor(monthsDiff / 3);
+        const monthsDiff = (calcYear - firstEscYear) * 12 + (calcMonth - firstEscMonth);
+        periods = Math.max(1, Math.floor(monthsDiff / 3) + 1); // +1 because the first quarter itself is period 1
     } else if (frequency === 'Annually') {
-        const yearsDiff = calculationDate.getFullYear() - firstEscDate.getFullYear();
-        if (calculationDate.getMonth() > firstEscDate.getMonth() || (calculationDate.getMonth() === firstEscDate.getMonth() && calculationDate.getDate() >= firstEscDate.getDate())) {
-            periods = yearsDiff;
+        const yearsDiff = calcYear - firstEscYear;
+        if (yearsDiff < 0) {
+            periods = 0;
+        } else if (yearsDiff === 0) {
+            // Same year - only count if we're at or past the escalation month
+            if (calcMonth >= firstEscMonth) {
+                periods = 1; // First escalation period
+            } else {
+                periods = 0;
+            }
         } else {
-            periods = yearsDiff - 1;
+            // Future year - calculate based on month position
+            if (calcMonth >= firstEscMonth) {
+                periods = yearsDiff + 1; // +1 because the escalation month in first year counts
+            } else {
+                periods = yearsDiff; // Escalation hasn't happened yet this year
+            }
         }
     }
     
@@ -16423,19 +16624,22 @@ function setupYearNavigationWidget() {
     // Update when year filter changes
     yearFilter.addEventListener('change', updateYearNavigation);
     
-    // Previous year button
+    // Previous year button - navigate to immediate previous year
     prevYearBtn.addEventListener('click', () => {
-        const currentYear = parseInt(yearFilter.value) || new Date().getFullYear();
+        const currentYear = parseInt(yearFilter.value);
+        if (isNaN(currentYear)) return;
+        
+        // Get available years, excluding current year
         const availableYears = Array.from(yearFilter.options)
             .map(opt => parseInt(opt.value))
-            .filter(y => !isNaN(y))
-            .sort((a, b) => a - b);
+            .filter(y => !isNaN(y) && y !== currentYear)
+            .sort((a, b) => b - a); // Sort descending
         
-        // Find the immediate previous year (currentYear - 1, or closest available if that doesn't exist)
+        // Find the immediate previous year (currentYear - 1, or closest available)
         const targetPrevYear = currentYear - 1;
         const prevYear = availableYears.includes(targetPrevYear) 
             ? targetPrevYear 
-            : availableYears.filter(y => y < currentYear).sort((a, b) => b - a)[0];
+            : availableYears.find(y => y < currentYear);
         
         if (prevYear !== undefined) {
             yearFilter.value = prevYear.toString();
@@ -16444,19 +16648,22 @@ function setupYearNavigationWidget() {
         }
     });
     
-    // Next year button
+    // Next year button - navigate to immediate next year
     nextYearBtn.addEventListener('click', () => {
-        const currentYear = parseInt(yearFilter.value) || new Date().getFullYear();
+        const currentYear = parseInt(yearFilter.value);
+        if (isNaN(currentYear)) return;
+        
+        // Get available years, excluding current year
         const availableYears = Array.from(yearFilter.options)
             .map(opt => parseInt(opt.value))
-            .filter(y => !isNaN(y))
-            .sort((a, b) => a - b); // Sort ascending to find immediate next
+            .filter(y => !isNaN(y) && y !== currentYear)
+            .sort((a, b) => a - b); // Sort ascending
         
-        // Find the immediate next year (currentYear + 1, or closest available if that doesn't exist)
+        // Find the immediate next year (currentYear + 1, or closest available)
         const targetNextYear = currentYear + 1;
         const nextYear = availableYears.includes(targetNextYear)
             ? targetNextYear
-            : availableYears.filter(y => y > currentYear).sort((a, b) => a - b)[0];
+            : availableYears.find(y => y > currentYear);
         
         if (nextYear !== undefined) {
             yearFilter.value = nextYear.toString();
@@ -16796,25 +17003,28 @@ function setupFinanceTabs() {
 
 // Calculate rent for a specific month based on lease and escalation
 // Returns { rent: number, hasEscalation: boolean }
+// Uses standardized date utilities for consistent calculations
 function calculateRentForMonth(lease, year, month) {
     if (!lease.monthlyRent) return { rent: 0, hasEscalation: false, isDeprecated: false };
     
     const initialRent = lease.monthlyRent;
-    const targetDate = new Date(year, month - 1, 1); // First day of the month
-    const endOfMonth = new Date(year, month, 0); // Last day of the month
+    const monthStart = getMonthStartDate(year, month);
+    const monthEnd = getMonthEndDate(year, month);
     
     // Check if lease is deprecated and if target month is after deprecation date
     const isDeprecated = isLeaseDeprecated(lease);
     if (isDeprecated && lease.deprecatedDate) {
-        const deprecatedDate = lease.deprecatedDate.toDate ? lease.deprecatedDate.toDate() : new Date(lease.deprecatedDate);
+        const deprecatedDate = toStandardDate(lease.deprecatedDate);
         
         // If target month is completely after deprecation date, return 0
-        if (targetDate > deprecatedDate) {
+        if (deprecatedDate && isDateAfterMonth(deprecatedDate, year, month)) {
             return { rent: 0, hasEscalation: false, isDeprecated: true };
         }
-        
-        // If target month includes deprecation date, use deprecation date as calculation cutoff
-        // This ensures we show the rent as of the deprecation date
+    }
+    
+    // Check if lease is active during this month (handles start/end dates)
+    if (!isLeaseActiveInMonth(lease, year, month)) {
+        return { rent: 0, hasEscalation: false, isDeprecated: isDeprecated || false };
     }
     
     // If no escalations, return initial rent
@@ -16822,58 +17032,33 @@ function calculateRentForMonth(lease, year, month) {
         return { rent: initialRent, hasEscalation: false, isDeprecated: isDeprecated || false };
     }
     
-    // Check if lease has started
-    if (lease.leaseStartDate) {
-        const startDate = lease.leaseStartDate.toDate();
-        if (targetDate < startDate) {
-            return { rent: 0, hasEscalation: false }; // Lease hasn't started yet
-        }
-    }
-    
-    // Check if lease has ended (unless auto-renewal)
-    // Note: For deprecated leases, we already checked deprecation date above
-    if (lease.leaseEndDate && !lease.autoRenewal && !isDeprecated) {
-        const endDate = lease.leaseEndDate.toDate();
-        if (endOfMonth > endDate) {
-            return { rent: 0, hasEscalation: false, isDeprecated: false }; // Lease has ended
-        }
-    }
-    
     // Need first escalation date to calculate
     if (!lease.rentEscalation.firstEscalationDate) {
-        return { rent: initialRent, hasEscalation: false };
+        return { rent: initialRent, hasEscalation: false, isDeprecated: isDeprecated || false };
     }
     
-    const firstEscDate = lease.rentEscalation.firstEscalationDate.toDate();
+    const firstEscDate = toStandardDate(lease.rentEscalation.firstEscalationDate);
+    if (!firstEscDate) {
+        return { rent: initialRent, hasEscalation: false, isDeprecated: isDeprecated || false };
+    }
     
-    // For deprecated leases, use deprecation date as the calculation cutoff instead of target date
-    let calculationDate = targetDate;
+    // For deprecated leases, use deprecation date as the calculation cutoff
+    let calculationDate = monthEnd;
     if (isDeprecated && lease.deprecatedDate) {
-        const deprecatedDate = lease.deprecatedDate.toDate ? lease.deprecatedDate.toDate() : new Date(lease.deprecatedDate);
-        // Use deprecation date if it's before the end of the target month
-        if (deprecatedDate < endOfMonth) {
+        const deprecatedDate = toStandardDate(lease.deprecatedDate);
+        if (deprecatedDate && deprecatedDate < monthEnd) {
             calculationDate = deprecatedDate;
         }
     }
     
-    // Get the escalation year and month (1-based for clarity)
-    const firstEscYear = firstEscDate.getFullYear();
-    const firstEscMonth = firstEscDate.getMonth() + 1; // Convert to 1-based (1 = January, 12 = December)
-    
-    // Calculation year and month (1-based) - use deprecation date if applicable
-    const calcYear = calculationDate.getFullYear();
-    const calcMonth = calculationDate.getMonth() + 1;
-    
-    // Target year and month (1-based) - for period calculations
-    const targetYear = year;
-    const targetMonth = month; // Already 1-based (1 = January, 12 = December)
+    // Get escalation and calculation months (1-based)
+    const firstEscYear = getStandardYear(firstEscDate);
+    const firstEscMonth = getStandardMonth(firstEscDate);
+    const calcYear = getStandardYear(calculationDate);
+    const calcMonth = getStandardMonth(calculationDate);
     
     // If we haven't reached the first escalation month, return initial rent
-    // Use calculation date (which may be deprecation date) for this check
-    if (calcYear < firstEscYear) {
-        return { rent: initialRent, hasEscalation: false, isDeprecated: isDeprecated || false };
-    }
-    if (calcYear === firstEscYear && calcMonth < firstEscMonth) {
+    if (calcYear < firstEscYear || (calcYear === firstEscYear && calcMonth < firstEscMonth)) {
         return { rent: initialRent, hasEscalation: false, isDeprecated: isDeprecated || false };
     }
     
@@ -17374,9 +17559,8 @@ function renderVerticalTable(tenantsData, tenants, units, buildings, year, month
                     
                     // Only count if month is not after deprecation date
                     if (isDeprecated && lease.deprecatedDate) {
-                        const deprecatedDate = lease.deprecatedDate.toDate ? lease.deprecatedDate.toDate() : new Date(lease.deprecatedDate);
-                        const targetDate = new Date(year, month - 1, 1);
-                        if (targetDate <= deprecatedDate) {
+                        const deprecatedDate = toStandardDate(lease.deprecatedDate);
+                        if (!deprecatedDate || !isDateAfterMonth(deprecatedDate, year, month)) {
                             annualRent += result.rent;
                         }
                     } else {
