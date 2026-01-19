@@ -354,7 +354,7 @@ When an Admin invites a user:
 2. **Self-Registration:**
    - Self-registered users start as **inactive** (`isActive: false`)
    - Admin must manually activate the account
-   - User receives welcome email but cannot log in until activated
+   - All new users receive a welcome email; self-registered users cannot log in until activated
 
 3. **Manual Activation:**
    - Admin can activate/deactivate users via the Users page

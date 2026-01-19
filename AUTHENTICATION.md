@@ -292,7 +292,7 @@ Proppli uses Firebase Authentication for user authentication and Firestore for u
 ### 3. Self-Registered Users
 - `users.isActive` MUST be `false` after signup
 - User MUST be signed out after signup
-- Welcome email MUST be sent
+- Welcome email MUST be sent on initial profile creation
 
 ### 4. Auto-Created Profiles (Allowed)
 - If a Firebase Auth user exists but no `users/{userId}` document is found, the app may create a default profile
@@ -358,7 +358,8 @@ Proppli uses Firebase Authentication for user authentication and Firestore for u
 - [ ] Admin can invite user
 - [ ] Invited user receives email
 - [ ] Invited user can sign up and immediately log in
-- [ ] Self-registered user is inactive and receives welcome email
+- [ ] All new users receive welcome email (Email/Password or Google)
+- [ ] Self-registered user is inactive after signup
 - [ ] Admin can activate user
 - [ ] Activated user receives activation email
 - [ ] "Remember Me" works correctly

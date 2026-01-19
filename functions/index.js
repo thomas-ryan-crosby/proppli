@@ -140,6 +140,59 @@ const emailTemplates = {
       
       This is an automated message from Proppli.
     `
+  }),
+
+  welcome: (data) => ({
+    subject: `Welcome to Proppli`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #667eea; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+          .content { background: #f8f9fa; padding: 30px; border-radius: 0 0 8px 8px; }
+          .button { display: inline-block; padding: 12px 24px; background: #667eea; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+          .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>Welcome to Proppli</h1>
+          </div>
+          <div class="content">
+            <p>Hello ${data.displayName || data.email},</p>
+            <p>Your Proppli account has been created successfully.</p>
+            <p>You can sign in at any time using the button below:</p>
+            <div style="text-align: center;">
+              <a href="${data.loginUrl}" class="button">Sign In</a>
+            </div>
+            <p>Or copy and paste this link into your browser:</p>
+            <p style="word-break: break-all; color: #667eea;">${data.loginUrl}</p>
+            <p>If you have any questions, please contact your system administrator.</p>
+          </div>
+          <div class="footer">
+            <p>This is an automated message from Proppli. Please do not reply to this email.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+    text: `
+      Welcome to Proppli
+      
+      Hello ${data.displayName || data.email},
+      
+      Your Proppli account has been created successfully.
+      
+      Sign in at: ${data.loginUrl}
+      
+      If you have any questions, please contact your system administrator.
+      
+      This is an automated message from Proppli.
+    `
   })
 };
 
@@ -328,10 +381,19 @@ async function sendActivationEmailInternal(data) {
 
 // Helper function to send welcome email (for self-registration)
 async function sendWelcomeEmailInternal(data) {
+  if (!data.email) {
+    console.log('Welcome email skipped: missing email address');
+    return;
+  }
+
+  const appUrl = functions.config().app?.url || 'https://www.proppli.com';
+  const loginUrl = `${appUrl}/#login`;
+
   // Prepare email data
   const emailData = {
     email: data.email,
-    displayName: data.displayName
+    displayName: data.displayName,
+    loginUrl: loginUrl
   };
   
   // Get email template
@@ -408,29 +470,22 @@ exports.onUserActivated = functions.firestore
     return null;
   });
 
-// Triggered when a new user profile is created (for self-registration welcome email)
+// Triggered when a new user profile is created (welcome email for all signups)
 exports.onUserSignup = functions.firestore
   .document('users/{userId}')
   .onCreate(async (snap) => {
     const userData = snap.data();
     
-    // Only send welcome email for self-registered users (isActive: false or undefined/null)
-    // Admin-invited users will be active immediately and get activation email instead
-    // Check for false, null, or undefined (new self-registered users)
-    if (userData.isActive === false || userData.isActive === null || userData.isActive === undefined) {
-      try {
-        await sendWelcomeEmailInternal({
-          email: userData.email,
-          displayName: userData.displayName
-        });
-        
-        console.log(`Welcome email triggered for ${userData.email}`);
-        return null;
-      } catch (error) {
-        console.error('Error triggering welcome email:', error);
-        return null;
-      }
+    try {
+      await sendWelcomeEmailInternal({
+        email: userData.email,
+        displayName: userData.displayName
+      });
+      
+      console.log(`Welcome email triggered for ${userData.email}`);
+      return null;
+    } catch (error) {
+      console.error('Error triggering welcome email:', error);
+      return null;
     }
-    
-    return null;
   });

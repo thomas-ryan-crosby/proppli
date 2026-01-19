@@ -211,7 +211,7 @@ This document describes all user workflow paths, the data that should be created
    ```
 
 3. **Cloud Function Triggered:**
-   - `onUserSignup` → Sends welcome email (if `isActive: false`)
+   - `onUserSignup` → Sends welcome email for all new user profiles
 
 **Session Management:**
 - User is signed out: `auth.signOut()`
