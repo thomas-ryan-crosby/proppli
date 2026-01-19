@@ -25,7 +25,6 @@ Proppli uses Firebase Authentication for user authentication and Firestore for u
 
 **Critical Points:**
 - Invited users are **always active** (`isActive: true`)
-- "Remember Me" flag is automatically set
 - Persistence is set to `LOCAL`
 - User can access application immediately after signup
 
@@ -41,7 +40,6 @@ Proppli uses Firebase Authentication for user authentication and Firestore for u
 
 **Critical Points:**
 - Self-registered users are **inactive** (`isActive: false`)
-- "Remember Me" flag is **NOT** set
 - User is signed out after signup
 - Admin must activate account before user can log in
 
@@ -51,16 +49,16 @@ Proppli uses Firebase Authentication for user authentication and Firestore for u
 1. User enters credentials and checks/unchecks "Remember Me"
 2. Persistence set based on checkbox:
    - Checked: `LOCAL` persistence
-   - Not checked: `SESSION` persistence
+   - Not checked: `SESSION` persistence (clears when browser session ends)
 3. User authenticates with Firebase Auth
 4. `loadUserProfile()` called
 5. If active → Application shown
 6. If inactive → Permission denied modal, user signed out
 
 **Critical Points:**
-- "Remember Me" preference stored in `sessionStorage` and `localStorage`
-- On page load, if "Remember Me" not checked → User signed out
-- `isUserActivelyLoggingIn` flag prevents sign-out during active login
+- "Remember Me" maps directly to Firebase Auth persistence
+- No forced sign-out on page load
+- `isUserActivelyLoggingIn` flag prevents edge cases during active login
 
 ### 4. Google Sign-In Flow
 
@@ -69,8 +67,8 @@ Proppli uses Firebase Authentication for user authentication and Firestore for u
 2. Google OAuth flow completes
 3. Firebase Auth account created/updated
 4. User profile created/updated in Firestore
-5. "Remember Me" automatically set to `true`
-6. User logged in immediately
+5. Persistence set to `LOCAL`
+6. If user is invited → access immediately; otherwise profile is inactive and user is signed out pending admin approval
 
 ---
 
@@ -81,13 +79,11 @@ Proppli uses Firebase Authentication for user authentication and Firestore for u
 #### `initAuth()`
 - Initializes Firebase Auth
 - Sets up `onAuthStateChanged` listener
-- Handles "Remember Me" check on page load
 - Manages session persistence
 
 #### `handleLogin(e)`
 - Processes login form submission
 - Sets persistence based on "Remember Me" checkbox
-- Stores "Remember Me" preference in storage
 - Updates last login timestamp
 
 #### `handleSignup(e)`
@@ -96,13 +92,14 @@ Proppli uses Firebase Authentication for user authentication and Firestore for u
 - Creates Firebase Auth account
 - Links to pending invitation OR creates default profile
 - Handles "email already exists" errors gracefully
+ - **Canonical signup order:** See `USER_WORKFLOW_PATHS.md`
 
 #### `loadUserProfile(userId)`
 - Loads user profile from Firestore
 - Creates default profile if missing (for existing Auth users)
 - Checks for pending invitations
 - Links pending invitations automatically
-- Shows permission denied modal if inactive
+- Shows permission denied modal if inactive (auto-created profiles are inactive)
 
 #### `checkPendingInvitation(email)`
 - Checks if email has pending invitation
@@ -124,7 +121,6 @@ Proppli uses Firebase Authentication for user authentication and Firestore for u
 #### `handleGoogleSignIn()`
 - Initiates Google Sign-In flow
 - Creates/updates user profile
-- Sets "Remember Me" automatically
 
 #### `showPermissionDeniedModal(message)`
 - Shows modal for inactive users
@@ -201,13 +197,10 @@ Proppli uses Firebase Authentication for user authentication and Firestore for u
 
 **How It Works:**
 1. User checks/unchecks "Remember Me" during login
-2. Preference stored in `sessionStorage` and `localStorage`
-3. Firebase Auth persistence set:
+2. Firebase Auth persistence set:
    - Checked: `LOCAL` (persists across sessions)
    - Not checked: `SESSION` (clears when tab closes)
-4. On page load, system checks storage:
-   - If "Remember Me" not found → User signed out
-   - If found → User stays logged in
+3. On page load, Firebase restores session based on persistence
 
 **Critical Flags:**
 - `isUserActivelyLoggingIn` - Prevents sign-out during active login
@@ -312,20 +305,23 @@ Proppli uses Firebase Authentication for user authentication and Firestore for u
 ### 2. Invited Users
 - `pendingUsers.isActive` MUST be `true`
 - `users.isActive` MUST be `true` after signup
-- "Remember Me" flag MUST be set after signup
-- Persistence MUST be set to `LOCAL` after signup
+- Persistence SHOULD be set to `LOCAL` after signup
 - User MUST be logged in immediately after signup
 
 ### 3. Self-Registered Users
 - `users.isActive` MUST be `false` after signup
 - User MUST be signed out after signup
-- "Remember Me" flag MUST NOT be set
 - Welcome email MUST be sent
 
-### 4. "Remember Me" Check
-- Only runs on initial page load (`isInitialLoad === true`)
-- Skips if user is actively logging in (`isUserActivelyLoggingIn === true`)
-- Signs out if flag is not found in storage
+### 4. Auto-Created Profiles (Allowed)
+- If a Firebase Auth user exists but no `users/{userId}` document is found, the app may create a default profile
+- Default profile MUST be `role: 'viewer'`, `isActive: false`
+- User MUST be signed out and shown a pending-approval message until an admin activates the account
+
+### 5. "Remember Me" Behavior
+- Checked → `LOCAL` persistence
+- Not checked → `SESSION` persistence
+- No forced sign-out on page load
 
 ### 5. Permission Errors
 - If profile creation fails → Sign out user
@@ -335,10 +331,6 @@ Proppli uses Firebase Authentication for user authentication and Firestore for u
 ---
 
 ## Common Issues and Solutions
-
-### Issue: Invited user signed out after signup
-**Cause:** "Remember Me" check running during signup  
-**Solution:** Set `isUserActivelyLoggingIn = true` BEFORE creating account
 
 ### Issue: Permission denied when creating profile
 **Cause:** Firestore rules blocking profile creation  
@@ -356,9 +348,9 @@ Proppli uses Firebase Authentication for user authentication and Firestore for u
 **Cause:** Race condition between `loadUserProfile()` and `handleSignup()`  
 **Solution:** Check for existing profile before creating, update instead of creating duplicate
 
-### Issue: User can't log in even with correct credentials
-**Cause:** "Remember Me" not checked and session expired  
-**Solution:** Check "Remember Me" checkbox OR user will be signed out on page load
+### Issue: User session ends after closing the browser
+**Cause:** "Remember Me" unchecked, so SESSION persistence is used  
+**Solution:** Check "Remember Me" for LOCAL persistence
 
 ### Issue: CORS error when calling Cloud Functions
 **Cause:** Cloud Function not properly configured for CORS  
@@ -402,7 +394,7 @@ Proppli uses Firebase Authentication for user authentication and Firestore for u
 3. **Active Status Check:** Inactive users cannot access application
 4. **Admin-Only Operations:** User management restricted to admins
 5. **Pending Invitation Validation:** Cloud Function validates invitations
-6. **Session Management:** "Remember Me" properly enforced
+6. **Session Management:** Persistence set via "Remember Me"
 
 ---
 

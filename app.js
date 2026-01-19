@@ -463,43 +463,11 @@ function initAuth() {
         auth = firebase.auth();
         console.log('✅ Firebase Auth initialized');
         
-        // Track if this is the initial page load (first auth state change)
-        let isInitialLoad = true;
-        
         // Listen for auth state changes
         auth.onAuthStateChanged(async (user) => {
             if (user) {
-                // Only check "Remember Me" on initial page load (when page first loads with existing session)
-                // Skip this check if user is actively logging in (isUserActivelyLoggingIn flag is set)
-                if (isInitialLoad && !isUserActivelyLoggingIn) {
-                    isInitialLoad = false;
-                    
-                    // Check if "Remember Me" was set
-                    // We check both sessionStorage (clears on tab close) and localStorage
-                    // If user logged in without "Remember Me", the flag won't be set
-                    const rememberMe = sessionStorage.getItem('rememberMe') === 'true' || localStorage.getItem('rememberMe') === 'true';
-                    
-                    // If user is authenticated on page load but "Remember Me" was not checked, sign them out
-                    // This prevents auto-login when "Remember Me" was unchecked
-                    if (!rememberMe) {
-                        console.log('⚠️ User authenticated on page load but "Remember Me" was not checked - signing out');
-                        try {
-                            await auth.signOut();
-                            sessionStorage.removeItem('rememberMe');
-                            localStorage.removeItem('rememberMe');
-                            // Show auth pages so user can log in again
-                            showAuthPages();
-                            return;
-                        } catch (signOutError) {
-                            console.error('Error signing out:', signOutError);
-                        }
-                    }
-                } else {
-                    // Not initial load OR user is actively logging in - allow it
-                    isInitialLoad = false;
-                    // Clear the active login flag after processing
-                    isUserActivelyLoggingIn = false;
-                }
+                // Clear the active login flag after processing
+                isUserActivelyLoggingIn = false;
                 
                 console.log('👤 User authenticated:', user.email);
                 currentUser = user;
@@ -1307,7 +1275,6 @@ async function handleLogin(e) {
         }
         
         // Set flag to indicate user is actively logging in (not a page load)
-        // This prevents the "Remember Me" check from running on fresh logins
         isUserActivelyLoggingIn = true;
         
         // Set persistence BEFORE sign-in
@@ -1316,18 +1283,7 @@ async function handleLogin(e) {
             ? firebase.auth.Auth.Persistence.LOCAL 
             : firebase.auth.Auth.Persistence.SESSION;
         
-        // Store "Remember Me" preference in sessionStorage (clears when tab closes)
-        // This allows us to check on page load if user should be auto-logged in
-        if (rememberMe) {
-            sessionStorage.setItem('rememberMe', 'true');
-            localStorage.setItem('rememberMe', 'true'); // Also store in localStorage for cross-tab consistency
-        } else {
-            // Clear the flag so user will be signed out on next page load
-            sessionStorage.removeItem('rememberMe');
-            localStorage.removeItem('rememberMe');
-        }
-        
-        // If "Remember Me" is not checked, ensure we're using SESSION persistence
+        // If "Remember Me" is not checked, use SESSION persistence
         // This means the session will only last for the current browser session
         await auth.setPersistence(persistence);
         
@@ -1468,7 +1424,6 @@ async function handleSignup(e) {
         console.log('🔵 Starting signup for email:', normalizedEmail);
         
         // Set flag to indicate user is actively signing up (not a page load)
-        // This prevents the "Remember Me" check from signing them out
         isUserActivelyLoggingIn = true;
         
         // CRITICAL: Check for pending invitation BEFORE creating account
@@ -1566,8 +1521,6 @@ async function handleSignup(e) {
         if (syncedProfile.isActive) {
             // User is active - invited user completed signup
             console.log('✅ Invited user completed signup, allowing access');
-            sessionStorage.setItem('rememberMe', 'true');
-            localStorage.setItem('rememberMe', 'true');
             await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
         
         // Show success message
@@ -1682,8 +1635,7 @@ async function handleGoogleSignIn() {
         
         // Set persistence to LOCAL for Google sign-in (users typically want to stay logged in)
         await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-        sessionStorage.setItem('rememberMe', 'true');
-        localStorage.setItem('rememberMe', 'true');
+        
         
         // Sign in with Google
         const result = await auth.signInWithPopup(provider);
@@ -1815,9 +1767,6 @@ window.logout = async function() {
             console.log('✅ Logged out successfully');
             currentUser = null;
             currentUserProfile = null;
-            // Clear "Remember Me" flags on logout
-            sessionStorage.removeItem('rememberMe');
-            localStorage.removeItem('rememberMe');
             showAuthPages();
         }
     } catch (error) {

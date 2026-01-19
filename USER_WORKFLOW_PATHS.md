@@ -76,19 +76,17 @@ This document describes all user workflow paths, the data that should be created
 **Trigger:** User fills out signup form and submits
 
 **Process:**
-1. **Set active login flag:** `isUserActivelyLoggingIn = true` (prevents "Remember Me" check from signing out)
-2. **Try to create Firebase Auth account:** `auth.createUserWithEmailAndPassword(email, password)`
-   - **If `auth/email-already-in-use` error:**
-     - Check for pending invitation: `checkPendingInvitation(email)`
-     - If pending invitation exists → Show message: "An account with this email already exists. Please sign in to complete your account setup."
+1. **Set active login flag:** `isUserActivelyLoggingIn = true`
+2. **Check for pending invitation BEFORE account creation:** `checkPendingInvitation(email)`
+   - If invitation exists, keep it for linking after Auth creation
+3. **Create Firebase Auth account:** `auth.createUserWithEmailAndPassword(email, password)`
+   - **If `auth/email-already-in-use` error and invitation exists:**
+     - Show message: "An account with this email already exists. Please sign in to complete your account setup."
      - Provide links to sign in and forgot password
      - User should sign in instead (see Step 3B below)
-   - **If successful:**
-     - Continue with steps below
-3. **Update display name:** `user.updateProfile({ displayName })`
-4. **Send email verification:** `user.sendEmailVerification()`
-5. **Check for pending invitation:** `checkPendingInvitation(email)`
-6. **Link to pending invitation:** `linkPendingUserToAccount(userId, email)`
+4. **Update display name:** `user.updateProfile({ displayName })`
+5. **Send email verification:** `user.sendEmailVerification()`
+6. **Link to pending invitation (or sync data):** `linkPendingUserToAccount(userId, email)` / `syncUserData(userId, email)`
 
 **Data Created/Updated in Firebase:**
 
@@ -126,11 +124,8 @@ This document describes all user workflow paths, the data that should be created
    ```
 
 **Session Management:**
-- Set `sessionStorage.setItem('rememberMe', 'true')`
-- Set `localStorage.setItem('rememberMe', 'true')`
-- Set persistence: `auth.setPersistence(LOCAL)`
-- Wait 500ms for profile to save
-- Reload page
+- Set persistence to `LOCAL` (invited users remain logged in)
+- No manual "Remember Me" flags are required
 
 **Expected Behavior:**
 - User account created in Firebase Auth
@@ -151,7 +146,7 @@ This document describes all user workflow paths, the data that should be created
 4. **Profile not found:** Firestore profile doesn't exist
 5. **Check for pending invitation:** `checkPendingInvitation(email)` → Returns pending user
 6. **Link to pending invitation:** `linkPendingUserToAccount(userId, email)`
-7. **Set session:** Set "Remember Me" flag and LOCAL persistence
+7. **Set session:** Set persistence to `LOCAL`
 8. **Reload page:** Page reloads, user is logged in and active
 
 **Data Created/Updated in Firebase:**
@@ -207,10 +202,10 @@ This document describes all user workflow paths, the data that should be created
 
 **Process:**
 1. **Set active login flag:** `isUserActivelyLoggingIn = true`
-2. **Create Firebase Auth account:** `auth.createUserWithEmailAndPassword(email, password)`
-3. **Update display name:** `user.updateProfile({ displayName })`
-4. **Send email verification:** `user.sendEmailVerification()`
-5. **Check for pending invitation:** `checkPendingInvitation(email)` → Returns `null`
+2. **Check for pending invitation BEFORE account creation:** `checkPendingInvitation(email)` → Returns `null`
+3. **Create Firebase Auth account:** `auth.createUserWithEmailAndPassword(email, password)`
+4. **Update display name:** `user.updateProfile({ displayName })`
+5. **Send email verification:** `user.sendEmailVerification()`
 6. **Create default profile:** `createUserProfile(userId, { role: 'viewer', isActive: false })`
 
 **Data Created in Firebase:**
@@ -240,7 +235,6 @@ This document describes all user workflow paths, the data that should be created
 
 **Session Management:**
 - User is signed out: `auth.signOut()`
-- "Remember Me" flags are NOT set
 
 **Expected Behavior:**
 - User account created in Firebase Auth
@@ -279,20 +273,15 @@ This document describes all user workflow paths, the data that should be created
 **Trigger:** User enters credentials and clicks "Sign In"
 
 **Process:**
-1. **Set active login flag:** `isUserActivelyLoggingIn = true` (if "Remember Me" checked)
+1. **Set active login flag:** `isUserActivelyLoggingIn = true`
 2. **Set persistence:** Based on "Remember Me" checkbox
    - Checked: `LOCAL` persistence
-   - Not checked: `SESSION` persistence
+   - Not checked: `SESSION` persistence (clears when the browser session ends)
 3. **Sign in:** `auth.signInWithEmailAndPassword(email, password)`
 4. **Update last login:** Update `users/{userId}.lastLogin` (non-blocking)
 
 **Session Management:**
-- If "Remember Me" checked:
-  - `sessionStorage.setItem('rememberMe', 'true')`
-  - `localStorage.setItem('rememberMe', 'true')`
-- If "Remember Me" NOT checked:
-  - `sessionStorage.removeItem('rememberMe')`
-  - `localStorage.removeItem('rememberMe')`
+- "Remember Me" maps directly to Firebase Auth persistence
 
 **Expected Behavior:**
 - User authenticates successfully
@@ -307,13 +296,9 @@ This document describes all user workflow paths, the data that should be created
 **Trigger:** `onAuthStateChanged` fires after login
 
 **Process:**
-1. **Check if active login:** If `isUserActivelyLoggingIn === true`, skip "Remember Me" check
-2. **Check "Remember Me" on page load:** If `isInitialLoad === true` and `isUserActivelyLoggingIn === false`:
-   - Check `sessionStorage.getItem('rememberMe')` or `localStorage.getItem('rememberMe')`
-   - If not set → Sign user out (they didn't check "Remember Me")
-3. **Load user profile:** `loadUserProfile(userId)`
-4. **Check if active:** If `currentUserProfile.isActive === true` → Show application
-5. **If inactive:** Show permission denied modal, sign out
+1. **Load user profile:** `loadUserProfile(userId)`
+2. **Check if active:** If `currentUserProfile.isActive === true` → Show application
+3. **If inactive:** Show permission denied modal, sign out
 
 **Expected Behavior:**
 - Active users → Application shown
@@ -329,11 +314,8 @@ This document describes all user workflow paths, the data that should be created
 **Process:**
 1. Firebase Auth automatically restores session
 2. `onAuthStateChanged` fires
-3. `isInitialLoad === true`, `isUserActivelyLoggingIn === false`
-4. Check "Remember Me" flag → Found in storage
-5. Skip sign-out
-6. Load user profile
-7. If active → Show application
+3. Load user profile
+4. If active → Show application
 
 **Expected Behavior:**
 - User is automatically logged in
@@ -342,16 +324,14 @@ This document describes all user workflow paths, the data that should be created
 ---
 
 ### Scenario B: User Does NOT Have "Remember Me" Checked
-**Trigger:** User visits site, but session expired or "Remember Me" was not checked
+**Trigger:** User visits site after SESSION persistence ended (e.g., browser closed)
 
 **Process:**
 1. Firebase Auth session may or may not exist (depends on SESSION persistence)
 2. If session exists:
    - `onAuthStateChanged` fires
-   - `isInitialLoad === true`, `isUserActivelyLoggingIn === false`
-   - Check "Remember Me" flag → NOT found in storage
-   - Sign user out
-   - Show landing page
+   - Load user profile
+   - If active → Show application
 3. If no session:
    - `onAuthStateChanged` fires with `user === null`
    - Show landing page
@@ -418,18 +398,21 @@ This document describes all user workflow paths, the data that should be created
 1. **Invited Users:**
    - `pendingUsers.isActive` MUST be `true`
    - `users.isActive` MUST be `true` after signup
-   - "Remember Me" flag MUST be set after signup
-   - Persistence MUST be set to `LOCAL` after signup
+   - Persistence SHOULD be `LOCAL` after signup
 
 2. **Self-Registered Users:**
    - `users.isActive` MUST be `false` after signup
    - User MUST be signed out after signup
-   - "Remember Me" flag MUST NOT be set
 
-3. **"Remember Me" Check:**
-   - Only runs on initial page load (`isInitialLoad === true`)
-   - Skips if user is actively logging in (`isUserActivelyLoggingIn === true`)
-   - Signs out if flag is not found in storage
+3. **"Remember Me" Behavior:**
+   - Checked → `LOCAL` persistence
+   - Not checked → `SESSION` persistence
+   - No forced sign-out on page load
+
+4. **Auto-Created Profiles (Allowed):**
+   - If a Firebase Auth user exists but no `users/{userId}` document is found, the app may create a default profile
+   - Default profile MUST be `role: 'viewer'`, `isActive: false`
+   - User MUST be signed out and shown a pending-approval message until an admin activates the account
 
 4. **Email Normalization:**
    - All emails MUST be normalized: `email.toLowerCase().trim()`
@@ -443,10 +426,6 @@ This document describes all user workflow paths, the data that should be created
 ---
 
 ## Common Issues and Solutions
-
-### Issue: Invited user signed out after signup
-**Cause:** "Remember Me" check running during signup
-**Solution:** Set `isUserActivelyLoggingIn = true` BEFORE creating account
 
 ### Issue: Permission denied when creating profile
 **Cause:** Firestore rules blocking profile creation
@@ -472,7 +451,7 @@ This document describes all user workflow paths, the data that should be created
 - [ ] Self-registered user is signed out after signup
 - [ ] Self-registered user profile has `isActive: false`
 - [ ] Admin can activate self-registered user
-- [ ] User with "Remember Me" stays logged in on page reload
-- [ ] User without "Remember Me" is signed out on page reload
+- [ ] User with "Remember Me" stays logged in after browser restart
+- [ ] User without "Remember Me" is logged out after browser close
 - [ ] Hash routing works for `#signup` and `#login`
 - [ ] Landing page shows on initial load (no hash)
