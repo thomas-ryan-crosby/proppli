@@ -814,12 +814,17 @@ async function loadUserProfile(userId) {
             // Update user menu with name
             updateUserMenu();
             
-            // Check if user is active
-            if (!currentUserProfile.isActive) {
+        // Check if user is active
+        if (!currentUserProfile.isActive) {
                 console.warn('⚠️ User account is not active');
                 showPermissionDeniedModal('Your account is pending admin approval. Please contact a system administrator to activate your account.');
                 await auth.signOut();
                 return;
+        }
+
+        if (!accountWarningShown && shouldWarnNoProperties(currentUserProfile)) {
+            accountWarningShown = true;
+            showAccountWarningModal('Your account is active, but no properties are assigned. Please contact an administrator to assign properties.');
         }
     } catch (error) {
         console.error('Error loading user profile:', error);
@@ -929,6 +934,28 @@ function updateUserMenu() {
 
 // Handle permission errors globally
 let permissionErrorShown = false;
+let accountWarningShown = false;
+
+function roleRequiresProperties(role) {
+    return ['maintenance', 'property_manager', 'viewer'].includes(role);
+}
+
+function shouldWarnNoProperties(profile) {
+    if (!profile || !profile.isActive) {
+        return false;
+    }
+    if (!roleRequiresProperties(profile.role)) {
+        return false;
+    }
+    return !Array.isArray(profile.assignedProperties) || profile.assignedProperties.length === 0;
+}
+
+function isMaintenanceWithoutProperties() {
+    return currentUserProfile &&
+        currentUserProfile.role === 'maintenance' &&
+        (!Array.isArray(currentUserProfile.assignedProperties) ||
+            currentUserProfile.assignedProperties.length === 0);
+}
 
 function handlePermissionError(context = '') {
     // Only show modal if user is actually logged in
@@ -984,6 +1011,46 @@ function showPermissionDeniedModal(message) {
     document.body.appendChild(modal);
     document.body.style.overflow = 'hidden';
 }
+
+function showAccountWarningModal(message) {
+    // Remove existing modal if present
+    const existingModal = document.getElementById('accountWarningModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+
+    const modal = document.createElement('div');
+    modal.id = 'accountWarningModal';
+    modal.className = 'modal show';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>Account Setup Required</h2>
+                <button class="close-btn" onclick="closeAccountWarningModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 20px; color: #64748b;">${message}</p>
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                    <p style="margin: 0 0 10px 0; font-weight: 600; color: #1e293b;">Contact System Administrator:</p>
+                    <p style="margin: 0; color: #475569;">
+                        <strong>Email:</strong> <a href="mailto:thomas.ryan.crosby@gmail.com" style="color: #667eea; text-decoration: none;">thomas.ryan.crosby@gmail.com</a>
+                    </p>
+                </div>
+                <button class="btn btn-secondary" onclick="closeAccountWarningModal()" style="width: 100%;">Close</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    document.body.style.overflow = 'hidden';
+}
+
+window.closeAccountWarningModal = function() {
+    const modal = document.getElementById('accountWarningModal');
+    if (modal) {
+        modal.remove();
+        document.body.style.overflow = '';
+    }
+};
 
 // Close permission denied modal
 window.closePermissionDeniedModal = function() {
@@ -8356,6 +8423,13 @@ window.toggleUserStatus = async function(userId, isActive) {
             const userDoc = await db.collection('users').doc(userId).get();
             if (userDoc.exists) {
                 userData = userDoc.data();
+                const assignedProps = Array.isArray(userData.assignedProperties) ? userData.assignedProperties : [];
+                if (roleRequiresProperties(userData.role) && assignedProps.length === 0) {
+                    const proceed = confirm('This user is being activated with no assigned properties. Do you want to continue?');
+                    if (!proceed) {
+                        return;
+                    }
+                }
             }
         }
         await db.collection('users').doc(userId).update({
@@ -8397,6 +8471,16 @@ async function saveUserDetails(userId, userData) {
         const userDoc = await db.collection('users').doc(userId).get();
         const currentUser = userDoc.exists ? userDoc.data() : {};
         const currentProfile = currentUser.profile || {};
+        const assignedProps = Array.isArray(currentUser.assignedProperties) ? currentUser.assignedProperties : [];
+        const targetRole = userData.role || currentUser.role;
+        const targetActive = userData.isActive !== undefined ? userData.isActive : currentUser.isActive;
+
+        if (targetActive && roleRequiresProperties(targetRole) && assignedProps.length === 0) {
+            const proceed = confirm('This user is active but has no assigned properties. Do you want to continue?');
+            if (!proceed) {
+                return false;
+            }
+        }
         
         const updateData = {
             displayName: userData.displayName,
