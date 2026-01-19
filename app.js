@@ -676,23 +676,7 @@ async function syncUserData(userId, email) {
     const userExists = userDoc.exists;
     const userData = userExists ? userDoc.data() : null;
     
-    // Step 2: Check pendingUsers collection
-    let pendingUser = null;
-    try {
-        const pendingSnapshot = await db.collection('pendingUsers')
-            .where('email', '==', normalizedEmail)
-            .where('status', '==', 'pending_signup')
-            .limit(1)
-            .get();
-        if (!pendingSnapshot.empty) {
-            pendingUser = pendingSnapshot.docs[0].data();
-            pendingUser.pendingId = pendingSnapshot.docs[0].id;
-        }
-    } catch (e) {
-        console.warn('Could not check pendingUsers:', e);
-    }
-    
-    // Step 3: Check userInvitations collection
+    // Step 2: Check userInvitations collection
     let invitation = null;
     try {
         const inviteSnapshot = await db.collection('userInvitations')
@@ -708,55 +692,35 @@ async function syncUserData(userId, email) {
         console.warn('Could not check userInvitations:', e);
     }
     
-    // Step 4: Determine what to do based on state
-    if (pendingUser) {
-        // There's a pending invitation - link it
+    // Step 3: Determine what to do based on state
+    if (invitation) {
         console.log('✅ Found pending invitation, linking...');
         
-        // Create or update user document with pending data
-        // Ensure assignedProperties is always an array
-        const assignedProps = Array.isArray(pendingUser.assignedProperties) 
-            ? pendingUser.assignedProperties 
-            : (pendingUser.assignedProperties ? [pendingUser.assignedProperties] : []);
+        const assignedProps = Array.isArray(invitation.assignedProperties) 
+            ? invitation.assignedProperties 
+            : (invitation.assignedProperties ? [invitation.assignedProperties] : []);
         
         const userProfileData = {
             email: normalizedEmail,
-            displayName: pendingUser.displayName,
-            role: pendingUser.role,
-            isActive: pendingUser.isActive !== false, // Ensure active
+            displayName: invitation.displayName,
+            role: invitation.role,
+            isActive: true,
             assignedProperties: assignedProps,
-            profile: pendingUser.profile || {},
+            profile: invitation.profile || {},
             createdAt: userData?.createdAt || firebase.firestore.FieldValue.serverTimestamp(),
             lastLogin: firebase.firestore.FieldValue.serverTimestamp(),
-            createdBy: pendingUser.createdBy
+            createdBy: invitation.invitedBy || invitation.createdBy || null
         };
         
         if (userExists) {
-            // Update existing user
             await db.collection('users').doc(userId).update(userProfileData);
-            console.log('✅ Updated existing user with pending invitation data');
+            console.log('✅ Updated existing user with invitation data');
         } else {
-            // Create new user
             await db.collection('users').doc(userId).set(userProfileData);
-            console.log('✅ Created user with pending invitation data');
+            console.log('✅ Created user with invitation data');
         }
         
-        // Mark pendingUser as completed
-        if (pendingUser.pendingId) {
-            try {
-                await db.collection('pendingUsers').doc(pendingUser.pendingId).update({
-                    status: 'completed',
-                    linkedUserId: userId,
-                    linkedAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                console.log('✅ Marked pending user as completed');
-            } catch (e) {
-                console.warn('Could not update pendingUser:', e);
-            }
-        }
-        
-        // Mark invitation as accepted
-        if (invitation?.invitationId) {
+        if (invitation.invitationId) {
             try {
                 await db.collection('userInvitations').doc(invitation.invitationId).update({
                     status: 'accepted',
@@ -769,7 +733,6 @@ async function syncUserData(userId, email) {
             }
         }
         
-        // Return the synced user data
         const syncedDoc = await db.collection('users').doc(userId).get();
         return { id: syncedDoc.id, ...syncedDoc.data() };
     } else if (userExists) {
@@ -7683,53 +7646,47 @@ async function loadUsers() {
         });
         
         // Also load pending invitations to show in the list
-        // BUT: Filter out pending users that have already been linked to active users
+        // BUT: Filter out invitations that already have active users
         try {
-            const pendingUsersSnapshot = await db.collection('pendingUsers')
-                .where('status', '==', 'pending_signup')
+            const invitationsSnapshot = await db.collection('userInvitations')
+                .where('status', '==', 'pending')
                 .get();
             
-            pendingUsersSnapshot.forEach((doc) => {
-                const pendingUser = doc.data();
-                const normalizedEmail = (pendingUser.email || '').toLowerCase().trim();
+            invitationsSnapshot.forEach((doc) => {
+                const invitation = doc.data();
+                const normalizedEmail = (invitation.email || '').toLowerCase().trim();
                 
-                // Check if this email already has an active user account
                 const existingUser = Object.values(firestoreUsers).find(u => {
                     const userEmail = (u.email || '').toLowerCase().trim();
                     return userEmail === normalizedEmail && u.isActive;
                 });
                 
-                // Only show pending user if no active user exists with this email
                 if (!existingUser) {
-                    const tempId = `pending_${doc.id}`;
+                    const tempId = `invite_${doc.id}`;
                     firestoreUsers[tempId] = {
                         id: tempId,
-                        email: pendingUser.email,
-                        displayName: pendingUser.displayName,
-                        role: pendingUser.role,
-                        isActive: pendingUser.isActive || false,
-                        assignedProperties: pendingUser.assignedProperties || [],
+                        email: invitation.email,
+                        displayName: invitation.displayName,
+                        role: invitation.role,
+                        isActive: false,
+                        assignedProperties: invitation.assignedProperties || [],
                         status: 'pending',
                         isPending: true,
-                        pendingUserId: doc.id,
-                        createdAt: pendingUser.createdAt,
-                        source: 'pending'
+                        invitationId: doc.id,
+                        createdAt: invitation.invitedAt,
+                        source: 'invitation'
                     };
-                } else {
-                    // Pending user already linked - mark it as completed if not already
-                    if (!pendingUser.linkedUserId) {
-                        console.log('🔄 Auto-completing pending user that already has active account:', normalizedEmail);
-                        db.collection('pendingUsers').doc(doc.id).update({
-                            status: 'completed',
-                            linkedUserId: existingUser.id,
-                            linkedAt: firebase.firestore.FieldValue.serverTimestamp()
-                        }).catch(e => console.warn('Could not update pending user:', e));
-                    }
+                } else if (invitation.status !== 'accepted') {
+                    console.log('🔄 Auto-accepting invitation for active account:', normalizedEmail);
+                    db.collection('userInvitations').doc(doc.id).update({
+                        status: 'accepted',
+                        acceptedBy: existingUser.id,
+                        acceptedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }).catch(e => console.warn('Could not update invitation:', e));
                 }
             });
         } catch (pendingError) {
-            console.warn('Could not load pending users:', pendingError);
-            // Continue without pending users
+            console.warn('Could not load invitations:', pendingError);
         }
         
         // Merge and store
@@ -7744,53 +7701,47 @@ async function loadUsers() {
                     allUsers[doc.id] = { id: doc.id, ...doc.data(), source: 'firestore' };
                 });
                 
-                // Also load pending users for real-time updates
-                // BUT: Filter out pending users that have already been linked to active users
+                // Also load pending invitations for real-time updates
                 try {
-                    const pendingUsersSnapshot = await db.collection('pendingUsers')
-                        .where('status', '==', 'pending_signup')
+                    const invitationsSnapshot = await db.collection('userInvitations')
+                        .where('status', '==', 'pending')
                         .get();
                     
-                    pendingUsersSnapshot.forEach((doc) => {
-                        const pendingUser = doc.data();
-                        const normalizedEmail = (pendingUser.email || '').toLowerCase().trim();
+                    invitationsSnapshot.forEach((doc) => {
+                        const invitation = doc.data();
+                        const normalizedEmail = (invitation.email || '').toLowerCase().trim();
                         
-                        // Check if this email already has an active user account
                         const existingUser = Object.values(allUsers).find(u => {
                             const userEmail = (u.email || '').toLowerCase().trim();
                             return userEmail === normalizedEmail && u.isActive && !u.isPending;
                         });
                         
-                        // Only show pending user if no active user exists with this email
                         if (!existingUser) {
-                            const tempId = `pending_${doc.id}`;
+                            const tempId = `invite_${doc.id}`;
                             allUsers[tempId] = {
                                 id: tempId,
-                                email: pendingUser.email,
-                                displayName: pendingUser.displayName,
-                                role: pendingUser.role,
-                                isActive: pendingUser.isActive || false,
-                                assignedProperties: pendingUser.assignedProperties || [],
+                                email: invitation.email,
+                                displayName: invitation.displayName,
+                                role: invitation.role,
+                                isActive: false,
+                                assignedProperties: invitation.assignedProperties || [],
                                 status: 'pending',
                                 isPending: true,
-                                pendingUserId: doc.id,
-                                createdAt: pendingUser.createdAt,
-                                source: 'pending'
+                                invitationId: doc.id,
+                                createdAt: invitation.invitedAt,
+                                source: 'invitation'
                             };
-                        } else {
-                            // Pending user already linked - mark it as completed if not already
-                            if (!pendingUser.linkedUserId) {
-                                console.log('🔄 Auto-completing pending user that already has active account:', normalizedEmail);
-                                db.collection('pendingUsers').doc(doc.id).update({
-                                    status: 'completed',
-                                    linkedUserId: existingUser.id,
-                                    linkedAt: firebase.firestore.FieldValue.serverTimestamp()
-                                }).catch(e => console.warn('Could not update pending user:', e));
-                            }
+                        } else if (invitation.status !== 'accepted') {
+                            console.log('🔄 Auto-accepting invitation for active account:', normalizedEmail);
+                            db.collection('userInvitations').doc(doc.id).update({
+                                status: 'accepted',
+                                acceptedBy: existingUser.id,
+                                acceptedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            }).catch(e => console.warn('Could not update invitation:', e));
                         }
                     });
                 } catch (pendingError) {
-                    console.warn('Could not load pending users:', pendingError);
+                    console.warn('Could not load invitations:', pendingError);
                 }
                 
                 // Sort by createdAt if available, otherwise by email
@@ -7908,7 +7859,7 @@ function renderUsersList(users) {
         let actionsHtml = '';
         if (user.isPending) {
             actionsHtml = `
-                <button class="btn-small btn-primary" onclick="viewPendingUser('${user.pendingUserId}')">View Invitation</button>
+                <button class="btn-small btn-primary" onclick="viewPendingUser('${user.invitationId}')">View Invitation</button>
                 <span style="color: #666; font-size: 0.85rem; font-style: italic;">Waiting for signup</span>
             `;
         } else {
@@ -8104,20 +8055,20 @@ async function loadProfileAssignedProperties(assignedPropertyIds) {
     }
 }
 
-// View pending user invitation details
-window.viewPendingUser = async function(pendingUserId) {
+// View pending invitation details
+window.viewPendingUser = async function(invitationId) {
     try {
-        const pendingUserDoc = await db.collection('pendingUsers').doc(pendingUserId).get();
-        if (!pendingUserDoc.exists) {
+        const invitationDoc = await db.collection('userInvitations').doc(invitationId).get();
+        if (!invitationDoc.exists) {
             alert('Pending invitation not found.');
             return;
         }
         
-        const pendingUser = pendingUserDoc.data();
+        const invitation = invitationDoc.data();
         const properties = [];
         
-        if (pendingUser.assignedProperties && pendingUser.assignedProperties.length > 0) {
-            const propertyPromises = pendingUser.assignedProperties.map(propId => 
+        if (invitation.assignedProperties && invitation.assignedProperties.length > 0) {
+            const propertyPromises = invitation.assignedProperties.map(propId => 
                 db.collection('properties').doc(propId).get()
             );
             const propertyDocs = await Promise.all(propertyPromises);
@@ -8129,9 +8080,9 @@ window.viewPendingUser = async function(pendingUserId) {
         }
         
         alert(`Pending Invitation Details:\n\n` +
-              `Name: ${pendingUser.displayName}\n` +
-              `Email: ${pendingUser.email}\n` +
-              `Role: ${pendingUser.role}\n` +
+              `Name: ${invitation.displayName}\n` +
+              `Email: ${invitation.email}\n` +
+              `Role: ${invitation.role}\n` +
               `Properties: ${properties.length > 0 ? properties.join(', ') : 'None'}\n` +
               `Status: Waiting for user to sign up\n\n` +
               `The user will receive an invitation email and can sign up to activate their account.`);
@@ -8686,22 +8637,6 @@ async function handleInviteUser(e) {
             }
         }
         
-        // Check pendingUsers collection
-        const existingPendingSnapshot = await db.collection('pendingUsers')
-            .where('email', '==', normalizedEmail)
-            .limit(1)
-            .get();
-        
-        if (!existingPendingSnapshot.empty) {
-            const errorMsg = 'A pending invitation already exists for this email address.';
-            console.warn('⚠️', errorMsg);
-            if (errorDiv) {
-                errorDiv.textContent = errorMsg;
-                errorDiv.style.display = 'block';
-            }
-            return;
-        }
-        
         // Check userInvitations collection for pending invitations
         const existingInvitationsSnapshot = await db.collection('userInvitations')
             .where('email', '==', normalizedEmail)
@@ -8747,46 +8682,6 @@ async function handleInviteUser(e) {
         } catch (inviteError) {
             console.error('❌ Failed to create invitation:', inviteError);
             throw new Error(`Failed to create invitation: ${inviteError.message || 'Unknown error'}`);
-        }
-        
-        // Create pending user document
-        // Use normalizedEmail already declared above
-        let pendingUserRef;
-        try {
-            pendingUserRef = db.collection('pendingUsers').doc();
-            await pendingUserRef.set({
-                email: normalizedEmail, // Store normalized email
-                displayName: fullName,
-                role: role,
-                isActive: true, // Admin-invited users are active immediately
-                assignedProperties: propertyIds,
-                profile: {
-                    phone: phone || null,
-                    title: title || null,
-                    department: department || null
-                },
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                createdBy: currentUser.uid,
-                invitationId: invitationRef.id,
-                status: 'pending_signup'
-            });
-            console.log('✅ Pending user document created:', pendingUserRef.id);
-            
-            // Verify the document was actually created
-            const verifyDoc = await pendingUserRef.get();
-            if (!verifyDoc.exists) {
-                throw new Error('Pending user document was not created successfully');
-            }
-        } catch (pendingError) {
-            console.error('❌ Failed to create pending user:', pendingError);
-            // Try to clean up invitation if pending user creation fails
-            try {
-                await invitationRef.delete();
-                console.log('⚠️ Cleaned up invitation due to pending user creation failure');
-            } catch (cleanupError) {
-                console.error('⚠️ Could not clean up invitation:', cleanupError);
-            }
-            throw new Error(`Failed to create pending user: ${pendingError.message || 'Unknown error'}`);
         }
         
         // Email sending is handled by the Firestore trigger (onInvitationCreated)
@@ -8912,16 +8807,25 @@ async function checkPendingInvitation(email) {
         
         // Fallback: Try direct Firestore query (requires authentication)
         if (db && auth && auth.currentUser) {
-            const pendingUsersSnapshot = await db.collection('pendingUsers')
+            const invitationsSnapshot = await db.collection('userInvitations')
                 .where('email', '==', normalizedEmail)
-                .where('status', '==', 'pending_signup')
+                .where('status', '==', 'pending')
                 .limit(1)
                 .get();
             
-            if (!pendingUsersSnapshot.empty) {
-                const pendingUser = pendingUsersSnapshot.docs[0].data();
-                console.log('✅ Found pending invitation via Firestore:', pendingUser);
-                return pendingUser;
+            if (!invitationsSnapshot.empty) {
+                const invitation = invitationsSnapshot.docs[0].data();
+                console.log('✅ Found pending invitation via Firestore:', invitation);
+                return {
+                    displayName: invitation.displayName,
+                    role: invitation.role,
+                    isActive: true,
+                    email: normalizedEmail,
+                    assignedProperties: invitation.assignedProperties || [],
+                    profile: invitation.profile || {},
+                    createdBy: invitation.invitedBy || null,
+                    invitationId: invitationsSnapshot.docs[0].id
+                };
             }
         }
         
@@ -8940,37 +8844,35 @@ async function linkPendingUserToAccount(userId, email) {
         const normalizedEmail = (email || '').toLowerCase().trim();
         console.log('🔗 Linking pending user to account:', { userId, email: normalizedEmail });
         
-        // Get full pending user data from Firestore (user is authenticated now)
-        // Query directly to ensure we get all fields including assignedProperties
-        let pendingUser = null;
+        // Get invitation data from Firestore
+        let invitation = null;
         if (db) {
             try {
-                const pendingUsersSnapshot = await db.collection('pendingUsers')
+                const invitationsSnapshot = await db.collection('userInvitations')
                     .where('email', '==', normalizedEmail)
-                    .where('status', '==', 'pending_signup')
+                    .where('status', '==', 'pending')
                     .limit(1)
                     .get();
                 
-                if (!pendingUsersSnapshot.empty) {
-                    pendingUser = pendingUsersSnapshot.docs[0].data();
-                    console.log('✅ Got full pending user data for linking:', {
-                        role: pendingUser.role,
-                        isActive: pendingUser.isActive,
-                        displayName: pendingUser.displayName,
-                        assignedPropertiesCount: (pendingUser.assignedProperties || []).length
+                if (!invitationsSnapshot.empty) {
+                    invitation = invitationsSnapshot.docs[0].data();
+                    invitation.invitationId = invitationsSnapshot.docs[0].id;
+                    console.log('✅ Got invitation data for linking:', {
+                        role: invitation.role,
+                        displayName: invitation.displayName,
+                        assignedPropertiesCount: (invitation.assignedProperties || []).length
                     });
                 }
             } catch (queryError) {
-                console.warn('⚠️ Could not query Firestore for pending user:', queryError.message);
-                // Fallback to checkPendingInvitation
-                pendingUser = await checkPendingInvitation(normalizedEmail);
+                console.warn('⚠️ Could not query Firestore for invitation:', queryError.message);
+                invitation = await checkPendingInvitation(normalizedEmail);
             }
         } else {
-            pendingUser = await checkPendingInvitation(normalizedEmail);
+            invitation = await checkPendingInvitation(normalizedEmail);
         }
         
-        if (!pendingUser) {
-            console.log('❌ No pending invitation found for:', normalizedEmail);
+        if (!invitation) {
+            console.log('❌ No invitation found for:', normalizedEmail);
             return false;
         }
         
@@ -8981,41 +8883,40 @@ async function linkPendingUserToAccount(userId, email) {
             console.log('⚠️ User profile already exists:', existingData);
             
             // If profile exists but doesn't match pending invitation, update it
-            const shouldBeActive = pendingUser.isActive !== false; // Ensure invited users are active
-            if (existingData.role !== pendingUser.role || existingData.isActive !== shouldBeActive) {
-                console.log('🔄 Updating existing profile to match pending invitation...');
+            if (existingData.role !== invitation.role || existingData.isActive !== true) {
+                console.log('🔄 Updating existing profile to match invitation...');
                 await db.collection('users').doc(userId).update({
                     email: normalizedEmail,
-                    displayName: pendingUser.displayName,
-                    role: pendingUser.role,
-                    isActive: shouldBeActive, // Ensure active
-                    assignedProperties: pendingUser.assignedProperties || [],
-                    profile: pendingUser.profile || {},
-                    createdBy: pendingUser.createdBy
+                    displayName: invitation.displayName,
+                    role: invitation.role,
+                    isActive: true,
+                    assignedProperties: invitation.assignedProperties || [],
+                    profile: invitation.profile || {},
+                    createdBy: invitation.invitedBy || invitation.createdBy || null
                 });
-                console.log('✅ Updated existing profile with pending invitation data - user is now ACTIVE');
+                console.log('✅ Updated existing profile with invitation data - user is now ACTIVE');
             } else {
-                console.log('✅ Existing profile already matches pending invitation');
+                console.log('✅ Existing profile already matches invitation');
             }
         } else {
-            // Create user document with pending user's data
+            // Create user document with invitation data
             try {
                 const userData = {
                     email: normalizedEmail, // Use normalized email
-                    displayName: pendingUser.displayName,
-                    role: pendingUser.role,
-                    isActive: pendingUser.isActive !== false, // Ensure invited users are active (default to true)
-                    assignedProperties: pendingUser.assignedProperties || [],
-                    profile: pendingUser.profile || {},
+                    displayName: invitation.displayName,
+                    role: invitation.role,
+                    isActive: true,
+                    assignedProperties: invitation.assignedProperties || [],
+                    profile: invitation.profile || {},
                     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                     lastLogin: firebase.firestore.FieldValue.serverTimestamp(),
-                    createdBy: pendingUser.createdBy
+                    createdBy: invitation.invitedBy || invitation.createdBy || null
                 };
                 
                 console.log('📝 Creating user profile with data:', userData);
                 console.log('🔑 User will be ACTIVE:', userData.isActive);
                 await db.collection('users').doc(userId).set(userData);
-                console.log('✅ User profile created with pending invitation data - user is ACTIVE');
+                console.log('✅ User profile created with invitation data - user is ACTIVE');
             } catch (createError) {
                 console.error('❌ Error creating user profile:', createError);
                 // Provide specific error message
@@ -9027,31 +8928,10 @@ async function linkPendingUserToAccount(userId, email) {
             }
         }
         
-        // Mark pending user as completed
-        try {
-            const pendingDoc = await db.collection('pendingUsers')
-                .where('email', '==', normalizedEmail)
-                .where('status', '==', 'pending_signup')
-                .limit(1)
-                .get();
-            
-            if (!pendingDoc.empty) {
-                await pendingDoc.docs[0].ref.update({
-                    status: 'completed',
-                    linkedUserId: userId,
-                    linkedAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                console.log('✅ Pending user marked as completed');
-            }
-        } catch (updateError) {
-            console.warn('⚠️ Could not update pending user status:', updateError);
-            // Don't fail the whole process if this update fails
-        }
-        
         // Update invitation status if exists
         try {
-            if (pendingUser.invitationId) {
-                await db.collection('userInvitations').doc(pendingUser.invitationId).update({
+            if (invitation.invitationId) {
+                await db.collection('userInvitations').doc(invitation.invitationId).update({
                     status: 'accepted',
                     acceptedBy: userId,
                     acceptedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -9063,7 +8943,7 @@ async function linkPendingUserToAccount(userId, email) {
             // Don't fail the whole process if this update fails
         }
         
-        console.log('✅ Pending user successfully linked to account');
+        console.log('✅ Invitation successfully linked to account');
         return true;
     } catch (error) {
         console.error('❌ Error linking pending user:', error);

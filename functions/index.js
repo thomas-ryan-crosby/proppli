@@ -155,25 +155,24 @@ exports.checkPendingInvitation = functions.https.onCall(async (data, context) =>
   try {
     const normalizedEmail = (data.email || '').toLowerCase().trim();
     
-    // Check pendingUsers collection
-    const pendingUsersSnapshot = await admin.firestore()
-      .collection('pendingUsers')
+    // Check userInvitations collection
+    const invitationSnapshot = await admin.firestore()
+      .collection('userInvitations')
       .where('email', '==', normalizedEmail)
-      .where('status', '==', 'pending_signup')
+      .where('status', '==', 'pending')
       .limit(1)
       .get();
     
-    if (!pendingUsersSnapshot.empty) {
-      const pendingUser = pendingUsersSnapshot.docs[0].data();
-      // Return full pending user data (needed for account linking)
+    if (!invitationSnapshot.empty) {
+      const invitation = invitationSnapshot.docs[0].data();
       return {
         hasInvitation: true,
-        displayName: pendingUser.displayName,
-        role: pendingUser.role,
-        isActive: pendingUser.isActive !== false, // Ensure true for invited users
-        assignedProperties: pendingUser.assignedProperties || [],
-        profile: pendingUser.profile || {},
-        createdBy: pendingUser.createdBy,
+        invitationId: invitationSnapshot.docs[0].id,
+        displayName: invitation.displayName,
+        role: invitation.role,
+        assignedProperties: invitation.assignedProperties || [],
+        profile: invitation.profile || {},
+        createdBy: invitation.invitedBy || null,
         email: normalizedEmail
       };
     }

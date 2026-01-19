@@ -16,7 +16,7 @@ Proppli uses Firebase Authentication for user authentication and Firestore for u
 ### 1. Admin Invites User (Invited User Flow)
 
 **Process:**
-1. Admin creates invitation → `userInvitations` and `pendingUsers` documents created
+1. Admin creates invitation → `userInvitations` document created
 2. Invitation email sent via Cloud Function trigger (`onInvitationCreated`)
 3. User clicks invitation link → Redirected to `#signup` page
 4. User signs up → Firebase Auth account created
@@ -260,24 +260,6 @@ Proppli uses Firebase Authentication for user authentication and Firestore for u
 }
 ```
 
-### Firestore: `pendingUsers/{pendingUserId}`
-```javascript
-{
-  email: "user@example.com", // Normalized: lowercase, trimmed
-  displayName: "John Doe",
-  role: "property_manager" | "admin" | "maintenance" | "viewer",
-  isActive: true, // CRITICAL: Invited users are always active
-  assignedProperties: ["propertyId1", "propertyId2"],
-  profile: { ... },
-  createdAt: serverTimestamp(),
-  createdBy: "adminUserId",
-  invitationId: "invitationId",
-  status: "pending_signup" | "completed",
-  linkedUserId: "userId" | null,
-  linkedAt: serverTimestamp() | null
-}
-```
-
 ### Firestore: `userInvitations/{invitationId}`
 ```javascript
 {
@@ -303,7 +285,6 @@ Proppli uses Firebase Authentication for user authentication and Firestore for u
 - Prevents duplicate accounts with different casing
 
 ### 2. Invited Users
-- `pendingUsers.isActive` MUST be `true`
 - `users.isActive` MUST be `true` after signup
 - Persistence SHOULD be set to `LOCAL` after signup
 - User MUST be logged in immediately after signup

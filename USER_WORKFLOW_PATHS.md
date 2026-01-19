@@ -30,26 +30,6 @@ This document describes all user workflow paths, the data that should be created
    }
    ```
 
-2. **`pendingUsers/{pendingUserId}`** document:
-   ```javascript
-   {
-     email: "user@example.com" (normalized: lowercase, trimmed),
-     displayName: "John Doe",
-     role: "property_manager" | "admin" | "maintenance" | "viewer",
-     isActive: true, // CRITICAL: Invited users are ACTIVE immediately
-     assignedProperties: ["propertyId1", "propertyId2"],
-     profile: {
-       phone: "123-456-7890" | null,
-       title: "Property Manager" | null,
-       department: "Operations" | null
-     },
-     createdAt: serverTimestamp(),
-     createdBy: "adminUserId",
-     invitationId: "invitationId",
-     status: "pending_signup" // Will change to "completed" after signup
-   }
-   ```
-
 **Cloud Function Triggered:**
 - `onInvitationCreated` (if `sendEmail: true`) → Sends invitation email with link to `https://proppli.com#signup`
 
@@ -113,13 +93,13 @@ This document describes all user workflow paths, the data that should be created
    }
    ```
 
-3. **`pendingUsers/{pendingUserId}`** document (updated):
+3. **`userInvitations/{invitationId}`** document (updated):
    ```javascript
    {
      ...existing fields...,
-     status: "completed", // Changed from "pending_signup"
-     linkedUserId: "userId",
-     linkedAt: serverTimestamp()
+     status: "accepted",
+     acceptedBy: "userId",
+     acceptedAt: serverTimestamp()
    }
    ```
 
@@ -166,13 +146,13 @@ This document describes all user workflow paths, the data that should be created
    }
    ```
 
-2. **`pendingUsers/{pendingUserId}`** document (updated):
+2. **`userInvitations/{invitationId}`** document (updated):
    ```javascript
    {
      ...existing fields...,
-     status: "completed",
-     linkedUserId: "userId",
-     linkedAt: serverTimestamp()
+     status: "accepted",
+     acceptedBy: "userId",
+     acceptedAt: serverTimestamp()
    }
    ```
 
@@ -359,19 +339,7 @@ This document describes all user workflow paths, the data that should be created
      - `profile` (object with phone, title, department)
      - `createdAt`, `lastLogin`, `createdBy`
 
-2. **`pendingUsers/{pendingUserId}`**
-   - **Purpose:** Admin-invited users before they sign up
-   - **Created by:** Admin invitation
-   - **Key fields:**
-     - `email` (normalized)
-     - `displayName`
-     - `role`
-     - `isActive: true` (always true for invited users)
-     - `assignedProperties`
-     - `status: "pending_signup"` → changes to `"completed"` after signup
-     - `linkedUserId`, `linkedAt` (set after signup)
-
-3. **`userInvitations/{invitationId}`**
+2. **`userInvitations/{invitationId}`**
    - **Purpose:** Invitation records (for email sending)
    - **Created by:** Admin invitation
    - **Key fields:**
@@ -396,7 +364,6 @@ This document describes all user workflow paths, the data that should be created
 ## Critical Rules
 
 1. **Invited Users:**
-   - `pendingUsers.isActive` MUST be `true`
    - `users.isActive` MUST be `true` after signup
    - Persistence SHOULD be `LOCAL` after signup
 

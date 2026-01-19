@@ -291,7 +291,7 @@ On the users page, allow a user to open up a window giving details on what users
 - ✅ Form validates required fields
 - ✅ Invitation is created successfully
 - ✅ `userInvitations` document created in Firestore
-- ✅ `pendingUsers` document created in Firestore
+- ✅ `userInvitations` document created in Firestore
 - ✅ Invitation email is sent (check email inbox)
 - ✅ Success message displays
 - ✅ Pending user appears in Users list
