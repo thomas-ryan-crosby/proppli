@@ -1252,6 +1252,11 @@ function initAuthPages() {
     if (googleSignInBtn) {
         googleSignInBtn.addEventListener('click', handleGoogleSignIn);
     }
+
+    const googleSignUpBtn = document.getElementById('googleSignUpBtn');
+    if (googleSignUpBtn) {
+        googleSignUpBtn.addEventListener('click', handleGoogleSignIn);
+    }
 }
 
 // Handle login
