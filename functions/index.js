@@ -164,13 +164,9 @@ const emailTemplates = {
           </div>
           <div class="content">
             <p>Hello ${data.displayName || data.email},</p>
-            <p>Your Proppli account has been created successfully.</p>
-            <p>You can sign in at any time using the button below:</p>
-            <div style="text-align: center;">
-              <a href="${data.loginUrl}" class="button">Sign In</a>
-            </div>
-            <p>Or copy and paste this link into your browser:</p>
-            <p style="word-break: break-all; color: #667eea;">${data.loginUrl}</p>
+            <p>Thanks for your interest in Proppli.</p>
+            <p>Your account has been created and is pending administrator approval.</p>
+            <p>You will be able to sign in once an administrator grants access.</p>
             <p>If you have any questions, please contact your system administrator.</p>
           </div>
           <div class="footer">
@@ -185,9 +181,10 @@ const emailTemplates = {
       
       Hello ${data.displayName || data.email},
       
-      Your Proppli account has been created successfully.
+      Thanks for your interest in Proppli.
       
-      Sign in at: ${data.loginUrl}
+      Your account has been created and is pending administrator approval.
+      You will be able to sign in once an administrator grants access.
       
       If you have any questions, please contact your system administrator.
       
