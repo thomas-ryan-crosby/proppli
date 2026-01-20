@@ -2705,6 +2705,14 @@ function setupEventListeners() {
                 if (coiForm) {
                     coiForm.reset();
                 }
+                // Reset drag-and-drop UI
+                const dropZoneContent = document.getElementById('coiFileDropZoneContent');
+                const fileNameDiv = document.getElementById('coiFileName');
+                const fileInput = document.getElementById('coiFile');
+                if (dropZoneContent) dropZoneContent.style.display = 'block';
+                if (fileNameDiv) fileNameDiv.style.display = 'none';
+                if (fileInput) fileInput.value = '';
+                
                 document.getElementById('coiVendorId').value = vendorId;
                 document.getElementById('coiUploadModal').classList.add('show');
             } else {
@@ -2725,15 +2733,42 @@ function setupEventListeners() {
     
     if (cancelCOIUploadFormBtn) {
         cancelCOIUploadFormBtn.addEventListener('click', () => {
+            // Reset form and drag-and-drop UI
+            const coiForm = document.getElementById('coiUploadForm');
+            if (coiForm) {
+                coiForm.reset();
+            }
+            const dropZoneContent = document.getElementById('coiFileDropZoneContent');
+            const fileNameDiv = document.getElementById('coiFileName');
+            const fileInput = document.getElementById('coiFile');
+            if (dropZoneContent) dropZoneContent.style.display = 'block';
+            if (fileNameDiv) fileNameDiv.style.display = 'none';
+            if (fileInput) fileInput.value = '';
+            
             document.getElementById('coiUploadModal').classList.remove('show');
         });
     }
     
-    if (vendorCOIInput) {
-        vendorCOIInput.addEventListener('change', function(e) {
-            // This is handled by the form submission, but we can add validation here if needed
+    if (closeCOIUploadModalBtn) {
+        closeCOIUploadModalBtn.addEventListener('click', () => {
+            // Reset form and drag-and-drop UI
+            const coiForm = document.getElementById('coiUploadForm');
+            if (coiForm) {
+                coiForm.reset();
+            }
+            const dropZoneContent = document.getElementById('coiFileDropZoneContent');
+            const fileNameDiv = document.getElementById('coiFileName');
+            const fileInput = document.getElementById('coiFile');
+            if (dropZoneContent) dropZoneContent.style.display = 'block';
+            if (fileNameDiv) fileNameDiv.style.display = 'none';
+            if (fileInput) fileInput.value = '';
+            
+            document.getElementById('coiUploadModal').classList.remove('show');
         });
     }
+    
+    // Setup drag-and-drop for COI upload
+    setupCOIDragDrop();
     
     // Tab switching for vendor detail modal
     const vendorTabButtons = document.querySelectorAll('#vendorDetailModal .tab-btn');
@@ -14153,6 +14188,106 @@ window.deleteVendorCOI = async function(vendorId, coiIndex) {
     }
 };
 
+// Setup drag-and-drop for COI file upload
+function setupCOIDragDrop() {
+    const dropZone = document.getElementById('coiFileDropZone');
+    const fileInput = document.getElementById('coiFile');
+    const dropZoneContent = document.getElementById('coiFileDropZoneContent');
+    const fileNameDiv = document.getElementById('coiFileName');
+    const fileNameText = document.getElementById('coiFileNameText');
+    const removeBtn = document.getElementById('coiFileRemoveBtn');
+    
+    if (!dropZone || !fileInput) return;
+    
+    // Handle file selection from input
+    fileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            handleCOIFileSelect(file);
+        }
+    });
+    
+    // Prevent default drag behaviors
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, preventDefaults, false);
+        document.body.addEventListener(eventName, preventDefaults, false);
+    });
+    
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    
+    // Highlight drop zone when item is dragged over it
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+            dropZone.style.borderColor = '#667eea';
+            dropZone.style.backgroundColor = '#f0f4ff';
+        }, false);
+    });
+    
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+            dropZone.style.borderColor = '#ccc';
+            dropZone.style.backgroundColor = '#f9f9f9';
+        }, false);
+    });
+    
+    // Handle dropped files
+    dropZone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        
+        if (files.length > 0) {
+            const file = files[0];
+            // Validate file type
+            const validTypes = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png'];
+            const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+            
+            if (validTypes.includes(fileExtension)) {
+                handleCOIFileSelect(file);
+                // Update the file input
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(file);
+                fileInput.files = dataTransfer.files;
+            } else {
+                alert('Please upload a PDF, Word document, or image file (PDF, DOC, DOCX, JPG, JPEG, PNG).');
+            }
+        }
+    }, false);
+    
+    // Handle remove button
+    if (removeBtn) {
+        removeBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            fileInput.value = '';
+            if (dropZoneContent) dropZoneContent.style.display = 'block';
+            if (fileNameDiv) fileNameDiv.style.display = 'none';
+        });
+    }
+    
+    // Click on drop zone to trigger file input
+    dropZone.addEventListener('click', function(e) {
+        if (e.target !== removeBtn && e.target !== fileInput) {
+            fileInput.click();
+        }
+    });
+}
+
+// Handle COI file selection
+function handleCOIFileSelect(file) {
+    const dropZoneContent = document.getElementById('coiFileDropZoneContent');
+    const fileNameDiv = document.getElementById('coiFileName');
+    const fileNameText = document.getElementById('coiFileNameText');
+    
+    if (dropZoneContent) dropZoneContent.style.display = 'none';
+    if (fileNameDiv) fileNameDiv.style.display = 'block';
+    if (fileNameText) {
+        fileNameText.textContent = file.name;
+    }
+}
+
 // Handle COI upload form submission
 function handleCOIUploadSubmit(e) {
     e.preventDefault();
@@ -14224,11 +14359,17 @@ function handleCOIUploadSubmit(e) {
     
     const file = fileInput.files[0];
     
-    uploadVendorCOI(vendorId, file, startDate, endDate, description)
+        uploadVendorCOI(vendorId, file, startDate, endDate, description)
         .then(() => {
             console.log('COI uploaded successfully');
             document.getElementById('coiUploadModal').classList.remove('show');
             coiForm.reset();
+            // Reset drag-and-drop UI
+            const dropZoneContent = document.getElementById('coiFileDropZoneContent');
+            const fileNameDiv = document.getElementById('coiFileName');
+            if (dropZoneContent) dropZoneContent.style.display = 'block';
+            if (fileNameDiv) fileNameDiv.style.display = 'none';
+            
             loadVendorCOIs(vendorId);
             resetButtonState();
             alert('Certificate of Insurance uploaded successfully!');
