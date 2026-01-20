@@ -2675,6 +2675,13 @@ function setupEventListeners() {
         });
     }
     
+    const closeInvoiceDetailModalBtn = document.getElementById('closeInvoiceDetailModal');
+    if (closeInvoiceDetailModalBtn) {
+        closeInvoiceDetailModalBtn.addEventListener('click', () => {
+            document.getElementById('invoiceDetailModal').classList.remove('show');
+        });
+    }
+    
     // Invoice filters
     if (invoiceStatusFilter) {
         invoiceStatusFilter.addEventListener('change', () => {
@@ -18603,9 +18610,13 @@ async function loadFinance() {
     // Setup year navigation widget
     setupYearNavigationWidget();
     
-    // Load invoice approval data if on invoice approval tab
+    // Hide year navigation widget if invoice approval tab is active
     const invoiceApprovalTab = document.getElementById('invoiceApprovalTab');
     if (invoiceApprovalTab && invoiceApprovalTab.style.display !== 'none') {
+        const yearNavWidget = document.getElementById('yearNavigationWidget');
+        if (yearNavWidget) {
+            yearNavWidget.style.display = 'none';
+        }
         loadInvoices();
     }
 }
@@ -18757,13 +18768,16 @@ function renderInvoicesList(invoices, properties, vendors) {
             <div class="tenant-card-body">
                 <p><strong>📅 Invoice Date:</strong> ${invoiceDate}</p>
                 <p><strong>💰 Amount:</strong> ${amount}</p>
+                ${invoice.accountCode ? `<p><strong>📊 Account Code:</strong> ${escapeHtml(invoice.accountCode)}</p>` : ''}
+                ${invoice.costCode ? `<p><strong>🏷️ Cost Code:</strong> ${escapeHtml(invoice.costCode)}</p>` : ''}
                 ${invoice.description ? `<p><strong>📝 Description:</strong> ${escapeHtml(invoice.description)}</p>` : ''}
                 ${status === 'approved' && approvedAt ? `<p style="color: #27ae60;"><strong>✅ Approved${approvedBy}</strong> on ${approvedAt}</p>` : ''}
                 ${status === 'rejected' && approvedAt ? `<p style="color: #e74c3c;"><strong>❌ Rejected${approvedBy}</strong> on ${approvedAt}</p>` : ''}
                 ${rejectionReason}
             </div>
             <div class="tenant-card-actions">
-                ${invoice.fileUrl ? `<a href="${escapeHtml(invoice.fileUrl)}" target="_blank" class="btn-primary btn-small" style="text-decoration: none; display: inline-block;">View Invoice</a>` : ''}
+                <button class="btn-primary btn-small" onclick="viewInvoiceDetail('${invoice.id}')" style="text-decoration: none; display: inline-block;">View Details</button>
+                ${invoice.fileUrl ? `<a href="${escapeHtml(invoice.fileUrl)}" target="_blank" class="btn-secondary btn-small" style="text-decoration: none; display: inline-block;">View Invoice File</a>` : ''}
                 ${canManageInvoices() && status === 'pending' ? `
                     <button class="btn-primary btn-small" onclick="approveInvoice('${invoice.id}')" style="background-color: #27ae60;">Approve</button>
                     <button class="btn-danger btn-small" onclick="rejectInvoice('${invoice.id}')">Reject</button>
@@ -18849,6 +18863,8 @@ window.editInvoice = function(invoiceId) {
         document.getElementById('invoiceDate').value = invoice.invoiceDate ? formatDateForInput(invoice.invoiceDate.toDate()) : '';
         document.getElementById('invoiceAmount').value = invoice.amount || '';
         document.getElementById('invoiceDescription').value = invoice.description || '';
+        document.getElementById('invoiceAccountCode').value = invoice.accountCode || '';
+        document.getElementById('invoiceCostCode').value = invoice.costCode || '';
         
         // Load dropdowns first, then set values
         loadPropertiesForInvoiceForm().then(() => {
@@ -18975,6 +18991,129 @@ window.rejectInvoice = function(invoiceId) {
         });
 };
 
+// View invoice details
+window.viewInvoiceDetail = async function(invoiceId) {
+    const modal = document.getElementById('invoiceDetailModal');
+    const content = document.getElementById('invoiceDetailContent');
+    const title = document.getElementById('invoiceDetailTitle');
+    
+    if (!modal || !content) return;
+    
+    content.innerHTML = '<p style="color: #999; font-style: italic; text-align: center; padding: 20px;">Loading invoice details...</p>';
+    modal.classList.add('show');
+    
+    try {
+        const invoiceDoc = await db.collection('invoices').doc(invoiceId).get();
+        if (!invoiceDoc.exists) {
+            content.innerHTML = '<p style="color: #e74c3c; text-align: center; padding: 20px;">Invoice not found.</p>';
+            return;
+        }
+        
+        const invoice = { id: invoiceDoc.id, ...invoiceDoc.data() };
+        
+        // Load related data
+        const [propertyDoc, vendorDoc] = await Promise.all([
+            invoice.propertyId ? db.collection('properties').doc(invoice.propertyId).get() : Promise.resolve(null),
+            invoice.vendorId ? db.collection('vendors').doc(invoice.vendorId).get() : Promise.resolve(null)
+        ]);
+        
+        const property = propertyDoc && propertyDoc.exists ? propertyDoc.data() : null;
+        const vendor = vendorDoc && vendorDoc.exists ? vendorDoc.data() : null;
+        
+        // Format dates
+        const invoiceDate = formatDateForDisplay(invoice.invoiceDate, 'N/A');
+        const createdAt = formatDateForDisplay(invoice.createdAt, 'N/A');
+        const approvedAt = invoice.approvedAt ? formatDateForDisplay(invoice.approvedAt, 'N/A') : null;
+        const processedAt = invoice.processedAt ? formatDateForDisplay(invoice.processedAt, 'N/A') : null;
+        
+        // Status badge
+        const status = invoice.status || 'pending';
+        let statusBadge = '';
+        if (status === 'approved') {
+            statusBadge = '<span class="status-badge status-active">Approved</span>';
+        } else if (status === 'processed') {
+            statusBadge = '<span class="status-badge" style="background: #3498db; color: white;">Processed</span>';
+        } else if (status === 'rejected') {
+            statusBadge = '<span class="status-badge status-expired">Rejected</span>';
+        } else {
+            statusBadge = '<span class="status-badge status-warning">Pending</span>';
+        }
+        
+        // Build detail HTML
+        let detailHTML = `
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                <div>
+                    <h3 style="margin: 0 0 10px 0;">${escapeHtml(invoice.invoiceNumber || 'Unnamed Invoice')}</h3>
+                    ${statusBadge}
+                </div>
+                <div style="text-align: right;">
+                    <p style="margin: 0; font-size: 1.5em; font-weight: 600; color: #667eea;">
+                        ${invoice.amount ? `$${parseFloat(invoice.amount).toFixed(2)}` : '$0.00'}
+                    </p>
+                </div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                <div>
+                    <p><strong>Vendor:</strong> ${vendor ? escapeHtml(vendor.name) : 'Unknown Vendor'}</p>
+                    ${vendor && vendor.primaryEmail ? `<p><strong>Vendor Email:</strong> <a href="mailto:${escapeHtml(vendor.primaryEmail)}">${escapeHtml(vendor.primaryEmail)}</a></p>` : ''}
+                    ${vendor && vendor.primaryPhone ? `<p><strong>Vendor Phone:</strong> <a href="tel:${escapeHtml(vendor.primaryPhone)}">${escapeHtml(vendor.primaryPhone)}</a></p>` : ''}
+                </div>
+                <div>
+                    <p><strong>Property:</strong> ${property ? escapeHtml(property.name) : 'Unknown Property'}</p>
+                    ${property && property.address ? `<p><strong>Property Address:</strong> ${escapeHtml(property.address)}</p>` : ''}
+                </div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                <div>
+                    <p><strong>Invoice Date:</strong> ${invoiceDate}</p>
+                    <p><strong>Invoice Number:</strong> ${escapeHtml(invoice.invoiceNumber || 'N/A')}</p>
+                </div>
+                <div>
+                    ${invoice.accountCode ? `<p><strong>Account Code:</strong> ${escapeHtml(invoice.accountCode)}</p>` : '<p><strong>Account Code:</strong> <span style="color: #999;">Not assigned</span></p>'}
+                    ${invoice.costCode ? `<p><strong>Cost Code:</strong> ${escapeHtml(invoice.costCode)}</p>` : '<p><strong>Cost Code:</strong> <span style="color: #999;">Not assigned</span></p>'}
+                </div>
+            </div>
+            
+            ${invoice.description ? `
+                <div style="margin-bottom: 20px;">
+                    <p><strong>Description:</strong></p>
+                    <p style="background: #f8f9fa; padding: 15px; border-radius: 4px; white-space: pre-wrap;">${escapeHtml(invoice.description)}</p>
+                </div>
+            ` : ''}
+            
+            <div style="margin-bottom: 20px;">
+                <p><strong>Status History:</strong></p>
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 4px;">
+                    <p><strong>Created:</strong> ${createdAt}${invoice.createdBy ? ` by ${escapeHtml(createdByName)}` : ''}</p>
+                    ${approvedAt ? `<p style="color: #27ae60;"><strong>Approved:</strong> ${approvedAt}${invoice.approvedBy ? ` by ${escapeHtml(invoice.approvedByName || 'Unknown')}` : ''}</p>` : ''}
+                    ${processedAt ? `<p style="color: #3498db;"><strong>Processed:</strong> ${processedAt}${invoice.processedBy ? ` by ${escapeHtml(invoice.processedByName || 'Unknown')}` : ''}</p>` : ''}
+                    ${status === 'rejected' && approvedAt ? `<p style="color: #e74c3c;"><strong>Rejected:</strong> ${approvedAt}${invoice.approvedBy ? ` by ${escapeHtml(invoice.approvedByName || 'Unknown')}` : ''}</p>` : ''}
+                    ${invoice.rejectionReason ? `<p style="color: #e74c3c; margin-top: 10px;"><strong>Rejection Reason:</strong> ${escapeHtml(invoice.rejectionReason)}</p>` : ''}
+                </div>
+            </div>
+            
+            ${invoice.fileUrl ? `
+                <div style="margin-bottom: 20px;">
+                    <p><strong>Invoice File:</strong></p>
+                    <a href="${escapeHtml(invoice.fileUrl)}" target="_blank" class="btn-primary" style="text-decoration: none; display: inline-block;">
+                        View Invoice File ${invoice.fileName ? `(${escapeHtml(invoice.fileName)})` : ''}
+                    </a>
+                </div>
+            ` : ''}
+        `;
+        
+        content.innerHTML = detailHTML;
+        if (title) {
+            title.textContent = `Invoice: ${escapeHtml(invoice.invoiceNumber || 'Details')}`;
+        }
+    } catch (error) {
+        console.error('Error loading invoice details:', error);
+        content.innerHTML = '<p style="color: #e74c3c; text-align: center; padding: 20px;">Error loading invoice details. Please try again.</p>';
+    }
+};
+
 // Mark invoice as processed
 window.markInvoiceAsProcessed = function(invoiceId) {
     if (!canManageInvoices()) {
@@ -19090,6 +19229,8 @@ async function handleInvoiceSubmit(e) {
     const invoiceDate = invoiceForm.querySelector('#invoiceDate').value;
     const amount = invoiceForm.querySelector('#invoiceAmount').value;
     const description = invoiceForm.querySelector('#invoiceDescription').value.trim() || null;
+    const accountCode = invoiceForm.querySelector('#invoiceAccountCode').value.trim() || null;
+    const costCode = invoiceForm.querySelector('#invoiceCostCode').value.trim() || null;
     const fileInput = invoiceForm.querySelector('#invoiceFile');
     
     if (!vendorId || !propertyId || !invoiceNumber || !invoiceDate || !amount) {
@@ -19745,8 +19886,18 @@ function setupFinanceTabs() {
             // Load tab-specific data
             if (tabName === 'rentRoll') {
                 loadRentRoll();
+                // Show year navigation widget for rent roll
+                const yearNavWidget = document.getElementById('yearNavigationWidget');
+                if (yearNavWidget) {
+                    yearNavWidget.style.display = 'flex';
+                }
             } else if (tabName === 'invoiceApproval') {
                 loadInvoices();
+                // Hide year navigation widget for invoice approval
+                const yearNavWidget = document.getElementById('yearNavigationWidget');
+                if (yearNavWidget) {
+                    yearNavWidget.style.display = 'none';
+                }
             }
         });
     });
