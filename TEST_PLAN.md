@@ -1365,11 +1365,362 @@ I would like all of the assignments, creation, etc. to get auto-linked to the us
 
 ---
 
+## 16. Vendor Management
+
+### Test Case 16.1: View Vendors List
+**Priority:** High  
+**Role:** Any Authenticated User
+
+**Steps:**
+1. Navigate to Vendors page from sidebar
+2. Verify vendors list displays
+3. Verify search functionality works
+4. Verify status filter works (active/inactive)
+5. Verify type filter works
+
+**Expected Results:**
+- ✅ Vendors page is accessible from sidebar
+- ✅ Vendor list displays all vendors (or filtered by permissions)
+- ✅ Search filters vendors by name, phone, or email
+- ✅ Status filter shows only active or inactive vendors
+- ✅ Type filter shows only vendors of selected type
+- ✅ Vendor cards show name, type, status, contact info
+- ✅ No console errors
+
+**Pass/Fail:** ☐ Pass ☐ Fail  
+**Notes:**
+
+---
+
+### Test Case 16.2: Create Vendor (Admin/Property Manager)
+**Priority:** High  
+**Role:** Admin, Super Admin, Property Manager
+
+**Steps:**
+1. Navigate to Vendors page
+2. Click "+ Add Vendor" button
+3. Fill in required fields (name, type)
+4. Fill in optional fields (phone, email, website, address, notes)
+5. Select status (active/inactive)
+6. Click "Save Vendor"
+7. Verify vendor appears in list
+
+**Expected Results:**
+- ✅ Add Vendor button is visible and clickable
+- ✅ Vendor modal opens
+- ✅ Required fields are marked with *
+- ✅ Form validation prevents saving without name/type
+- ✅ Vendor is saved to Firestore
+- ✅ Vendor appears in list after creation
+- ✅ Created vendor has correct data
+- ✅ Timestamps (createdAt, updatedAt) are set
+- ✅ createdBy field is set to current user
+
+**Pass/Fail:** ☐ Pass ☐ Fail  
+**Notes:**
+
+---
+
+### Test Case 16.3: Create Vendor - Permission Denied (Maintenance/Viewer)
+**Priority:** High  
+**Role:** Maintenance, Viewer
+
+**Steps:**
+1. Navigate to Vendors page as maintenance/viewer user
+2. Verify "+ Add Vendor" button is not visible or disabled
+3. Try to access vendor creation directly (if possible)
+
+**Expected Results:**
+- ✅ Add Vendor button is hidden or disabled
+- ✅ Cannot create vendors (Firestore rules prevent write)
+- ✅ Appropriate error message if attempting to create
+
+**Pass/Fail:** ☐ Pass ☐ Fail  
+**Notes:**
+
+---
+
+### Test Case 16.4: Edit Vendor
+**Priority:** High  
+**Role:** Admin, Super Admin, Property Manager
+
+**Steps:**
+1. Navigate to Vendors page
+2. Click "Edit" on a vendor card
+3. Modify vendor information
+4. Click "Save Vendor"
+5. Verify changes are saved
+
+**Expected Results:**
+- ✅ Edit button opens vendor modal with existing data
+- ✅ All fields are pre-populated correctly
+- ✅ Changes are saved to Firestore
+- ✅ Updated vendor appears in list with new data
+- ✅ updatedAt timestamp is updated
+- ✅ No console errors
+
+**Pass/Fail:** ☐ Pass ☐ Fail  
+**Notes:**
+
+---
+
+### Test Case 16.5: Delete Vendor
+**Priority:** Medium  
+**Role:** Admin, Super Admin, Property Manager
+
+**Steps:**
+1. Navigate to Vendors page
+2. Click "Delete" on a vendor card
+3. Confirm deletion
+4. Verify vendor is removed from list
+
+**Expected Results:**
+- ✅ Delete button shows confirmation dialog
+- ✅ Vendor is deleted from Firestore
+- ✅ Vendor is removed from list
+- ✅ Associated employees are not automatically deleted (subcollection remains)
+- ✅ No console errors
+
+**Pass/Fail:** ☐ Pass ☐ Fail  
+**Notes:**
+
+---
+
+### Test Case 16.6: View Vendor Details
+**Priority:** High  
+**Role:** Any Authenticated User
+
+**Steps:**
+1. Navigate to Vendors page
+2. Click "View Details" on a vendor card
+3. Verify vendor detail modal opens
+4. Verify vendor information displays correctly
+5. Verify employees list displays
+
+**Expected Results:**
+- ✅ Vendor detail modal opens
+- ✅ Vendor header shows name, type, status badges
+- ✅ All vendor information displays (phone, email, website, address, notes)
+- ✅ Employees list section is visible
+- ✅ Employees are loaded and displayed
+- ✅ "Add Employee" button is visible for users with edit permissions
+- ✅ No console errors
+
+**Pass/Fail:** ☐ Pass ☐ Fail  
+**Notes:**
+
+---
+
+### Test Case 16.7: Add Employee to Vendor
+**Priority:** High  
+**Role:** Admin, Super Admin, Property Manager
+
+**Steps:**
+1. Open vendor detail view
+2. Click "+ Add Employee"
+3. Fill in required field (full name)
+4. Fill in optional fields (title, phone, email, emergency contact, notes)
+5. Select status (active/inactive)
+6. Click "Save Employee"
+7. Verify employee appears in list
+
+**Expected Results:**
+- ✅ Add Employee button opens employee modal
+- ✅ Employee form has required field (full name)
+- ✅ Employee is saved to vendors/{vendorId}/employees subcollection
+- ✅ Employee appears in employees list
+- ✅ Employee has correct data
+- ✅ vendorId field is set correctly
+- ✅ Timestamps (createdAt, updatedAt) are set
+- ✅ createdBy field is set to current user
+
+**Pass/Fail:** ☐ Pass ☐ Fail  
+**Notes:**
+
+---
+
+### Test Case 16.8: Edit Employee
+**Priority:** High  
+**Role:** Admin, Super Admin, Property Manager
+
+**Steps:**
+1. Open vendor detail view
+2. Click "Edit" on an employee card
+3. Modify employee information
+4. Click "Save Employee"
+5. Verify changes are saved
+
+**Expected Results:**
+- ✅ Edit button opens employee modal with existing data
+- ✅ All fields are pre-populated correctly
+- ✅ Changes are saved to Firestore
+- ✅ Updated employee appears in list with new data
+- ✅ updatedAt timestamp is updated
+- ✅ No console errors
+
+**Pass/Fail:** ☐ Pass ☐ Fail  
+**Notes:**
+
+---
+
+### Test Case 16.9: Delete Employee
+**Priority:** Medium  
+**Role:** Admin, Super Admin, Property Manager
+
+**Steps:**
+1. Open vendor detail view
+2. Click "Delete" on an employee card
+3. Confirm deletion
+4. Verify employee is removed from list
+
+**Expected Results:**
+- ✅ Delete button shows confirmation dialog
+- ✅ Employee is deleted from Firestore
+- ✅ Employee is removed from employees list
+- ✅ No console errors
+
+**Pass/Fail:** ☐ Pass ☐ Fail  
+**Notes:**
+
+---
+
+### Test Case 16.10: Vendor Employee - Permission Denied (Maintenance/Viewer)
+**Priority:** High  
+**Role:** Maintenance, Viewer
+
+**Steps:**
+1. Open vendor detail view as maintenance/viewer user
+2. Verify "Add Employee" button is not visible
+3. Verify Edit/Delete buttons are not visible on employee cards
+4. Verify employees list is read-only
+
+**Expected Results:**
+- ✅ Add Employee button is hidden
+- ✅ Edit/Delete buttons are hidden on employee cards
+- ✅ Employees list is visible (read-only)
+- ✅ Cannot create/edit/delete employees (Firestore rules prevent write)
+
+**Pass/Fail:** ☐ Pass ☐ Fail  
+**Notes:**
+
+---
+
+### Test Case 16.11: Vendor Search and Filtering
+**Priority:** Medium  
+**Role:** Any Authenticated User
+
+**Steps:**
+1. Navigate to Vendors page
+2. Enter search term in search box
+3. Verify vendors are filtered by name, phone, or email
+4. Select status filter (active/inactive)
+5. Select type filter
+6. Verify filters work together
+
+**Expected Results:**
+- ✅ Search filters vendors in real-time
+- ✅ Status filter works correctly
+- ✅ Type filter works correctly
+- ✅ Multiple filters work together (AND logic)
+- ✅ Empty state shows when no vendors match filters
+- ✅ Filters persist during session
+
+**Pass/Fail:** ☐ Pass ☐ Fail  
+**Notes:**
+
+---
+
+### Test Case 16.12: Vendor Status Toggle
+**Priority:** Medium  
+**Role:** Admin, Super Admin, Property Manager
+
+**Steps:**
+1. Create or edit a vendor
+2. Set status to "inactive"
+3. Save vendor
+4. Verify vendor appears when "All" status filter is selected
+5. Verify vendor does not appear when "Active" filter is selected
+6. Verify vendor appears when "Inactive" filter is selected
+
+**Expected Results:**
+- ✅ Status can be set to active or inactive
+- ✅ Inactive vendors are hidden by default (if default filter is active)
+- ✅ Status filter correctly shows/hides vendors
+- ✅ Status badge displays correctly (Active/Inactive)
+
+**Pass/Fail:** ☐ Pass ☐ Fail  
+**Notes:**
+
+---
+
+### Test Case 16.13: Vendor with No Employees
+**Priority:** Low  
+**Role:** Any Authenticated User
+
+**Steps:**
+1. Create a new vendor
+2. Open vendor detail view
+3. Verify employees list shows empty state
+
+**Expected Results:**
+- ✅ Employees list shows "No employees added yet" message
+- ✅ Add Employee button is visible (if user has permissions)
+- ✅ No console errors
+
+**Pass/Fail:** ☐ Pass ☐ Fail  
+**Notes:**
+
+---
+
+### Test Case 16.14: Vendor Data Validation
+**Priority:** High  
+**Role:** Admin, Super Admin, Property Manager
+
+**Steps:**
+1. Try to create vendor without name
+2. Try to create vendor without type
+3. Try to create vendor with invalid email format
+4. Try to create vendor with invalid URL format
+5. Verify validation errors
+
+**Expected Results:**
+- ✅ Name is required (form validation)
+- ✅ Type is required (form validation)
+- ✅ Email format is validated (if email provided)
+- ✅ URL format is validated (if website provided)
+- ✅ Appropriate error messages are shown
+- ✅ Invalid data is not saved
+
+**Pass/Fail:** ☐ Pass ☐ Fail  
+**Notes:**
+
+---
+
+### Test Case 16.15: Employee Data Validation
+**Priority:** High  
+**Role:** Admin, Super Admin, Property Manager
+
+**Steps:**
+1. Try to create employee without full name
+2. Try to create employee with invalid email format
+3. Verify validation errors
+
+**Expected Results:**
+- ✅ Full name is required (form validation)
+- ✅ Email format is validated (if email provided)
+- ✅ Appropriate error messages are shown
+- ✅ Invalid data is not saved
+
+**Pass/Fail:** ☐ Pass ☐ Fail  
+**Notes:**
+
+---
+
 ## Test Execution Summary
 
 ### Test Results Tracking
 
-**Total Test Cases:** 50+  
+**Total Test Cases:** 65+  
 **Execution Date:** _______________  
 **Tested By:** _______________  
 **Environment:** _______________

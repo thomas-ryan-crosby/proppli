@@ -1,7 +1,7 @@
 // Global state
 let selectedPropertyId = localStorage.getItem('selectedPropertyId') || '';
 let currentView = 'active'; // 'active' or 'completed'
-let currentPage = localStorage.getItem('currentPage') || 'maintenance'; // 'maintenance', 'properties', 'tenants'
+let currentPage = localStorage.getItem('currentPage') || 'maintenance'; // 'maintenance', 'properties', 'tenants', 'vendors', 'leases', 'finance', 'users'
 let editingTicketId = null;
 let editingPropertyId = null;
 let beforeFiles = []; // Array of { file: File, preview: string }
@@ -2024,6 +2024,8 @@ function showPage(page) {
         loadTenants();
         // Reload property filter dropdown when showing tenants page
         loadPropertiesForTenantFilter();
+    } else if (page === 'vendors') {
+        loadVendors();
     } else if (page === 'maintenance') {
         loadTickets();
     } else if (page === 'leases') {
@@ -2579,6 +2581,106 @@ function setupEventListeners() {
             if (tenantDocumentInput) {
                 tenantDocumentInput.click();
             }
+        });
+    }
+    
+    // Vendor management
+    const addVendorBtn = document.getElementById('addVendorBtn');
+    const vendorForm = document.getElementById('vendorForm');
+    const closeVendorModalBtn = document.getElementById('closeVendorModal');
+    const cancelVendorFormBtn = document.getElementById('cancelVendorForm');
+    const vendorSearchInput = document.getElementById('vendorSearchInput');
+    const vendorStatusFilter = document.getElementById('vendorStatusFilter');
+    const vendorTypeFilter = document.getElementById('vendorTypeFilter');
+    const closeVendorDetailModalBtn = document.getElementById('closeVendorDetailModal');
+    
+    if (addVendorBtn) {
+        addVendorBtn.addEventListener('click', () => {
+            if (!canEditVendor()) {
+                alert('You do not have permission to add vendors.');
+                return;
+            }
+            window.addVendor();
+        });
+    }
+    
+    if (vendorForm) {
+        vendorForm.addEventListener('submit', handleVendorSubmit);
+    }
+    
+    if (closeVendorModalBtn) {
+        closeVendorModalBtn.addEventListener('click', () => {
+            document.getElementById('vendorModal').classList.remove('show');
+        });
+    }
+    
+    if (cancelVendorFormBtn) {
+        cancelVendorFormBtn.addEventListener('click', () => {
+            document.getElementById('vendorModal').classList.remove('show');
+        });
+    }
+    
+    if (closeVendorDetailModalBtn) {
+        closeVendorDetailModalBtn.addEventListener('click', () => {
+            window.backToVendors();
+        });
+    }
+    
+    // Vendor search and filters
+    if (vendorSearchInput) {
+        vendorSearchInput.addEventListener('input', () => {
+            loadVendors(); // Re-render with current filters
+        });
+    }
+    
+    if (vendorStatusFilter) {
+        vendorStatusFilter.addEventListener('change', () => {
+            loadVendors(); // Re-render with current filters
+        });
+    }
+    
+    if (vendorTypeFilter) {
+        vendorTypeFilter.addEventListener('change', () => {
+            loadVendors(); // Re-render with current filters
+        });
+    }
+    
+    // Employee management
+    const addEmployeeBtn = document.getElementById('addEmployeeBtn');
+    const employeeForm = document.getElementById('employeeForm');
+    const closeEmployeeModalBtn = document.getElementById('closeEmployeeModal');
+    const cancelEmployeeFormBtn = document.getElementById('cancelEmployeeForm');
+    
+    if (addEmployeeBtn) {
+        addEmployeeBtn.addEventListener('click', () => {
+            let vendorId = currentVendorIdForDetail;
+            if (!vendorId) {
+                const vendorDetailModal = document.getElementById('vendorDetailModal');
+                if (vendorDetailModal) {
+                    vendorId = vendorDetailModal.getAttribute('data-vendor-id');
+                }
+            }
+            if (vendorId) {
+                window.addEmployee(vendorId);
+            } else {
+                alert('Error: Vendor context is missing.');
+            }
+        });
+    }
+    
+    if (employeeForm) {
+        employeeForm.addEventListener('submit', handleEmployeeSubmit);
+    }
+    
+    if (closeEmployeeModalBtn) {
+        closeEmployeeModalBtn.addEventListener('click', () => {
+            document.getElementById('employeeModal').classList.remove('show');
+        });
+    }
+    
+    if (cancelEmployeeFormBtn) {
+        cancelEmployeeFormBtn.addEventListener('click', () => {
+            document.getElementById('employeeModal').classList.remove('show');
         });
     }
     
@@ -13137,6 +13239,580 @@ window.removeTenantFromUnit = function(occupancyId, tenantId) {
             alert('Error removing tenant from unit: ' + error.message);
         });
 };
+
+// ============================================
+// VENDOR MANAGEMENT
+// ============================================
+
+let editingVendorId = null;
+let editingEmployeeId = null;
+let currentVendorIdForDetail = null;
+
+// Load vendors
+function loadVendors() {
+    // Don't load if user is not authenticated
+    if (!currentUser || !auth || !auth.currentUser || !currentUserProfile) {
+        return;
+    }
+    
+    // Check permissions - all authenticated users can view vendors (read-only for maintenance/viewer)
+    db.collection('vendors').orderBy('name').onSnapshot((snapshot) => {
+        const vendors = {};
+        snapshot.forEach((doc) => {
+            vendors[doc.id] = { id: doc.id, ...doc.data() };
+        });
+        renderVendorsList(vendors);
+    }, (error) => {
+        console.error('Error loading vendors:', error);
+        const vendorsList = document.getElementById('vendorsList');
+        if (vendorsList) {
+            vendorsList.innerHTML = '<p style="color: #e74c3c; text-align: center; padding: 20px;">Error loading vendors. Please try again.</p>';
+        }
+    });
+}
+
+// Render vendors list
+function renderVendorsList(vendors) {
+    const vendorsList = document.getElementById('vendorsList');
+    if (!vendorsList) return;
+    
+    vendorsList.innerHTML = '';
+    
+    // Get filter values
+    const searchTerm = document.getElementById('vendorSearchInput')?.value.toLowerCase() || '';
+    const statusFilter = document.getElementById('vendorStatusFilter')?.value || '';
+    const typeFilter = document.getElementById('vendorTypeFilter')?.value || '';
+    
+    // Filter vendors
+    let filteredVendors = Object.values(vendors).filter(vendor => {
+        // Search filter
+        if (searchTerm) {
+            const searchableText = [
+                vendor.name || '',
+                vendor.primaryPhone || '',
+                vendor.primaryEmail || ''
+            ].join(' ').toLowerCase();
+            if (!searchableText.includes(searchTerm)) {
+                return false;
+            }
+        }
+        
+        // Status filter
+        if (statusFilter) {
+            const vendorStatus = (vendor.status || 'active').toLowerCase();
+            if (vendorStatus !== statusFilter) {
+                return false;
+            }
+        }
+        
+        // Type filter
+        if (typeFilter) {
+            if (vendor.type !== typeFilter) {
+                return false;
+            }
+        }
+        
+        return true;
+    });
+    
+    // Sort by name
+    filteredVendors.sort((a, b) => {
+        const nameA = (a.name || '').toLowerCase();
+        const nameB = (b.name || '').toLowerCase();
+        return nameA.localeCompare(nameB);
+    });
+    
+    if (filteredVendors.length === 0) {
+        vendorsList.innerHTML = '<p class="no-tenants-message">No vendors found. Add one to get started.</p>';
+        return;
+    }
+    
+    filteredVendors.forEach(vendor => {
+        const card = document.createElement('div');
+        card.className = 'tenant-card';
+        const status = vendor.status || 'active';
+        const statusBadge = `<span class="status-badge status-${status.toLowerCase()}">${status === 'active' ? 'Active' : 'Inactive'}</span>`;
+        const typeBadge = vendor.type ? `<span class="status-badge" style="background: #667eea; color: white;">${escapeHtml(vendor.type)}</span>` : '';
+        
+        card.innerHTML = `
+            <div class="tenant-card-header">
+                <h3>${escapeHtml(vendor.name || 'Unnamed Vendor')}</h3>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    ${statusBadge}
+                    ${typeBadge}
+                </div>
+            </div>
+            <div class="tenant-card-body">
+                ${vendor.primaryPhone ? `<p><strong>📞 Phone:</strong> ${escapeHtml(vendor.primaryPhone)}</p>` : ''}
+                ${vendor.primaryEmail ? `<p><strong>✉️ Email:</strong> <a href="mailto:${escapeHtml(vendor.primaryEmail)}" style="color: #667eea;">${escapeHtml(vendor.primaryEmail)}</a></p>` : ''}
+                ${vendor.website ? `<p><strong>🌐 Website:</strong> <a href="${escapeHtml(vendor.website)}" target="_blank" style="color: #667eea;">${escapeHtml(vendor.website)}</a></p>` : ''}
+                ${vendor.address ? `<p><strong>📍 Address:</strong> ${escapeHtml(vendor.address)}</p>` : ''}
+                ${vendor.notes ? `<p><strong>📝 Notes:</strong> ${escapeHtml(vendor.notes.substring(0, 100))}${vendor.notes.length > 100 ? '...' : ''}</p>` : ''}
+            </div>
+            <div class="tenant-card-actions">
+                <button class="btn-primary btn-small" onclick="viewVendorDetail('${vendor.id}')">View Details</button>
+                ${canEditVendor() ? `
+                    <button class="btn-secondary btn-small" onclick="editVendor('${vendor.id}')">Edit</button>
+                    <button class="btn-danger btn-small" onclick="deleteVendor('${vendor.id}')">Delete</button>
+                ` : ''}
+            </div>
+        `;
+        vendorsList.appendChild(card);
+    });
+}
+
+// Check if user can edit vendors
+function canEditVendor() {
+    if (!currentUserProfile) return false;
+    const role = currentUserProfile.role;
+    return role === 'admin' || role === 'super_admin' || role === 'property_manager';
+}
+
+// Vendor CRUD functions
+window.addVendor = function() {
+    editingVendorId = null;
+    const vendorForm = document.getElementById('vendorForm');
+    if (vendorForm) {
+        vendorForm.reset();
+    }
+    document.getElementById('vendorId').value = '';
+    document.getElementById('vendorModalTitle').textContent = 'Add Vendor';
+    document.getElementById('vendorModal').classList.add('show');
+};
+
+window.editVendor = function(vendorId) {
+    editingVendorId = vendorId;
+    const vendorForm = document.getElementById('vendorForm');
+    if (vendorForm) {
+        vendorForm.reset();
+    }
+    
+    db.collection('vendors').doc(vendorId).get().then((doc) => {
+        if (!doc.exists) {
+            alert('Vendor not found');
+            return;
+        }
+        
+        const vendor = doc.data();
+        document.getElementById('vendorModalTitle').textContent = 'Edit Vendor';
+        document.getElementById('vendorId').value = vendorId;
+        document.getElementById('vendorName').value = vendor.name || '';
+        document.getElementById('vendorType').value = vendor.type || '';
+        document.getElementById('vendorStatus').value = vendor.status || 'active';
+        document.getElementById('vendorPrimaryPhone').value = vendor.primaryPhone || '';
+        document.getElementById('vendorPrimaryEmail').value = vendor.primaryEmail || '';
+        document.getElementById('vendorWebsite').value = vendor.website || '';
+        document.getElementById('vendorAddress').value = vendor.address || '';
+        document.getElementById('vendorNotes').value = vendor.notes || '';
+        
+        document.getElementById('vendorModal').classList.add('show');
+    }).catch((error) => {
+        console.error('Error loading vendor:', error);
+        alert('Error loading vendor: ' + error.message);
+    });
+};
+
+window.deleteVendor = function(vendorId) {
+    if (!confirm('Are you sure you want to delete this vendor? This action cannot be undone.')) {
+        return;
+    }
+    
+    db.collection('vendors').doc(vendorId).delete()
+        .then(() => {
+            console.log('Vendor deleted successfully');
+            loadVendors();
+        })
+        .catch((error) => {
+            console.error('Error deleting vendor:', error);
+            alert('Error deleting vendor: ' + error.message);
+        });
+};
+
+window.viewVendorDetail = function(vendorId) {
+    currentVendorIdForDetail = vendorId;
+    const vendorDetailModal = document.getElementById('vendorDetailModal');
+    if (vendorDetailModal) {
+        vendorDetailModal.setAttribute('data-vendor-id', vendorId);
+        db.collection('vendors').doc(vendorId).get().then((doc) => {
+            const vendor = doc.data();
+            if (vendor) {
+                const nameElement = document.getElementById('vendorDetailName');
+                if (nameElement) nameElement.textContent = vendor.name || 'Unnamed Vendor';
+                
+                // Render vendor info
+                const vendorInfoElement = document.getElementById('vendorDetailInfo');
+                if (vendorInfoElement) {
+                    const status = vendor.status || 'active';
+                    const statusBadge = `<span class="status-badge status-${status.toLowerCase()}">${status === 'active' ? 'Active' : 'Inactive'}</span>`;
+                    const typeBadge = vendor.type ? `<span class="status-badge" style="background: #667eea; color: white; margin-left: 8px;">${escapeHtml(vendor.type)}</span>` : '';
+                    
+                    vendorInfoElement.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px;">
+                            <div>
+                                <h3 style="margin: 0 0 10px 0;">${escapeHtml(vendor.name || 'Unnamed Vendor')}</h3>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    ${statusBadge}
+                                    ${typeBadge}
+                                </div>
+                            </div>
+                            ${canEditVendor() ? `
+                                <button class="btn-secondary btn-small" onclick="editVendor('${vendorId}'); document.getElementById('vendorDetailModal').classList.remove('show');">Edit Vendor</button>
+                            ` : ''}
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                            ${vendor.primaryPhone ? `<div><strong>Phone:</strong> ${escapeHtml(vendor.primaryPhone)}</div>` : ''}
+                            ${vendor.primaryEmail ? `<div><strong>Email:</strong> <a href="mailto:${escapeHtml(vendor.primaryEmail)}">${escapeHtml(vendor.primaryEmail)}</a></div>` : ''}
+                            ${vendor.website ? `<div><strong>Website:</strong> <a href="${escapeHtml(vendor.website)}" target="_blank">${escapeHtml(vendor.website)}</a></div>` : ''}
+                            ${vendor.address ? `<div style="grid-column: 1 / -1;"><strong>Address:</strong> ${escapeHtml(vendor.address)}</div>` : ''}
+                            ${vendor.notes ? `<div style="grid-column: 1 / -1;"><strong>Notes:</strong> ${escapeHtml(vendor.notes)}</div>` : ''}
+                        </div>
+                    `;
+                }
+                
+                // Show/hide add employee button based on permissions
+                const addEmployeeBtn = document.getElementById('addEmployeeBtn');
+                if (addEmployeeBtn) {
+                    addEmployeeBtn.style.display = canEditVendor() ? 'block' : 'none';
+                }
+            }
+        });
+        loadEmployees(vendorId);
+        
+        // Show modal
+        vendorDetailModal.classList.add('show');
+    }
+    updateFABsVisibility();
+};
+
+window.backToVendors = function() {
+    const vendorDetailModal = document.getElementById('vendorDetailModal');
+    if (vendorDetailModal) {
+        vendorDetailModal.classList.remove('show');
+    }
+    currentVendorIdForDetail = null;
+    updateFABsVisibility();
+};
+
+// Employee Management
+function loadEmployees(vendorId) {
+    const employeesList = document.getElementById('employeesList');
+    if (!employeesList) return;
+    
+    employeesList.innerHTML = '<p style="color: #999; font-style: italic;">Loading employees...</p>';
+    
+    db.collection('vendors').doc(vendorId).collection('employees').orderBy('fullName').onSnapshot((snapshot) => {
+        const employees = [];
+        snapshot.forEach((doc) => {
+            employees.push({ id: doc.id, ...doc.data() });
+        });
+        
+        if (employees.length === 0) {
+            employeesList.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">No employees added yet.</p>';
+            return;
+        }
+        
+        employeesList.innerHTML = '';
+        employees.forEach(employee => {
+            const employeeCard = document.createElement('div');
+            employeeCard.className = 'contact-card';
+            const status = employee.status || 'active';
+            const statusBadge = `<span class="status-badge status-${status.toLowerCase()}">${status === 'active' ? 'Active' : 'Inactive'}</span>`;
+            
+            employeeCard.innerHTML = `
+                <div class="contact-card-header">
+                    <div>
+                        <h4 style="margin: 0 0 5px 0;">${escapeHtml(employee.fullName || 'Unnamed Employee')}</h4>
+                        ${employee.title ? `<p style="margin: 0; color: #666; font-size: 0.9em;">${escapeHtml(employee.title)}</p>` : ''}
+                    </div>
+                    ${statusBadge}
+                </div>
+                <div class="contact-card-body">
+                    ${employee.phone ? `<p><strong>📞 Phone:</strong> <a href="tel:${escapeHtml(employee.phone)}">${escapeHtml(employee.phone)}</a></p>` : ''}
+                    ${employee.email ? `<p><strong>✉️ Email:</strong> <a href="mailto:${escapeHtml(employee.email)}">${escapeHtml(employee.email)}</a></p>` : ''}
+                    ${employee.emergencyContact ? `<p><strong>🚨 Emergency Contact:</strong> ${escapeHtml(employee.emergencyContact)}</p>` : ''}
+                    ${employee.notes ? `<p><strong>📝 Notes:</strong> ${escapeHtml(employee.notes)}</p>` : ''}
+                </div>
+                ${canEditVendor() ? `
+                    <div class="contact-card-actions">
+                        <button class="btn-secondary btn-small" onclick="editEmployee('${employee.id}', '${vendorId}')">Edit</button>
+                        <button class="btn-danger btn-small" onclick="deleteEmployee('${employee.id}', '${vendorId}')">Delete</button>
+                    </div>
+                ` : ''}
+            `;
+            employeesList.appendChild(employeeCard);
+        });
+    }, (error) => {
+        console.error('Error loading employees:', error);
+        employeesList.innerHTML = '<p style="color: #e74c3c; text-align: center; padding: 20px;">Error loading employees. Please try again.</p>';
+    });
+}
+
+window.addEmployee = function(vendorId) {
+    editingEmployeeId = null;
+    const employeeForm = document.getElementById('employeeForm');
+    if (employeeForm) {
+        employeeForm.reset();
+    }
+    document.getElementById('employeeId').value = '';
+    document.getElementById('employeeVendorId').value = vendorId || currentVendorIdForDetail;
+    document.getElementById('employeeStatus').value = 'active';
+    document.getElementById('employeeModalTitle').textContent = 'Add Employee';
+    document.getElementById('employeeModal').classList.add('show');
+};
+
+window.editEmployee = function(employeeId, vendorId) {
+    editingEmployeeId = employeeId;
+    const employeeForm = document.getElementById('employeeForm');
+    if (employeeForm) {
+        employeeForm.reset();
+    }
+    
+    const targetVendorId = vendorId || currentVendorIdForDetail;
+    if (!targetVendorId) {
+        alert('Error: Vendor context is missing.');
+        return;
+    }
+    
+    db.collection('vendors').doc(targetVendorId).collection('employees').doc(employeeId).get().then((doc) => {
+        if (!doc.exists) {
+            alert('Employee not found');
+            return;
+        }
+        
+        const employee = doc.data();
+        document.getElementById('employeeModalTitle').textContent = 'Edit Employee';
+        document.getElementById('employeeId').value = employeeId;
+        document.getElementById('employeeVendorId').value = targetVendorId;
+        document.getElementById('employeeFullName').value = employee.fullName || '';
+        document.getElementById('employeeTitle').value = employee.title || '';
+        document.getElementById('employeePhone').value = employee.phone || '';
+        document.getElementById('employeeEmail').value = employee.email || '';
+        document.getElementById('employeeEmergencyContact').value = employee.emergencyContact || '';
+        document.getElementById('employeeStatus').value = employee.status || 'active';
+        document.getElementById('employeeNotes').value = employee.notes || '';
+        
+        document.getElementById('employeeModal').classList.add('show');
+    }).catch((error) => {
+        console.error('Error loading employee:', error);
+        alert('Error loading employee: ' + error.message);
+    });
+};
+
+window.deleteEmployee = function(employeeId, vendorId) {
+    if (!confirm('Are you sure you want to delete this employee? This action cannot be undone.')) {
+        return;
+    }
+    
+    const targetVendorId = vendorId || currentVendorIdForDetail;
+    if (!targetVendorId) {
+        alert('Error: Vendor context is missing.');
+        return;
+    }
+    
+    db.collection('vendors').doc(targetVendorId).collection('employees').doc(employeeId).delete()
+        .then(() => {
+            console.log('Employee deleted successfully');
+            loadEmployees(targetVendorId);
+        })
+        .catch((error) => {
+            console.error('Error deleting employee:', error);
+            alert('Error deleting employee: ' + error.message);
+        });
+};
+
+// Handle vendor form submission
+function handleVendorSubmit(e) {
+    e.preventDefault();
+    
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const resetButtonState = () => {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save Vendor';
+            submitBtn.classList.remove('saving');
+        }
+    };
+    
+    const vendorForm = document.getElementById('vendorForm');
+    if (!vendorForm) {
+        console.error('Vendor form not found');
+        alert('Error: Vendor form not found. Please refresh the page.');
+        resetButtonState();
+        return;
+    }
+    
+    const id = vendorForm.querySelector('#vendorId').value;
+    const name = vendorForm.querySelector('#vendorName').value.trim();
+    const type = vendorForm.querySelector('#vendorType').value;
+    const status = vendorForm.querySelector('#vendorStatus').value;
+    const primaryPhone = vendorForm.querySelector('#vendorPrimaryPhone').value.trim() || null;
+    const primaryEmail = vendorForm.querySelector('#vendorPrimaryEmail').value.trim() || null;
+    const website = vendorForm.querySelector('#vendorWebsite').value.trim() || null;
+    const address = vendorForm.querySelector('#vendorAddress').value.trim() || null;
+    const notes = vendorForm.querySelector('#vendorNotes').value.trim() || null;
+    
+    if (!name) {
+        alert('Vendor name is required');
+        resetButtonState();
+        vendorForm.querySelector('#vendorName').focus();
+        return;
+    }
+    
+    if (!type) {
+        alert('Vendor type is required');
+        resetButtonState();
+        return;
+    }
+    
+    // Update button state
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
+        submitBtn.classList.add('saving');
+    }
+    
+    const vendorData = {
+        name: name,
+        type: type,
+        status: status,
+        primaryPhone: primaryPhone,
+        primaryEmail: primaryEmail,
+        website: website,
+        address: address,
+        notes: notes,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    
+    if (id) {
+        // Update existing vendor
+        db.collection('vendors').doc(id).update(vendorData)
+            .then(() => {
+                console.log('Vendor updated successfully');
+                document.getElementById('vendorModal').classList.remove('show');
+                loadVendors();
+                resetButtonState();
+            })
+            .catch((error) => {
+                console.error('Error updating vendor:', error);
+                alert('Error saving vendor: ' + error.message);
+                resetButtonState();
+            });
+    } else {
+        // Create new vendor
+        vendorData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+        vendorData.createdBy = currentUser ? currentUser.uid : null;
+        
+        db.collection('vendors').add(vendorData)
+            .then(() => {
+                console.log('Vendor created successfully');
+                document.getElementById('vendorModal').classList.remove('show');
+                loadVendors();
+                resetButtonState();
+            })
+            .catch((error) => {
+                console.error('Error creating vendor:', error);
+                alert('Error saving vendor: ' + error.message);
+                resetButtonState();
+            });
+    }
+}
+
+// Handle employee form submission
+function handleEmployeeSubmit(e) {
+    e.preventDefault();
+    
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const resetButtonState = () => {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save Employee';
+            submitBtn.classList.remove('saving');
+        }
+    };
+    
+    const employeeForm = document.getElementById('employeeForm');
+    if (!employeeForm) {
+        console.error('Employee form not found');
+        alert('Error: Employee form not found. Please refresh the page.');
+        resetButtonState();
+        return;
+    }
+    
+    const id = employeeForm.querySelector('#employeeId').value;
+    const vendorId = employeeForm.querySelector('#employeeVendorId').value;
+    const fullName = employeeForm.querySelector('#employeeFullName').value.trim();
+    const title = employeeForm.querySelector('#employeeTitle').value.trim() || null;
+    const phone = employeeForm.querySelector('#employeePhone').value.trim() || null;
+    const email = employeeForm.querySelector('#employeeEmail').value.trim() || null;
+    const emergencyContact = employeeForm.querySelector('#employeeEmergencyContact').value.trim() || null;
+    const status = employeeForm.querySelector('#employeeStatus').value;
+    const notes = employeeForm.querySelector('#employeeNotes').value.trim() || null;
+    
+    if (!fullName) {
+        alert('Employee full name is required');
+        resetButtonState();
+        employeeForm.querySelector('#employeeFullName').focus();
+        return;
+    }
+    
+    if (!vendorId) {
+        alert('Error: Vendor context is missing.');
+        resetButtonState();
+        return;
+    }
+    
+    // Update button state
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
+        submitBtn.classList.add('saving');
+    }
+    
+    const employeeData = {
+        vendorId: vendorId,
+        fullName: fullName,
+        title: title,
+        phone: phone,
+        email: email,
+        emergencyContact: emergencyContact,
+        status: status,
+        notes: notes,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    
+    if (id) {
+        // Update existing employee
+        db.collection('vendors').doc(vendorId).collection('employees').doc(id).update(employeeData)
+            .then(() => {
+                console.log('Employee updated successfully');
+                document.getElementById('employeeModal').classList.remove('show');
+                loadEmployees(vendorId);
+                resetButtonState();
+            })
+            .catch((error) => {
+                console.error('Error updating employee:', error);
+                alert('Error saving employee: ' + error.message);
+                resetButtonState();
+            });
+    } else {
+        // Create new employee
+        employeeData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+        employeeData.createdBy = currentUser ? currentUser.uid : null;
+        
+        db.collection('vendors').doc(vendorId).collection('employees').add(employeeData)
+            .then(() => {
+                console.log('Employee created successfully');
+                document.getElementById('employeeModal').classList.remove('show');
+                loadEmployees(vendorId);
+                resetButtonState();
+            })
+            .catch((error) => {
+                console.error('Error creating employee:', error);
+                alert('Error saving employee: ' + error.message);
+                resetButtonState();
+            });
+    }
+}
 
 // Unlink deleted unit from occupancy
 window.unlinkDeletedUnit = function(occupancyId, tenantId) {

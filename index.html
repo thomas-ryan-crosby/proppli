@@ -239,6 +239,10 @@
                     <span class="nav-icon">👥</span>
                     <span class="nav-label">Tenants</span>
                 </button>
+                <button class="sidebar-nav-link" data-page="vendors" title="Vendors">
+                    <span class="nav-icon">🏭</span>
+                    <span class="nav-label">Vendors</span>
+                </button>
                 <button class="sidebar-nav-link" data-page="leases" title="Leases">
                     <span class="nav-icon">📄</span>
                     <span class="nav-label">Leases</span>
@@ -1406,6 +1410,196 @@
             </div>
         </div>
     </div>
+
+        <!-- Vendors Page -->
+        <div id="vendorsPage" class="page" style="display: none;">
+            <header>
+                <h2>Vendor Management</h2>
+                <div class="header-actions">
+                    <button id="addVendorBtn" class="btn-primary">+ Add Vendor</button>
+                </div>
+            </header>
+
+            <main>
+                <div class="vendors-page-content">
+                    <div class="section">
+                        <div class="section-header-controls">
+                            <div class="filter-controls">
+                                <input type="text" id="vendorSearchInput" placeholder="Search vendors by name, phone, or email..." style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; width: 300px;">
+                                <label for="vendorStatusFilter" style="margin-left: 15px;">Filter by Status:</label>
+                                <select id="vendorStatusFilter" style="margin-left: 5px;">
+                                    <option value="">All</option>
+                                    <option value="active">Active</option>
+                                    <option value="inactive">Inactive</option>
+                                </select>
+                                <label for="vendorTypeFilter" style="margin-left: 15px;">Filter by Type:</label>
+                                <select id="vendorTypeFilter" style="margin-left: 5px;">
+                                    <option value="">All Types</option>
+                                    <option value="HVAC">HVAC</option>
+                                    <option value="Plumbing">Plumbing</option>
+                                    <option value="Electrical">Electrical</option>
+                                    <option value="Landscaping">Landscaping</option>
+                                    <option value="General Maintenance">General Maintenance</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="vendorsList" class="tenants-grid"></div>
+                    </div>
+                </div>
+            </main>
+            
+            <!-- Vendor Modal -->
+            <div id="vendorModal" class="modal">
+                <div class="modal-content" style="max-width: 700px;">
+                    <div class="modal-header">
+                        <h2 id="vendorModalTitle">Add Vendor</h2>
+                        <button class="close-btn" id="closeVendorModal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="vendorForm">
+                            <input type="hidden" id="vendorId">
+                            
+                            <div class="form-group">
+                                <label for="vendorName">Vendor Name *</label>
+                                <input type="text" id="vendorName" required placeholder="e.g., ABC Plumbing Services">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="vendorType">Vendor Type *</label>
+                                <select id="vendorType" required>
+                                    <option value="">Select vendor type...</option>
+                                    <option value="HVAC">HVAC</option>
+                                    <option value="Plumbing">Plumbing</option>
+                                    <option value="Electrical">Electrical</option>
+                                    <option value="Landscaping">Landscaping</option>
+                                    <option value="General Maintenance">General Maintenance</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="vendorStatus">Status *</label>
+                                <select id="vendorStatus" required>
+                                    <option value="active">Active</option>
+                                    <option value="inactive">Inactive</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="vendorPrimaryPhone">Primary Phone</label>
+                                <input type="tel" id="vendorPrimaryPhone" placeholder="e.g., (555) 123-4567">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="vendorPrimaryEmail">Primary Email</label>
+                                <input type="email" id="vendorPrimaryEmail" placeholder="e.g., contact@vendor.com">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="vendorWebsite">Website</label>
+                                <input type="url" id="vendorWebsite" placeholder="e.g., https://vendor.com">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="vendorAddress">Address</label>
+                                <input type="text" id="vendorAddress" placeholder="e.g., 123 Main St, City, State ZIP">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="vendorNotes">Notes</label>
+                                <textarea id="vendorNotes" rows="3" placeholder="Additional notes about the vendor..."></textarea>
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button type="submit" class="btn-primary">Save Vendor</button>
+                                <button type="button" class="btn-secondary" id="cancelVendorForm">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Vendor Detail Modal -->
+            <div id="vendorDetailModal" class="modal">
+                <div class="modal-content" style="max-width: 900px; max-height: 90vh; overflow-y: auto;">
+                    <div class="modal-header">
+                        <h2 id="vendorDetailName">Vendor Details</h2>
+                        <button class="close-btn" id="closeVendorDetailModal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="vendorDetailHeader" style="margin-bottom: 20px; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+                            <div id="vendorDetailInfo"></div>
+                        </div>
+                        
+                        <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <h4 style="margin: 0;">Employees</h4>
+                            <button id="addEmployeeBtn" class="btn-primary btn-small" style="display: none;">+ Add Employee</button>
+                        </div>
+                        <div id="employeesList" class="contacts-list"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Employee Modal -->
+            <div id="employeeModal" class="modal">
+                <div class="modal-content" style="max-width: 600px;">
+                    <div class="modal-header">
+                        <h2 id="employeeModalTitle">Add Employee</h2>
+                        <button class="close-btn" id="closeEmployeeModal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="employeeForm">
+                            <input type="hidden" id="employeeId">
+                            <input type="hidden" id="employeeVendorId">
+                            
+                            <div class="form-group">
+                                <label for="employeeFullName">Full Name *</label>
+                                <input type="text" id="employeeFullName" required placeholder="e.g., John Doe">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="employeeTitle">Title/Role</label>
+                                <input type="text" id="employeeTitle" placeholder="e.g., Lead Technician, Project Manager">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="employeePhone">Phone</label>
+                                <input type="tel" id="employeePhone" placeholder="e.g., (555) 123-4567">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="employeeEmail">Email</label>
+                                <input type="email" id="employeeEmail" placeholder="e.g., john@vendor.com">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="employeeEmergencyContact">Emergency Contact</label>
+                                <input type="text" id="employeeEmergencyContact" placeholder="e.g., Jane Doe - (555) 987-6543">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="employeeStatus">Status *</label>
+                                <select id="employeeStatus" required>
+                                    <option value="active">Active</option>
+                                    <option value="inactive">Inactive</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="employeeNotes">Notes</label>
+                                <textarea id="employeeNotes" rows="2" placeholder="Additional notes about this employee..."></textarea>
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button type="submit" class="btn-primary">Save Employee</button>
+                                <button type="button" class="btn-secondary" id="cancelEmployeeForm">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- Leases Page -->
         <div id="leasesPage" class="page" style="display: none;">
