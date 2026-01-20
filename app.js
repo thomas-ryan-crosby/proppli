@@ -2026,6 +2026,7 @@ function showPage(page) {
         loadPropertiesForTenantFilter();
     } else if (page === 'vendors') {
         loadVendors();
+        loadPropertiesForVendorFilter();
     } else if (page === 'maintenance') {
         loadTickets();
     } else if (page === 'leases') {
@@ -2694,6 +2695,13 @@ function setupEventListeners() {
     
     if (vendorTypeFilter) {
         vendorTypeFilter.addEventListener('change', () => {
+            loadVendors(); // Re-render with current filters
+        });
+    }
+    
+    const vendorPropertyFilter = document.getElementById('vendorPropertyFilter');
+    if (vendorPropertyFilter) {
+        vendorPropertyFilter.addEventListener('change', () => {
             loadVendors(); // Re-render with current filters
         });
     }
@@ -13478,6 +13486,7 @@ function renderVendorsList(vendors) {
     const searchTerm = document.getElementById('vendorSearchInput')?.value.toLowerCase() || '';
     const statusFilter = document.getElementById('vendorStatusFilter')?.value || '';
     const typeFilter = document.getElementById('vendorTypeFilter')?.value || '';
+    const propertyFilter = document.getElementById('vendorPropertyFilter')?.value || '';
     
     // Filter vendors
     let filteredVendors = Object.values(vendors).filter(vendor => {
@@ -13508,6 +13517,16 @@ function renderVendorsList(vendors) {
             }
         }
         
+        // Property filter
+        if (propertyFilter) {
+            const assignedProperties = vendor.assignedProperties || [];
+            // If vendor has no assigned properties, it's available for all properties
+            // If vendor has assigned properties, check if the selected property is in the list
+            if (assignedProperties.length > 0 && !assignedProperties.includes(propertyFilter)) {
+                return false;
+            }
+        }
+        
         return true;
     });
     
@@ -13530,6 +13549,12 @@ function renderVendorsList(vendors) {
         const statusBadge = `<span class="status-badge status-${status.toLowerCase()}">${status === 'active' ? 'Active' : 'Inactive'}</span>`;
         const typeBadge = vendor.type ? `<span class="status-badge" style="background: #667eea; color: white;">${escapeHtml(vendor.type)}</span>` : '';
         
+        // Get assigned properties names (we'll load them asynchronously)
+        const assignedProperties = vendor.assignedProperties || [];
+        const assignedPropertiesText = assignedProperties.length > 0 
+            ? `<p><strong>🏢 Assigned Properties:</strong> <span style="color: #667eea;">${assignedProperties.length} property${assignedProperties.length !== 1 ? 'ies' : ''}</span></p>`
+            : '<p><strong>🏢 Assigned Properties:</strong> <span style="color: #999;">All Properties</span></p>';
+        
         card.innerHTML = `
             <div class="tenant-card-header">
                 <h3>${escapeHtml(vendor.name || 'Unnamed Vendor')}</h3>
@@ -13543,6 +13568,7 @@ function renderVendorsList(vendors) {
                 ${vendor.primaryEmail ? `<p><strong>✉️ Email:</strong> <a href="mailto:${escapeHtml(vendor.primaryEmail)}" style="color: #667eea;">${escapeHtml(vendor.primaryEmail)}</a></p>` : ''}
                 ${vendor.website ? `<p><strong>🌐 Website:</strong> <a href="${escapeHtml(vendor.website)}" target="_blank" style="color: #667eea;">${escapeHtml(vendor.website)}</a></p>` : ''}
                 ${vendor.address ? `<p><strong>📍 Address:</strong> ${escapeHtml(vendor.address)}</p>` : ''}
+                ${assignedPropertiesText}
                 ${vendor.notes ? `<p><strong>📝 Notes:</strong> ${escapeHtml(vendor.notes.substring(0, 100))}${vendor.notes.length > 100 ? '...' : ''}</p>` : ''}
             </div>
             <div class="tenant-card-actions">
@@ -13571,6 +13597,100 @@ function canEditTenant() {
     return role === 'admin' || role === 'super_admin' || role === 'property_manager';
 }
 
+// Load properties for vendor property filter dropdown
+async function loadPropertiesForVendorFilter() {
+    const propertyFilter = document.getElementById('vendorPropertyFilter');
+    if (!propertyFilter) return;
+    
+    propertyFilter.innerHTML = '<option value="">All Properties</option>';
+    
+    try {
+        const snapshot = await db.collection('properties').orderBy('name').get();
+        snapshot.forEach((doc) => {
+            const property = doc.data();
+            const option = document.createElement('option');
+            option.value = doc.id;
+            option.textContent = property.name || 'Unnamed Property';
+            propertyFilter.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error loading properties for vendor filter:', error);
+    }
+}
+
+// Load properties for vendor form
+async function loadPropertiesForVendorForm() {
+    const container = document.getElementById('vendorAssignedPropertiesContainer');
+    if (!container) return;
+    
+    container.innerHTML = '<p style="color: #999; font-style: italic; margin: 0;">Loading properties...</p>';
+    
+    try {
+        const snapshot = await db.collection('properties').orderBy('name').get();
+        const properties = [];
+        snapshot.forEach((doc) => {
+            properties.push({ id: doc.id, ...doc.data() });
+        });
+        
+        if (properties.length === 0) {
+            container.innerHTML = '<p style="color: #999; font-style: italic; margin: 0;">No properties available.</p>';
+            return;
+        }
+        
+        container.innerHTML = '';
+        properties.forEach(property => {
+            const checkboxDiv = document.createElement('div');
+            checkboxDiv.style.marginBottom = '8px';
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.id = `vendorProperty_${property.id}`;
+            checkbox.value = property.id;
+            checkbox.style.marginRight = '8px';
+            
+            const label = document.createElement('label');
+            label.htmlFor = `vendorProperty_${property.id}`;
+            label.textContent = property.name || 'Unnamed Property';
+            label.style.cursor = 'pointer';
+            
+            checkboxDiv.appendChild(checkbox);
+            checkboxDiv.appendChild(label);
+            container.appendChild(checkboxDiv);
+        });
+    } catch (error) {
+        console.error('Error loading properties for vendor form:', error);
+        container.innerHTML = '<p style="color: #e74c3c; margin: 0;">Error loading properties. Please try again.</p>';
+    }
+}
+
+// Get selected properties from vendor form
+function getSelectedVendorProperties() {
+    const container = document.getElementById('vendorAssignedPropertiesContainer');
+    if (!container) return [];
+    
+    const checkboxes = container.querySelectorAll('input[type="checkbox"]:checked');
+    return Array.from(checkboxes).map(cb => cb.value);
+}
+
+// Set selected properties in vendor form
+function setSelectedVendorProperties(propertyIds) {
+    const container = document.getElementById('vendorAssignedPropertiesContainer');
+    if (!container) return;
+    
+    if (!Array.isArray(propertyIds) || propertyIds.length === 0) {
+        // Uncheck all
+        const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+        checkboxes.forEach(cb => cb.checked = false);
+        return;
+    }
+    
+    propertyIds.forEach(propertyId => {
+        const checkbox = document.getElementById(`vendorProperty_${propertyId}`);
+        if (checkbox) {
+            checkbox.checked = true;
+        }
+    });
+}
+
 // Vendor CRUD functions
 window.addVendor = function() {
     editingVendorId = null;
@@ -13580,6 +13700,8 @@ window.addVendor = function() {
     }
     document.getElementById('vendorId').value = '';
     document.getElementById('vendorModalTitle').textContent = 'Add Vendor';
+    loadPropertiesForVendorForm();
+    setSelectedVendorProperties([]);
     document.getElementById('vendorModal').classList.add('show');
 };
 
@@ -13607,6 +13729,12 @@ window.editVendor = function(vendorId) {
         document.getElementById('vendorWebsite').value = vendor.website || '';
         document.getElementById('vendorAddress').value = vendor.address || '';
         document.getElementById('vendorNotes').value = vendor.notes || '';
+        
+        // Load properties and set selected ones
+        loadPropertiesForVendorForm().then(() => {
+            const assignedProperties = vendor.assignedProperties || [];
+            setSelectedVendorProperties(assignedProperties);
+        });
         
         document.getElementById('vendorModal').classList.add('show');
     }).catch((error) => {
@@ -13665,9 +13793,12 @@ window.viewVendorDetail = function(vendorId) {
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                             ${vendor.primaryPhone ? `<div><strong>Phone:</strong> ${escapeHtml(vendor.primaryPhone)}</div>` : ''}
                             ${vendor.primaryEmail ? `<div><strong>Email:</strong> <a href="mailto:${escapeHtml(vendor.primaryEmail)}">${escapeHtml(vendor.primaryEmail)}</a></div>` : ''}
-                            ${vendor.website ? `<div><strong>Website:</strong> <a href="${escapeHtml(vendor.website)}" target="_blank">${escapeHtml(vendor.website)}</a></div>` : ''}
-                            ${vendor.address ? `<div style="grid-column: 1 / -1;"><strong>Address:</strong> ${escapeHtml(vendor.address)}</div>` : ''}
-                            ${vendor.notes ? `<div style="grid-column: 1 / -1;"><strong>Notes:</strong> ${escapeHtml(vendor.notes)}</div>` : ''}
+                        ${vendor.website ? `<div><strong>Website:</strong> <a href="${escapeHtml(vendor.website)}" target="_blank">${escapeHtml(vendor.website)}</a></div>` : ''}
+                        ${vendor.address ? `<div style="grid-column: 1 / -1;"><strong>Address:</strong> ${escapeHtml(vendor.address)}</div>` : ''}
+                        ${vendor.assignedProperties && vendor.assignedProperties.length > 0 ? 
+                            `<div style="grid-column: 1 / -1;"><strong>Assigned Properties:</strong> <span style="color: #667eea;">${vendor.assignedProperties.length} property${vendor.assignedProperties.length !== 1 ? 'ies' : ''}</span></div>` : 
+                            '<div style="grid-column: 1 / -1;"><strong>Assigned Properties:</strong> <span style="color: #999;">All Properties</span></div>'}
+                        ${vendor.notes ? `<div style="grid-column: 1 / -1;"><strong>Notes:</strong> ${escapeHtml(vendor.notes)}</div>` : ''}
                         </div>
                     `;
                 }
@@ -13873,6 +14004,7 @@ function handleVendorSubmit(e) {
     const website = vendorForm.querySelector('#vendorWebsite').value.trim() || null;
     const address = vendorForm.querySelector('#vendorAddress').value.trim() || null;
     const notes = vendorForm.querySelector('#vendorNotes').value.trim() || null;
+    const assignedProperties = getSelectedVendorProperties();
     
     if (!name) {
         alert('Vendor name is required');
@@ -13903,11 +14035,13 @@ function handleVendorSubmit(e) {
         website: website,
         address: address,
         notes: notes,
+        assignedProperties: assignedProperties.length > 0 ? assignedProperties : [],
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
     
     if (id) {
         // Update existing vendor
+        // Don't update createdAt on update
         db.collection('vendors').doc(id).update(vendorData)
             .then(() => {
                 console.log('Vendor updated successfully');
@@ -13924,6 +14058,10 @@ function handleVendorSubmit(e) {
         // Create new vendor
         vendorData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
         vendorData.createdBy = currentUser ? currentUser.uid : null;
+        // Ensure assignedProperties is always an array
+        if (!vendorData.assignedProperties) {
+            vendorData.assignedProperties = [];
+        }
         
         db.collection('vendors').add(vendorData)
             .then(() => {
