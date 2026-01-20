@@ -1190,6 +1190,7 @@
                             <button class="tab-btn active" data-tab="contacts">Contacts</button>
                             <button class="tab-btn" data-tab="occupancies">Occupancies</button>
                             <button class="tab-btn" data-tab="documents">Documents</button>
+                            <button class="tab-btn" data-tab="cois">Certificates of Insurance</button>
                         </div>
                         <div id="contactsTab" class="tab-content active">
                             <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
@@ -1213,6 +1214,72 @@
                             <div id="documentsList" class="documents-list"></div>
                             <input type="file" id="tenantDocumentInput" style="display: none;" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.jpg,.jpeg,.png">
                         </div>
+                        <div id="coisTab" class="tab-content" style="display: none;">
+                            <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <h4 style="margin: 0;">Certificates of Insurance</h4>
+                                <button id="uploadTenantCOIBtn" class="btn-primary btn-small" style="display: none;">+ Upload COI</button>
+                            </div>
+                            <div id="tenantCOIsList" class="documents-list"></div>
+                            <input type="file" id="tenantCOIInput" style="display: none;" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tenant COI Upload Modal -->
+            <div id="tenantCOIUploadModal" class="modal">
+                <div class="modal-content" style="max-width: 600px;">
+                    <div class="modal-header">
+                        <h2>Upload Certificate of Insurance</h2>
+                        <button class="close-btn" id="closeTenantCOIUploadModal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="tenantCOIUploadForm">
+                            <input type="hidden" id="tenantCOITenantId">
+                            
+                            <div class="form-group">
+                                <label>Certificate of Insurance File *</label>
+                                <div id="tenantCOIFileDropZone" style="border: 2px dashed #ccc; border-radius: 8px; padding: 30px; text-align: center; background-color: #f9f9f9; cursor: pointer; transition: all 0.3s ease; margin-top: 10px;">
+                                    <div id="tenantCOIFileDropZoneContent">
+                                        <p style="margin: 0 0 10px 0; color: #666; font-size: 14px;">
+                                            <strong>Drag and drop a file here</strong>
+                                        </p>
+                                        <p style="margin: 0; color: #999; font-size: 12px;">or</p>
+                                        <label for="tenantCOIFile" style="display: inline-block; margin-top: 10px; padding: 8px 16px; background-color: #667eea; color: white; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                                            Browse Files
+                                        </label>
+                                        <input type="file" id="tenantCOIFile" required accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" style="display: none;">
+                                    </div>
+                                    <div id="tenantCOIFileName" style="display: none; margin-top: 10px; padding: 8px; background-color: #e8f4f8; border-radius: 4px;">
+                                        <span id="tenantCOIFileNameText" style="color: #667eea; font-weight: 500;"></span>
+                                        <button type="button" id="tenantCOIFileRemoveBtn" style="margin-left: 10px; padding: 4px 8px; background-color: #dc2626; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Remove</button>
+                                    </div>
+                                </div>
+                                <small style="color: #666; font-size: 12px; display: block; margin-top: 8px;">Upload PDF, Word document, or image file</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="tenantCOIStartDate">Insurance Start Date *</label>
+                                <input type="date" id="tenantCOIStartDate" required>
+                                <small style="color: #666; font-size: 12px;">Date when the insurance certificate becomes effective</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="tenantCOIEndDate">Insurance End Date *</label>
+                                <input type="date" id="tenantCOIEndDate" required>
+                                <small style="color: #666; font-size: 12px;">Date when the insurance certificate expires</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="tenantCOIDescription">Description/Notes</label>
+                                <textarea id="tenantCOIDescription" rows="3" placeholder="Optional: Add notes about this certificate (e.g., policy number, coverage type)"></textarea>
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button type="submit" class="btn-primary">Upload COI</button>
+                                <button type="button" class="btn-secondary" id="cancelTenantCOIUploadForm">Cancel</button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>

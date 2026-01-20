@@ -2568,6 +2568,11 @@ function setupEventListeners() {
                 loadTenantDocuments(currentTenantIdForDetail);
             }
             
+            // Load COIs if COIs tab is clicked
+            if (tabName === 'cois' && currentTenantIdForDetail) {
+                loadTenantCOIs(currentTenantIdForDetail);
+            }
+            
             updateFABsVisibility();
         });
     });
@@ -2583,6 +2588,54 @@ function setupEventListeners() {
             }
         });
     }
+    
+    // Tenant COI upload
+    const uploadTenantCOIBtn = document.getElementById('uploadTenantCOIBtn');
+    const tenantCOIUploadForm = document.getElementById('tenantCOIUploadForm');
+    const closeTenantCOIUploadModalBtn = document.getElementById('closeTenantCOIUploadModal');
+    const cancelTenantCOIUploadFormBtn = document.getElementById('cancelTenantCOIUploadForm');
+    
+    if (uploadTenantCOIBtn) {
+        uploadTenantCOIBtn.addEventListener('click', () => {
+            let tenantId = currentTenantIdForDetail;
+            if (!tenantId) {
+                const tenantDetailModal = document.getElementById('tenantDetailModal');
+                if (tenantDetailModal) {
+                    tenantId = tenantDetailModal.getAttribute('data-tenant-id');
+                }
+            }
+            
+            if (!tenantId) {
+                alert('Error: Tenant context is missing.');
+                return;
+            }
+            
+            const tenantCOIUploadModal = document.getElementById('tenantCOIUploadModal');
+            if (tenantCOIUploadModal) {
+                document.getElementById('tenantCOITenantId').value = tenantId;
+                tenantCOIUploadModal.classList.add('show');
+            }
+        });
+    }
+    
+    if (closeTenantCOIUploadModalBtn) {
+        closeTenantCOIUploadModalBtn.addEventListener('click', () => {
+            document.getElementById('tenantCOIUploadModal').classList.remove('show');
+        });
+    }
+    
+    if (cancelTenantCOIUploadFormBtn) {
+        cancelTenantCOIUploadFormBtn.addEventListener('click', () => {
+            document.getElementById('tenantCOIUploadModal').classList.remove('show');
+        });
+    }
+    
+    if (tenantCOIUploadForm) {
+        tenantCOIUploadForm.addEventListener('submit', handleTenantCOIUploadSubmit);
+    }
+    
+    // Setup tenant COI drag-and-drop
+    setupTenantCOIDragDrop();
     
     // Vendor management
     const addVendorBtn = document.getElementById('addVendorBtn');
@@ -12326,6 +12379,12 @@ window.viewTenantDetail = function(tenantId) {
             if (tenant) {
                 const nameElement = document.getElementById('tenantDetailName');
                 if (nameElement) nameElement.textContent = tenant.tenantName || 'Unnamed Tenant';
+                
+                // Show/hide upload COI button based on permissions
+                const uploadTenantCOIBtn = document.getElementById('uploadTenantCOIBtn');
+                if (uploadTenantCOIBtn) {
+                    uploadTenantCOIBtn.style.display = canEditTenant() ? 'block' : 'none';
+                }
             }
         });
         loadContacts(tenantId);
@@ -13505,6 +13564,13 @@ function canEditVendor() {
     return role === 'admin' || role === 'super_admin' || role === 'property_manager';
 }
 
+// Check if user can edit tenants
+function canEditTenant() {
+    if (!currentUserProfile) return false;
+    const role = currentUserProfile.role;
+    return role === 'admin' || role === 'super_admin' || role === 'property_manager';
+}
+
 // Vendor CRUD functions
 window.addVendor = function() {
     editingVendorId = null;
@@ -14376,6 +14442,416 @@ function handleCOIUploadSubmit(e) {
         })
         .catch((error) => {
             console.error('Error uploading COI:', error);
+            alert('Error uploading certificate: ' + error.message);
+            resetButtonState();
+        });
+}
+
+// ============================================
+// TENANT COI (CERTIFICATE OF INSURANCE) MANAGEMENT
+// ============================================
+
+// Load tenant COIs
+function loadTenantCOIs(tenantId) {
+    const coisList = document.getElementById('tenantCOIsList');
+    if (!coisList) return;
+    
+    coisList.innerHTML = '<p style="color: #999; font-style: italic;">Loading certificates...</p>';
+    
+    db.collection('tenants').doc(tenantId).get().then((doc) => {
+        const tenant = doc.data();
+        if (!tenant) {
+            coisList.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">No certificates found.</p>';
+            return;
+        }
+        
+        const cois = tenant.cois || [];
+        coisList.innerHTML = '';
+        
+        if (cois.length === 0) {
+            coisList.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">No certificates uploaded yet. Click "Upload COI" to add one.</p>';
+            return;
+        }
+        
+        // Sort COIs by end date (newest expiration first)
+        const sortedCOIs = [...cois].sort((a, b) => {
+            const dateA = toStandardDate(a.endDate) || new Date(0);
+            const dateB = toStandardDate(b.endDate) || new Date(0);
+            return dateB - dateA;
+        });
+        
+        sortedCOIs.forEach((coi, index) => {
+            const coiCard = document.createElement('div');
+            coiCard.className = 'contact-card';
+            coiCard.style.marginBottom = '15px';
+            
+            const startDate = formatDateForDisplay(coi.startDate, 'N/A');
+            const endDate = formatDateForDisplay(coi.endDate, 'N/A');
+            const uploadedDate = formatDateForDisplay(coi.uploadedAt, 'N/A');
+            
+            // Check if COI is expired or expiring soon
+            const endDateObj = toStandardDate(coi.endDate);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const daysUntilExpiration = endDateObj ? Math.ceil((endDateObj - today) / (1000 * 60 * 60 * 24)) : null;
+            
+            let statusBadge = '';
+            let statusClass = '';
+            if (daysUntilExpiration !== null) {
+                if (daysUntilExpiration < 0) {
+                    statusBadge = '<span class="status-badge status-expired">Expired</span>';
+                    statusClass = 'status-expired';
+                } else if (daysUntilExpiration <= 30) {
+                    statusBadge = '<span class="status-badge status-warning">Expiring Soon</span>';
+                    statusClass = 'status-warning';
+                } else {
+                    statusBadge = '<span class="status-badge status-active">Active</span>';
+                    statusClass = 'status-active';
+                }
+            }
+            
+            const fileSize = coi.fileSize ? `(${(coi.fileSize / 1024).toFixed(1)} KB)` : '';
+            const isImage = coi.isImage || false;
+            
+            coiCard.innerHTML = `
+                <div class="contact-card-header">
+                    <div>
+                        <h4 style="margin: 0 0 5px 0;">${escapeHtml(coi.fileName || 'Certificate')}</h4>
+                        <p style="margin: 0; color: #666; font-size: 0.9em;">Uploaded: ${uploadedDate}</p>
+                    </div>
+                    ${statusBadge}
+                </div>
+                <div class="contact-card-body">
+                    <p><strong>📅 Valid From:</strong> ${startDate}</p>
+                    <p><strong>📅 Valid Until:</strong> ${endDate}</p>
+                    ${daysUntilExpiration !== null && daysUntilExpiration < 0 ? 
+                        `<p style="color: #e74c3c; font-weight: 600;">⚠️ Expired ${Math.abs(daysUntilExpiration)} day${Math.abs(daysUntilExpiration) !== 1 ? 's' : ''} ago</p>` : 
+                        daysUntilExpiration !== null && daysUntilExpiration <= 30 ? 
+                        `<p style="color: #f39c12; font-weight: 600;">⚠️ Expires in ${daysUntilExpiration} day${daysUntilExpiration !== 1 ? 's' : ''}</p>` : 
+                        ''}
+                    ${coi.description ? `<p><strong>📝 Notes:</strong> ${escapeHtml(coi.description)}</p>` : ''}
+                    <p><strong>📎 File:</strong> ${fileSize}</p>
+                </div>
+                <div class="contact-card-actions">
+                    <a href="${escapeHtml(coi.fileUrl)}" target="_blank" class="btn-primary btn-small" style="text-decoration: none; display: inline-block;">View Certificate</a>
+                    ${canEditTenant() ? `
+                        <button class="btn-danger btn-small" onclick="deleteTenantCOI('${tenantId}', ${index})">Delete</button>
+                    ` : ''}
+                </div>
+            `;
+            coisList.appendChild(coiCard);
+        });
+    }, (error) => {
+        console.error('Error loading tenant COIs:', error);
+        coisList.innerHTML = '<p style="color: #e74c3c; text-align: center; padding: 20px;">Error loading certificates. Please try again.</p>';
+    });
+}
+
+// Upload tenant COI
+async function uploadTenantCOI(tenantId, file, startDate, endDate, description) {
+    try {
+        const storageRef = firebase.storage().ref();
+        const fileRef = storageRef.child(`tenants/${tenantId}/cois/${Date.now()}_${file.name}`);
+        
+        // Upload file
+        const uploadTask = fileRef.put(file);
+        
+        await new Promise((resolve, reject) => {
+            uploadTask.on('state_changed',
+                (snapshot) => {
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    console.log(`Tenant COI upload progress: ${progress}%`);
+                },
+                (error) => {
+                    console.error('Tenant COI upload error:', error);
+                    reject(error);
+                },
+                () => {
+                    resolve();
+                }
+            );
+        });
+        
+        // Get download URL
+        const fileUrl = await fileRef.getDownloadURL();
+        
+        // Get tenant document
+        const tenantDoc = await db.collection('tenants').doc(tenantId).get();
+        const tenant = tenantDoc.data();
+        const cois = tenant.cois || [];
+        
+        // Convert dates to Firestore timestamps
+        const startDateObj = parseDateInputValue(startDate);
+        const endDateObj = parseDateInputValue(endDate);
+        
+        if (!startDateObj || !endDateObj) {
+            throw new Error('Invalid date format');
+        }
+        
+        // Validate that end date is after start date
+        if (endDateObj < startDateObj) {
+            throw new Error('End date must be after start date');
+        }
+        
+        // Add new COI to array
+        cois.push({
+            fileName: file.name,
+            fileUrl: fileUrl,
+            fileSize: file.size,
+            isImage: file.type.startsWith('image/'),
+            startDate: firebase.firestore.Timestamp.fromDate(startDateObj),
+            endDate: firebase.firestore.Timestamp.fromDate(endDateObj),
+            description: description || null,
+            uploadedAt: firebase.firestore.Timestamp.now(),
+            uploadedBy: currentUser ? currentUser.uid : null
+        });
+        
+        // Update tenant document
+        await db.collection('tenants').doc(tenantId).update({
+            cois: cois,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        console.log('Tenant COI uploaded successfully');
+        return true;
+    } catch (error) {
+        console.error('Error uploading tenant COI:', error);
+        throw error;
+    }
+}
+
+// Delete tenant COI
+window.deleteTenantCOI = async function(tenantId, coiIndex) {
+    if (!confirm('Are you sure you want to delete this certificate of insurance?')) {
+        return;
+    }
+    
+    try {
+        const tenantDoc = await db.collection('tenants').doc(tenantId).get();
+        const tenant = tenantDoc.data();
+        const cois = tenant.cois || [];
+        
+        if (coiIndex < 0 || coiIndex >= cois.length) {
+            alert('Invalid certificate index');
+            return;
+        }
+        
+        const coi = cois[coiIndex];
+        
+        // Delete file from storage
+        try {
+            const storageRef = firebase.storage().refFromURL(coi.fileUrl);
+            await storageRef.delete();
+        } catch (storageError) {
+            console.warn('Error deleting file from storage:', storageError);
+            // Continue with removing from Firestore even if storage delete fails
+        }
+        
+        // Remove COI from array
+        cois.splice(coiIndex, 1);
+        
+        // Update tenant document
+        await db.collection('tenants').doc(tenantId).update({
+            cois: cois,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        // Reload COIs
+        loadTenantCOIs(tenantId);
+    } catch (error) {
+        console.error('Error deleting tenant COI:', error);
+        alert('Error deleting certificate: ' + error.message);
+    }
+};
+
+// Setup drag-and-drop for tenant COI file upload
+function setupTenantCOIDragDrop() {
+    const dropZone = document.getElementById('tenantCOIFileDropZone');
+    const fileInput = document.getElementById('tenantCOIFile');
+    const dropZoneContent = document.getElementById('tenantCOIFileDropZoneContent');
+    const fileNameDiv = document.getElementById('tenantCOIFileName');
+    const fileNameText = document.getElementById('tenantCOIFileNameText');
+    const removeBtn = document.getElementById('tenantCOIFileRemoveBtn');
+    
+    if (!dropZone || !fileInput) return;
+    
+    // Handle file selection from input
+    fileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            handleTenantCOIFileSelect(file);
+        }
+    });
+    
+    // Prevent default drag behaviors
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, preventDefaults, false);
+        document.body.addEventListener(eventName, preventDefaults, false);
+    });
+    
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    
+    // Highlight drop zone when item is dragged over it
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+            dropZone.style.borderColor = '#667eea';
+            dropZone.style.backgroundColor = '#f0f4ff';
+        }, false);
+    });
+    
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+            dropZone.style.borderColor = '#ccc';
+            dropZone.style.backgroundColor = '#f9f9f9';
+        }, false);
+    });
+    
+    // Handle dropped files
+    dropZone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        
+        if (files.length > 0) {
+            const file = files[0];
+            // Validate file type
+            const validTypes = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png'];
+            const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+            
+            if (validTypes.includes(fileExtension)) {
+                handleTenantCOIFileSelect(file);
+                // Update the file input
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(file);
+                fileInput.files = dataTransfer.files;
+            } else {
+                alert('Please upload a PDF, Word document, or image file (PDF, DOC, DOCX, JPG, JPEG, PNG).');
+            }
+        }
+    }, false);
+    
+    // Handle remove button
+    if (removeBtn) {
+        removeBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            fileInput.value = '';
+            if (dropZoneContent) dropZoneContent.style.display = 'block';
+            if (fileNameDiv) fileNameDiv.style.display = 'none';
+        });
+    }
+    
+    // Click on drop zone to trigger file input
+    dropZone.addEventListener('click', function(e) {
+        if (e.target !== removeBtn && e.target !== fileInput) {
+            fileInput.click();
+        }
+    });
+}
+
+// Handle tenant COI file selection
+function handleTenantCOIFileSelect(file) {
+    const dropZoneContent = document.getElementById('tenantCOIFileDropZoneContent');
+    const fileNameDiv = document.getElementById('tenantCOIFileName');
+    const fileNameText = document.getElementById('tenantCOIFileNameText');
+    
+    if (dropZoneContent) dropZoneContent.style.display = 'none';
+    if (fileNameDiv) fileNameDiv.style.display = 'block';
+    if (fileNameText) {
+        fileNameText.textContent = file.name;
+    }
+}
+
+// Handle tenant COI upload form submission
+function handleTenantCOIUploadSubmit(e) {
+    e.preventDefault();
+    
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const resetButtonState = () => {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Upload COI';
+            submitBtn.classList.remove('saving');
+        }
+    };
+    
+    const coiForm = document.getElementById('tenantCOIUploadForm');
+    if (!coiForm) {
+        console.error('Tenant COI upload form not found');
+        alert('Error: Tenant COI upload form not found. Please refresh the page.');
+        resetButtonState();
+        return;
+    }
+    
+    const tenantId = coiForm.querySelector('#tenantCOITenantId').value;
+    const fileInput = coiForm.querySelector('#tenantCOIFile');
+    const startDate = coiForm.querySelector('#tenantCOIStartDate').value;
+    const endDate = coiForm.querySelector('#tenantCOIEndDate').value;
+    const description = coiForm.querySelector('#tenantCOIDescription').value.trim() || null;
+    
+    if (!tenantId) {
+        alert('Error: Tenant context is missing.');
+        resetButtonState();
+        return;
+    }
+    
+    if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+        alert('Please select a file to upload.');
+        resetButtonState();
+        fileInput?.focus();
+        return;
+    }
+    
+    if (!startDate || !endDate) {
+        alert('Please provide both start and end dates.');
+        resetButtonState();
+        return;
+    }
+    
+    // Validate dates
+    const startDateObj = parseDateInputValue(startDate);
+    const endDateObj = parseDateInputValue(endDate);
+    
+    if (!startDateObj || !endDateObj) {
+        alert('Invalid date format. Please use valid dates.');
+        resetButtonState();
+        return;
+    }
+    
+    if (endDateObj < startDateObj) {
+        alert('End date must be after start date.');
+        resetButtonState();
+        return;
+    }
+    
+    // Update button state
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Uploading...';
+        submitBtn.classList.add('saving');
+    }
+    
+    const file = fileInput.files[0];
+    
+    uploadTenantCOI(tenantId, file, startDate, endDate, description)
+        .then(() => {
+            console.log('Tenant COI uploaded successfully');
+            document.getElementById('tenantCOIUploadModal').classList.remove('show');
+            coiForm.reset();
+            // Reset drag-and-drop UI
+            const dropZoneContent = document.getElementById('tenantCOIFileDropZoneContent');
+            const fileNameDiv = document.getElementById('tenantCOIFileName');
+            if (dropZoneContent) dropZoneContent.style.display = 'block';
+            if (fileNameDiv) fileNameDiv.style.display = 'none';
+            
+            loadTenantCOIs(tenantId);
+            resetButtonState();
+            alert('Certificate of Insurance uploaded successfully!');
+        })
+        .catch((error) => {
+            console.error('Error uploading tenant COI:', error);
             alert('Error uploading certificate: ' + error.message);
             resetButtonState();
         });
