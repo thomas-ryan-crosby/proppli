@@ -2358,7 +2358,7 @@
                     <!-- Finance Sub-tabs -->
                     <div class="finance-tabs" style="margin-bottom: 20px; border-bottom: 2px solid #e2e8f0;">
                         <button class="tab-btn active" data-finance-tab="rentRoll">Rent Roll</button>
-                        <!-- Future tabs can be added here -->
+                        <button class="tab-btn" data-finance-tab="invoiceApproval">Invoice Approval</button>
                     </div>
 
                     <!-- Rent Roll Tab -->
@@ -2424,8 +2424,125 @@
                             <div id="rentRollTable" class="rent-roll-container" style="overflow-x: auto;"></div>
                         </div>
                     </div>
+
+                    <!-- Invoice Approval Tab -->
+                    <div id="invoiceApprovalTab" class="tab-content" style="display: none;">
+                        <div class="section">
+                            <div class="section-header-controls" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                                <div class="filter-controls" style="display: flex; gap: 15px; flex-wrap: wrap; align-items: center;">
+                                    <div>
+                                        <label for="invoiceStatusFilter">Status:</label>
+                                        <select id="invoiceStatusFilter" style="margin-left: 5px;">
+                                            <option value="">All Statuses</option>
+                                            <option value="pending">Pending</option>
+                                            <option value="approved">Approved</option>
+                                            <option value="processed">Processed</option>
+                                            <option value="rejected">Rejected</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label for="invoicePropertyFilter">Property:</label>
+                                        <select id="invoicePropertyFilter" style="margin-left: 5px;">
+                                            <option value="">All Properties</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label for="invoiceVendorFilter">Vendor:</label>
+                                        <select id="invoiceVendorFilter" style="margin-left: 5px;">
+                                            <option value="">All Vendors</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label for="invoiceDateFrom">From:</label>
+                                        <input type="date" id="invoiceDateFrom" style="margin-left: 5px;">
+                                    </div>
+                                    <div>
+                                        <label for="invoiceDateTo">To:</label>
+                                        <input type="date" id="invoiceDateTo" style="margin-left: 5px;">
+                                    </div>
+                                </div>
+                                <button id="addInvoiceBtn" class="btn-primary" style="display: none;">+ Add Invoice</button>
+                            </div>
+                            <div id="invoicesList" class="invoices-list"></div>
+                        </div>
+                    </div>
                 </div>
             </main>
+        </div>
+
+        <!-- Invoice Upload/Add Modal -->
+        <div id="invoiceModal" class="modal">
+            <div class="modal-content" style="max-width: 700px;">
+                <div class="modal-header">
+                    <h2 id="invoiceModalTitle">Add Invoice</h2>
+                    <button class="close-btn" id="closeInvoiceModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="invoiceForm">
+                        <input type="hidden" id="invoiceId">
+                        
+                        <div class="form-group">
+                            <label for="invoiceVendor">Vendor *</label>
+                            <select id="invoiceVendor" required>
+                                <option value="">Select vendor...</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="invoiceProperty">Property *</label>
+                            <select id="invoiceProperty" required>
+                                <option value="">Select property...</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="invoiceNumber">Invoice Number *</label>
+                            <input type="text" id="invoiceNumber" required placeholder="e.g., INV-2024-001">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="invoiceDate">Invoice Date *</label>
+                            <input type="date" id="invoiceDate" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="invoiceAmount">Amount *</label>
+                            <input type="number" id="invoiceAmount" required step="0.01" min="0" placeholder="0.00">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="invoiceDescription">Description</label>
+                            <textarea id="invoiceDescription" rows="3" placeholder="Description of services or items..."></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Invoice File *</label>
+                            <div id="invoiceFileDropZone" style="border: 2px dashed #ccc; border-radius: 8px; padding: 30px; text-align: center; background-color: #f9f9f9; cursor: pointer; transition: all 0.3s ease; margin-top: 10px;">
+                                <div id="invoiceFileDropZoneContent">
+                                    <p style="margin: 0 0 10px 0; color: #666; font-size: 14px;">
+                                        <strong>Drag and drop a file here</strong>
+                                    </p>
+                                    <p style="margin: 0; color: #999; font-size: 12px;">or</p>
+                                    <label for="invoiceFile" style="display: inline-block; margin-top: 10px; padding: 8px 16px; background-color: #667eea; color: white; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                                        Browse Files
+                                    </label>
+                                    <input type="file" id="invoiceFile" required accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" style="display: none;">
+                                </div>
+                                <div id="invoiceFileName" style="display: none; margin-top: 10px; padding: 8px; background-color: #e8f4f8; border-radius: 4px;">
+                                    <span id="invoiceFileNameText" style="color: #667eea; font-weight: 500;"></span>
+                                    <button type="button" id="invoiceFileRemoveBtn" style="margin-left: 10px; padding: 4px 8px; background-color: #dc2626; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Remove</button>
+                                </div>
+                            </div>
+                            <small style="color: #666; font-size: 12px; display: block; margin-top: 8px;">Upload PDF, Word document, or image file</small>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="submit" class="btn-primary">Save Invoice</button>
+                            <button type="button" class="btn-secondary" id="cancelInvoiceForm">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
 
         <!-- Users Management Page -->

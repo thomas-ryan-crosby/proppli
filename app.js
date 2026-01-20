@@ -2638,6 +2638,77 @@ function setupEventListeners() {
     // Setup tenant COI drag-and-drop
     setupTenantCOIDragDrop();
     
+    // Invoice management
+    const addInvoiceBtn = document.getElementById('addInvoiceBtn');
+    const invoiceForm = document.getElementById('invoiceForm');
+    const closeInvoiceModalBtn = document.getElementById('closeInvoiceModal');
+    const cancelInvoiceFormBtn = document.getElementById('cancelInvoiceForm');
+    const invoiceStatusFilter = document.getElementById('invoiceStatusFilter');
+    const invoicePropertyFilter = document.getElementById('invoicePropertyFilter');
+    const invoiceVendorFilter = document.getElementById('invoiceVendorFilter');
+    const invoiceDateFrom = document.getElementById('invoiceDateFrom');
+    const invoiceDateTo = document.getElementById('invoiceDateTo');
+    
+    if (addInvoiceBtn) {
+        addInvoiceBtn.addEventListener('click', () => {
+            if (!canManageInvoices()) {
+                alert('You do not have permission to add invoices.');
+                return;
+            }
+            window.addInvoice();
+        });
+    }
+    
+    if (invoiceForm) {
+        invoiceForm.addEventListener('submit', handleInvoiceSubmit);
+    }
+    
+    if (closeInvoiceModalBtn) {
+        closeInvoiceModalBtn.addEventListener('click', () => {
+            document.getElementById('invoiceModal').classList.remove('show');
+        });
+    }
+    
+    if (cancelInvoiceFormBtn) {
+        cancelInvoiceFormBtn.addEventListener('click', () => {
+            document.getElementById('invoiceModal').classList.remove('show');
+        });
+    }
+    
+    // Invoice filters
+    if (invoiceStatusFilter) {
+        invoiceStatusFilter.addEventListener('change', () => {
+            loadInvoices();
+        });
+    }
+    
+    if (invoicePropertyFilter) {
+        invoicePropertyFilter.addEventListener('change', () => {
+            loadInvoices();
+        });
+    }
+    
+    if (invoiceVendorFilter) {
+        invoiceVendorFilter.addEventListener('change', () => {
+            loadInvoices();
+        });
+    }
+    
+    if (invoiceDateFrom) {
+        invoiceDateFrom.addEventListener('change', () => {
+            loadInvoices();
+        });
+    }
+    
+    if (invoiceDateTo) {
+        invoiceDateTo.addEventListener('change', () => {
+            loadInvoices();
+        });
+    }
+    
+    // Setup invoice file drag-and-drop
+    setupInvoiceFileDragDrop();
+    
     // Vendor management
     const addVendorBtn = document.getElementById('addVendorBtn');
     const vendorForm = document.getElementById('vendorForm');
@@ -18531,6 +18602,700 @@ async function loadFinance() {
     
     // Setup year navigation widget
     setupYearNavigationWidget();
+    
+    // Load invoice approval data if on invoice approval tab
+    const invoiceApprovalTab = document.getElementById('invoiceApprovalTab');
+    if (invoiceApprovalTab && invoiceApprovalTab.style.display !== 'none') {
+        loadInvoices();
+    }
+}
+
+// ============================================
+// INVOICE APPROVAL MANAGEMENT
+// ============================================
+
+// Check if user can manage invoices
+function canManageInvoices() {
+    if (!currentUserProfile) return false;
+    const role = currentUserProfile.role;
+    return role === 'admin' || role === 'super_admin' || role === 'property_manager';
+}
+
+// Load invoices
+async function loadInvoices() {
+    const invoicesList = document.getElementById('invoicesList');
+    if (!invoicesList) return;
+    
+    invoicesList.innerHTML = '<p style="color: #999; font-style: italic; text-align: center; padding: 20px;">Loading invoices...</p>';
+    
+    try {
+        // Get filter values
+        const statusFilter = document.getElementById('invoiceStatusFilter')?.value || '';
+        const propertyFilter = document.getElementById('invoicePropertyFilter')?.value || '';
+        const vendorFilter = document.getElementById('invoiceVendorFilter')?.value || '';
+        const dateFrom = document.getElementById('invoiceDateFrom')?.value || '';
+        const dateTo = document.getElementById('invoiceDateTo')?.value || '';
+        
+        // Build query
+        let query = db.collection('invoices').orderBy('invoiceDate', 'desc');
+        
+        // Apply status filter
+        if (statusFilter) {
+            query = query.where('status', '==', statusFilter);
+        }
+        
+        // Apply property filter
+        if (propertyFilter) {
+            query = query.where('propertyId', '==', propertyFilter);
+        }
+        
+        // Apply vendor filter
+        if (vendorFilter) {
+            query = query.where('vendorId', '==', vendorFilter);
+        }
+        
+        const snapshot = await query.get();
+        
+        // Load properties and vendors for display
+        const propertiesSnapshot = await db.collection('properties').get();
+        const properties = {};
+        propertiesSnapshot.forEach((doc) => {
+            properties[doc.id] = doc.data();
+        });
+        
+        const vendorsSnapshot = await db.collection('vendors').get();
+        const vendors = {};
+        vendorsSnapshot.forEach((doc) => {
+            vendors[doc.id] = doc.data();
+        });
+        
+        // Filter by date range in memory (Firestore doesn't support multiple range queries easily)
+        let invoices = [];
+        snapshot.forEach((doc) => {
+            const invoice = { id: doc.id, ...doc.data() };
+            
+            // Apply date filters
+            if (dateFrom || dateTo) {
+                const invoiceDate = invoice.invoiceDate?.toDate ? invoice.invoiceDate.toDate() : null;
+                if (invoiceDate) {
+                    const invoiceDateStr = formatDateForInput(invoiceDate);
+                    if (dateFrom && invoiceDateStr < dateFrom) return;
+                    if (dateTo && invoiceDateStr > dateTo) return;
+                }
+            }
+            
+            invoices.push(invoice);
+        });
+        
+        // Render invoices
+        renderInvoicesList(invoices, properties, vendors);
+        
+        // Populate filters
+        await populateInvoiceFilters(properties, vendors);
+        
+        // Show/hide add button based on permissions
+        const addInvoiceBtn = document.getElementById('addInvoiceBtn');
+        if (addInvoiceBtn) {
+            addInvoiceBtn.style.display = canManageInvoices() ? 'block' : 'none';
+        }
+    } catch (error) {
+        console.error('Error loading invoices:', error);
+        invoicesList.innerHTML = '<p style="color: #e74c3c; text-align: center; padding: 20px;">Error loading invoices. Please try again.</p>';
+    }
+}
+
+// Render invoices list
+function renderInvoicesList(invoices, properties, vendors) {
+    const invoicesList = document.getElementById('invoicesList');
+    if (!invoicesList) return;
+    
+    invoicesList.innerHTML = '';
+    
+    if (invoices.length === 0) {
+        invoicesList.innerHTML = '<p class="no-tenants-message">No invoices found. Add one to get started.</p>';
+        return;
+    }
+    
+    invoices.forEach(invoice => {
+        const card = document.createElement('div');
+        card.className = 'tenant-card';
+        card.style.marginBottom = '15px';
+        
+        const status = invoice.status || 'pending';
+        let statusBadge = '';
+        let statusClass = '';
+        if (status === 'approved') {
+            statusBadge = '<span class="status-badge status-active">Approved</span>';
+            statusClass = 'status-active';
+        } else if (status === 'processed') {
+            statusBadge = '<span class="status-badge" style="background: #3498db; color: white;">Processed</span>';
+            statusClass = 'status-processed';
+        } else if (status === 'rejected') {
+            statusBadge = '<span class="status-badge status-expired">Rejected</span>';
+            statusClass = 'status-expired';
+        } else {
+            statusBadge = '<span class="status-badge status-warning">Pending</span>';
+            statusClass = 'status-warning';
+        }
+        
+        const property = properties[invoice.propertyId];
+        const vendor = vendors[invoice.vendorId];
+        const invoiceDate = formatDateForDisplay(invoice.invoiceDate, 'N/A');
+        const amount = invoice.amount ? `$${parseFloat(invoice.amount).toFixed(2)}` : '$0.00';
+        const approvedBy = invoice.approvedBy ? ` by ${escapeHtml(invoice.approvedByName || 'Unknown')}` : '';
+        const approvedAt = invoice.approvedAt ? formatDateForDisplay(invoice.approvedAt, '') : '';
+        const rejectionReason = invoice.rejectionReason ? `<p style="color: #e74c3c; margin-top: 10px;"><strong>Rejection Reason:</strong> ${escapeHtml(invoice.rejectionReason)}</p>` : '';
+        
+        card.innerHTML = `
+            <div class="tenant-card-header">
+                <div>
+                    <h3 style="margin: 0 0 5px 0;">${escapeHtml(invoice.invoiceNumber || 'Unnamed Invoice')}</h3>
+                    <p style="margin: 0; color: #666; font-size: 0.9em;">${vendor ? escapeHtml(vendor.name) : 'Unknown Vendor'} - ${property ? escapeHtml(property.name) : 'Unknown Property'}</p>
+                </div>
+                ${statusBadge}
+            </div>
+            <div class="tenant-card-body">
+                <p><strong>📅 Invoice Date:</strong> ${invoiceDate}</p>
+                <p><strong>💰 Amount:</strong> ${amount}</p>
+                ${invoice.description ? `<p><strong>📝 Description:</strong> ${escapeHtml(invoice.description)}</p>` : ''}
+                ${status === 'approved' && approvedAt ? `<p style="color: #27ae60;"><strong>✅ Approved${approvedBy}</strong> on ${approvedAt}</p>` : ''}
+                ${status === 'rejected' && approvedAt ? `<p style="color: #e74c3c;"><strong>❌ Rejected${approvedBy}</strong> on ${approvedAt}</p>` : ''}
+                ${rejectionReason}
+            </div>
+            <div class="tenant-card-actions">
+                ${invoice.fileUrl ? `<a href="${escapeHtml(invoice.fileUrl)}" target="_blank" class="btn-primary btn-small" style="text-decoration: none; display: inline-block;">View Invoice</a>` : ''}
+                ${canManageInvoices() && status === 'pending' ? `
+                    <button class="btn-primary btn-small" onclick="approveInvoice('${invoice.id}')" style="background-color: #27ae60;">Approve</button>
+                    <button class="btn-danger btn-small" onclick="rejectInvoice('${invoice.id}')">Reject</button>
+                ` : ''}
+                ${canManageInvoices() ? `
+                    <button class="btn-secondary btn-small" onclick="editInvoice('${invoice.id}')">Edit</button>
+                    <button class="btn-danger btn-small" onclick="deleteInvoice('${invoice.id}')">Delete</button>
+                ` : ''}
+            </div>
+        `;
+        invoicesList.appendChild(card);
+    });
+}
+
+// Populate invoice filters
+async function populateInvoiceFilters(properties, vendors) {
+    // Populate property filter
+    const propertyFilter = document.getElementById('invoicePropertyFilter');
+    if (propertyFilter) {
+        const currentValue = propertyFilter.value;
+        propertyFilter.innerHTML = '<option value="">All Properties</option>';
+        Object.keys(properties).forEach(propId => {
+            const property = properties[propId];
+            const option = document.createElement('option');
+            option.value = propId;
+            option.textContent = property.name || 'Unnamed Property';
+            propertyFilter.appendChild(option);
+        });
+        if (currentValue) propertyFilter.value = currentValue;
+    }
+    
+    // Populate vendor filter
+    const vendorFilter = document.getElementById('invoiceVendorFilter');
+    if (vendorFilter) {
+        const currentValue = vendorFilter.value;
+        vendorFilter.innerHTML = '<option value="">All Vendors</option>';
+        Object.keys(vendors).forEach(vendorId => {
+            const vendor = vendors[vendorId];
+            const option = document.createElement('option');
+            option.value = vendorId;
+            option.textContent = vendor.name || 'Unnamed Vendor';
+            vendorFilter.appendChild(option);
+        });
+        if (currentValue) vendorFilter.value = currentValue;
+    }
+}
+
+// Add invoice
+window.addInvoice = function() {
+    editingInvoiceId = null;
+    const invoiceForm = document.getElementById('invoiceForm');
+    if (invoiceForm) {
+        invoiceForm.reset();
+    }
+    document.getElementById('invoiceId').value = '';
+    document.getElementById('invoiceModalTitle').textContent = 'Add Invoice';
+    loadPropertiesForInvoiceForm();
+    loadVendorsForInvoiceForm();
+    resetInvoiceFileUpload();
+    document.getElementById('invoiceModal').classList.add('show');
+};
+
+// Edit invoice
+window.editInvoice = function(invoiceId) {
+    editingInvoiceId = invoiceId;
+    const invoiceForm = document.getElementById('invoiceForm');
+    if (invoiceForm) {
+        invoiceForm.reset();
+    }
+    
+    db.collection('invoices').doc(invoiceId).get().then((doc) => {
+        if (!doc.exists) {
+            alert('Invoice not found');
+            return;
+        }
+        
+        const invoice = doc.data();
+        document.getElementById('invoiceModalTitle').textContent = 'Edit Invoice';
+        document.getElementById('invoiceId').value = invoiceId;
+        document.getElementById('invoiceVendor').value = invoice.vendorId || '';
+        document.getElementById('invoiceProperty').value = invoice.propertyId || '';
+        document.getElementById('invoiceNumber').value = invoice.invoiceNumber || '';
+        document.getElementById('invoiceDate').value = invoice.invoiceDate ? formatDateForInput(invoice.invoiceDate.toDate()) : '';
+        document.getElementById('invoiceAmount').value = invoice.amount || '';
+        document.getElementById('invoiceDescription').value = invoice.description || '';
+        
+        // Load dropdowns first, then set values
+        loadPropertiesForInvoiceForm().then(() => {
+            document.getElementById('invoiceProperty').value = invoice.propertyId || '';
+        });
+        loadVendorsForInvoiceForm().then(() => {
+            document.getElementById('invoiceVendor').value = invoice.vendorId || '';
+        });
+        
+        // Show existing file if present
+        if (invoice.fileUrl) {
+            const fileNameDiv = document.getElementById('invoiceFileName');
+            const fileNameText = document.getElementById('invoiceFileNameText');
+            const dropZoneContent = document.getElementById('invoiceFileDropZoneContent');
+            if (fileNameDiv && fileNameText) {
+                fileNameText.textContent = invoice.fileName || 'Existing file';
+                fileNameDiv.style.display = 'block';
+                if (dropZoneContent) dropZoneContent.style.display = 'none';
+            }
+        } else {
+            resetInvoiceFileUpload();
+        }
+        
+        document.getElementById('invoiceModal').classList.add('show');
+    }).catch((error) => {
+        console.error('Error loading invoice:', error);
+        alert('Error loading invoice: ' + error.message);
+    });
+};
+
+// Delete invoice
+window.deleteInvoice = function(invoiceId) {
+    if (!confirm('Are you sure you want to delete this invoice? This action cannot be undone.')) {
+        return;
+    }
+    
+    db.collection('invoices').doc(invoiceId).get().then((doc) => {
+        const invoice = doc.data();
+        
+        // Delete file from storage if exists
+        if (invoice.fileUrl) {
+            try {
+                const storageRef = firebase.storage().refFromURL(invoice.fileUrl);
+                storageRef.delete().catch((error) => {
+                    console.warn('Error deleting file from storage:', error);
+                });
+            } catch (error) {
+                console.warn('Error deleting file from storage:', error);
+            }
+        }
+        
+        // Delete invoice document
+        return db.collection('invoices').doc(invoiceId).delete();
+    })
+    .then(() => {
+        console.log('Invoice deleted successfully');
+        loadInvoices();
+    })
+    .catch((error) => {
+        console.error('Error deleting invoice:', error);
+        alert('Error deleting invoice: ' + error.message);
+    });
+};
+
+// Approve invoice
+window.approveInvoice = function(invoiceId) {
+    if (!canManageInvoices()) {
+        alert('You do not have permission to approve invoices.');
+        return;
+    }
+    
+    if (!confirm('Are you sure you want to approve this invoice?')) {
+        return;
+    }
+    
+    const updateData = {
+        status: 'approved',
+        approvedBy: currentUser ? currentUser.uid : null,
+        approvedByName: currentUserProfile ? (currentUserProfile.name || currentUserProfile.email) : null,
+        approvedAt: firebase.firestore.Timestamp.now(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    
+    db.collection('invoices').doc(invoiceId).update(updateData)
+        .then(() => {
+            console.log('Invoice approved successfully');
+            loadInvoices();
+        })
+        .catch((error) => {
+            console.error('Error approving invoice:', error);
+            alert('Error approving invoice: ' + error.message);
+        });
+};
+
+// Reject invoice
+window.rejectInvoice = function(invoiceId) {
+    if (!canManageInvoices()) {
+        alert('You do not have permission to reject invoices.');
+        return;
+    }
+    
+    const reason = prompt('Please provide a reason for rejection:');
+    if (reason === null) {
+        return; // User cancelled
+    }
+    
+    const updateData = {
+        status: 'rejected',
+        approvedBy: currentUser ? currentUser.uid : null,
+        approvedByName: currentUserProfile ? (currentUserProfile.name || currentUserProfile.email) : null,
+        approvedAt: firebase.firestore.Timestamp.now(),
+        rejectionReason: reason.trim() || null,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    
+    db.collection('invoices').doc(invoiceId).update(updateData)
+        .then(() => {
+            console.log('Invoice rejected successfully');
+            loadInvoices();
+        })
+        .catch((error) => {
+            console.error('Error rejecting invoice:', error);
+            alert('Error rejecting invoice: ' + error.message);
+        });
+};
+
+// Mark invoice as processed
+window.markInvoiceAsProcessed = function(invoiceId) {
+    if (!canManageInvoices()) {
+        alert('You do not have permission to mark invoices as processed.');
+        return;
+    }
+    
+    if (!confirm('Mark this invoice as processed? This indicates it has been entered into the accounting system.')) {
+        return;
+    }
+    
+    const updateData = {
+        status: 'processed',
+        processedBy: currentUser ? currentUser.uid : null,
+        processedByName: currentUserProfile ? (currentUserProfile.name || currentUserProfile.email) : null,
+        processedAt: firebase.firestore.Timestamp.now(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    
+    db.collection('invoices').doc(invoiceId).update(updateData)
+        .then(() => {
+            console.log('Invoice marked as processed successfully');
+            loadInvoices();
+        })
+        .catch((error) => {
+            console.error('Error marking invoice as processed:', error);
+            alert('Error marking invoice as processed: ' + error.message);
+        });
+};
+
+// Load properties for invoice form
+async function loadPropertiesForInvoiceForm() {
+    const propertySelect = document.getElementById('invoiceProperty');
+    if (!propertySelect) return Promise.resolve();
+    
+    propertySelect.innerHTML = '<option value="">Select property...</option>';
+    
+    try {
+        const snapshot = await db.collection('properties').orderBy('name').get();
+        snapshot.forEach((doc) => {
+            const property = doc.data();
+            const option = document.createElement('option');
+            option.value = doc.id;
+            option.textContent = property.name || 'Unnamed Property';
+            propertySelect.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error loading properties for invoice form:', error);
+    }
+    
+    return Promise.resolve();
+}
+
+// Load vendors for invoice form
+async function loadVendorsForInvoiceForm() {
+    const vendorSelect = document.getElementById('invoiceVendor');
+    if (!vendorSelect) return Promise.resolve();
+    
+    vendorSelect.innerHTML = '<option value="">Select vendor...</option>';
+    
+    try {
+        const snapshot = await db.collection('vendors').orderBy('name').get();
+        snapshot.forEach((doc) => {
+            const vendor = doc.data();
+            const option = document.createElement('option');
+            option.value = doc.id;
+            option.textContent = vendor.name || 'Unnamed Vendor';
+            vendorSelect.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error loading vendors for invoice form:', error);
+    }
+    
+    return Promise.resolve();
+}
+
+// Reset invoice file upload UI
+function resetInvoiceFileUpload() {
+    const dropZoneContent = document.getElementById('invoiceFileDropZoneContent');
+    const fileNameDiv = document.getElementById('invoiceFileName');
+    if (dropZoneContent) dropZoneContent.style.display = 'block';
+    if (fileNameDiv) fileNameDiv.style.display = 'none';
+    const fileInput = document.getElementById('invoiceFile');
+    if (fileInput) fileInput.value = '';
+}
+
+// Handle invoice form submission
+let editingInvoiceId = null;
+async function handleInvoiceSubmit(e) {
+    e.preventDefault();
+    
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const resetButtonState = () => {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save Invoice';
+            submitBtn.classList.remove('saving');
+        }
+    };
+    
+    const invoiceForm = document.getElementById('invoiceForm');
+    if (!invoiceForm) {
+        console.error('Invoice form not found');
+        alert('Error: Invoice form not found. Please refresh the page.');
+        resetButtonState();
+        return;
+    }
+    
+    const id = invoiceForm.querySelector('#invoiceId').value;
+    const vendorId = invoiceForm.querySelector('#invoiceVendor').value;
+    const propertyId = invoiceForm.querySelector('#invoiceProperty').value;
+    const invoiceNumber = invoiceForm.querySelector('#invoiceNumber').value.trim();
+    const invoiceDate = invoiceForm.querySelector('#invoiceDate').value;
+    const amount = invoiceForm.querySelector('#invoiceAmount').value;
+    const description = invoiceForm.querySelector('#invoiceDescription').value.trim() || null;
+    const fileInput = invoiceForm.querySelector('#invoiceFile');
+    
+    if (!vendorId || !propertyId || !invoiceNumber || !invoiceDate || !amount) {
+        alert('Please fill in all required fields.');
+        resetButtonState();
+        return;
+    }
+    
+    // Validate amount
+    const amountNum = parseFloat(amount);
+    if (isNaN(amountNum) || amountNum < 0) {
+        alert('Please enter a valid amount.');
+        resetButtonState();
+        return;
+    }
+    
+    // Update button state
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
+        submitBtn.classList.add('saving');
+    }
+    
+    try {
+        // Parse date
+        const invoiceDateObj = parseDateInputValue(invoiceDate);
+        if (!invoiceDateObj) {
+            throw new Error('Invalid date format');
+        }
+        
+        const invoiceData = {
+            vendorId: vendorId,
+            propertyId: propertyId,
+            invoiceNumber: invoiceNumber,
+            invoiceDate: firebase.firestore.Timestamp.fromDate(invoiceDateObj),
+            amount: amountNum,
+            description: description,
+            status: id ? undefined : 'pending', // Only set status for new invoices
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        
+        // Handle file upload
+        let fileUrl = null;
+        let fileName = null;
+        if (fileInput && fileInput.files && fileInput.files.length > 0) {
+            const file = fileInput.files[0];
+            const storageRef = firebase.storage().ref();
+            const fileRef = storageRef.child(`invoices/${id || Date.now()}/${Date.now()}_${file.name}`);
+            
+            // Upload file
+            const uploadTask = fileRef.put(file);
+            await new Promise((resolve, reject) => {
+                uploadTask.on('state_changed',
+                    (snapshot) => {
+                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                        console.log(`Invoice upload progress: ${progress}%`);
+                    },
+                    (error) => {
+                        console.error('Invoice upload error:', error);
+                        reject(error);
+                    },
+                    () => {
+                        resolve();
+                    }
+                );
+            });
+            
+            fileUrl = await fileRef.getDownloadURL();
+            fileName = file.name;
+            invoiceData.fileUrl = fileUrl;
+            invoiceData.fileName = fileName;
+        } else if (id) {
+            // For edits, keep existing file if no new file uploaded
+            const existingInvoice = await db.collection('invoices').doc(id).get();
+            if (existingInvoice.exists) {
+                const existing = existingInvoice.data();
+                if (existing.fileUrl) {
+                    invoiceData.fileUrl = existing.fileUrl;
+                    invoiceData.fileName = existing.fileName;
+                }
+            }
+        }
+        
+        if (id) {
+            // Update existing invoice
+            await db.collection('invoices').doc(id).update(invoiceData);
+            console.log('Invoice updated successfully');
+        } else {
+            // Create new invoice
+            invoiceData.createdAt = firebase.firestore.Timestamp.now();
+            invoiceData.createdBy = currentUser ? currentUser.uid : null;
+            await db.collection('invoices').add(invoiceData);
+            console.log('Invoice created successfully');
+        }
+        
+        document.getElementById('invoiceModal').classList.remove('show');
+        invoiceForm.reset();
+        resetInvoiceFileUpload();
+        loadInvoices();
+        resetButtonState();
+        alert('Invoice saved successfully!');
+    } catch (error) {
+        console.error('Error saving invoice:', error);
+        alert('Error saving invoice: ' + error.message);
+        resetButtonState();
+    }
+}
+
+// Setup invoice file drag-and-drop
+function setupInvoiceFileDragDrop() {
+    const dropZone = document.getElementById('invoiceFileDropZone');
+    const fileInput = document.getElementById('invoiceFile');
+    const dropZoneContent = document.getElementById('invoiceFileDropZoneContent');
+    const fileNameDiv = document.getElementById('invoiceFileName');
+    const fileNameText = document.getElementById('invoiceFileNameText');
+    const removeBtn = document.getElementById('invoiceFileRemoveBtn');
+    
+    if (!dropZone || !fileInput) return;
+    
+    // Handle file selection from input
+    fileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            handleInvoiceFileSelect(file);
+        }
+    });
+    
+    // Prevent default drag behaviors
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, preventDefaults, false);
+        document.body.addEventListener(eventName, preventDefaults, false);
+    });
+    
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    
+    // Highlight drop zone when item is dragged over it
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+            dropZone.style.borderColor = '#667eea';
+            dropZone.style.backgroundColor = '#f0f4ff';
+        }, false);
+    });
+    
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+            dropZone.style.borderColor = '#ccc';
+            dropZone.style.backgroundColor = '#f9f9f9';
+        }, false);
+    });
+    
+    // Handle dropped files
+    dropZone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        
+        if (files.length > 0) {
+            const file = files[0];
+            // Validate file type
+            const validTypes = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png'];
+            const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+            
+            if (validTypes.includes(fileExtension)) {
+                handleInvoiceFileSelect(file);
+                // Update the file input
+                const dataTransfer = new DataTransfer();
+                dataTransfer.items.add(file);
+                fileInput.files = dataTransfer.files;
+            } else {
+                alert('Please upload a PDF, Word document, or image file (PDF, DOC, DOCX, JPG, JPEG, PNG).');
+            }
+        }
+    }, false);
+    
+    // Handle remove button
+    if (removeBtn) {
+        removeBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            fileInput.value = '';
+            if (dropZoneContent) dropZoneContent.style.display = 'block';
+            if (fileNameDiv) fileNameDiv.style.display = 'none';
+        });
+    }
+    
+    // Click on drop zone to trigger file input
+    dropZone.addEventListener('click', function(e) {
+        if (e.target !== removeBtn && e.target !== fileInput) {
+            fileInput.click();
+        }
+    });
+}
+
+// Handle invoice file selection
+function handleInvoiceFileSelect(file) {
+    const dropZoneContent = document.getElementById('invoiceFileDropZoneContent');
+    const fileNameDiv = document.getElementById('invoiceFileName');
+    const fileNameText = document.getElementById('invoiceFileNameText');
+    
+    if (dropZoneContent) dropZoneContent.style.display = 'none';
+    if (fileNameDiv) fileNameDiv.style.display = 'block';
+    if (fileNameText) {
+        fileNameText.textContent = file.name;
+    }
 }
 
 // Setup year navigation widget
@@ -18980,6 +19745,8 @@ function setupFinanceTabs() {
             // Load tab-specific data
             if (tabName === 'rentRoll') {
                 loadRentRoll();
+            } else if (tabName === 'invoiceApproval') {
+                loadInvoices();
             }
         });
     });
