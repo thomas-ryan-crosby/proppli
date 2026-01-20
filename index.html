@@ -1532,11 +1532,27 @@
                             <div id="vendorDetailInfo"></div>
                         </div>
                         
-                        <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                            <h4 style="margin: 0;">Employees</h4>
-                            <button id="addEmployeeBtn" class="btn-primary btn-small" style="display: none;">+ Add Employee</button>
+                        <div class="property-detail-tabs" style="margin-bottom: 20px; border-bottom: 2px solid #e2e8f0;">
+                            <button class="tab-btn active" data-tab="employees">Employees</button>
+                            <button class="tab-btn" data-tab="cois">Certificates of Insurance</button>
                         </div>
-                        <div id="employeesList" class="contacts-list"></div>
+                        
+                        <div id="employeesTab" class="tab-content active">
+                            <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <h4 style="margin: 0;">Employees</h4>
+                                <button id="addEmployeeBtn" class="btn-primary btn-small" style="display: none;">+ Add Employee</button>
+                            </div>
+                            <div id="employeesList" class="contacts-list"></div>
+                        </div>
+                        
+                        <div id="coisTab" class="tab-content" style="display: none;">
+                            <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <h4 style="margin: 0;">Certificates of Insurance</h4>
+                                <button id="uploadCOIBtn" class="btn-primary btn-small" style="display: none;">+ Upload COI</button>
+                            </div>
+                            <div id="coisList" class="documents-list"></div>
+                            <input type="file" id="vendorCOIInput" style="display: none;" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1594,6 +1610,49 @@
                             <div class="form-actions">
                                 <button type="submit" class="btn-primary">Save Employee</button>
                                 <button type="button" class="btn-secondary" id="cancelEmployeeForm">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- COI Upload Modal -->
+            <div id="coiUploadModal" class="modal">
+                <div class="modal-content" style="max-width: 600px;">
+                    <div class="modal-header">
+                        <h2>Upload Certificate of Insurance</h2>
+                        <button class="close-btn" id="closeCOIUploadModal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="coiUploadForm">
+                            <input type="hidden" id="coiVendorId">
+                            
+                            <div class="form-group">
+                                <label for="coiFile">Certificate of Insurance File *</label>
+                                <input type="file" id="coiFile" required accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
+                                <small style="color: #666; font-size: 12px;">Upload PDF, Word document, or image file</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="coiStartDate">Insurance Start Date *</label>
+                                <input type="date" id="coiStartDate" required>
+                                <small style="color: #666; font-size: 12px;">Date when the insurance certificate becomes effective</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="coiEndDate">Insurance End Date *</label>
+                                <input type="date" id="coiEndDate" required>
+                                <small style="color: #666; font-size: 12px;">Date when the insurance certificate expires</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="coiDescription">Description/Notes</label>
+                                <textarea id="coiDescription" rows="3" placeholder="Optional: Add notes about this certificate (e.g., policy number, coverage type)"></textarea>
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button type="submit" class="btn-primary">Upload COI</button>
+                                <button type="button" class="btn-secondary" id="cancelCOIUploadForm">Cancel</button>
                             </div>
                         </form>
                     </div>
