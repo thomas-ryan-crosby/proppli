@@ -2034,7 +2034,9 @@ function showPage(page) {
         loadVendors();
         loadPropertiesForVendorFilter();
     } else if (page === 'maintenance') {
-        loadTickets();
+        // Restore last selected maintenance sub-section
+        const savedSection = localStorage.getItem('maintenanceSection') || 'tickets';
+        switchMaintenanceSection(savedSection);
     } else if (page === 'leases') {
         loadLeases();
     } else if (page === 'finance') {
@@ -2334,9 +2336,11 @@ function setupEventListeners() {
     const viewDeletedBtn = document.getElementById('viewDeletedBtn');
     if (viewDeletedBtn) viewDeletedBtn.addEventListener('click', () => switchView('deleted'));
 
-    // View toggles - inspection reports
-    const viewInspectionReportsBtn = document.getElementById('viewInspectionReportsBtn');
-    if (viewInspectionReportsBtn) viewInspectionReportsBtn.addEventListener('click', () => switchView('inspectionReports'));
+    // Maintenance sub-section toggles (Tickets vs Inspection Reports)
+    const maintenanceSectionTicketsBtn = document.getElementById('maintenanceSectionTicketsBtn');
+    const maintenanceSectionInspectionReportsBtn = document.getElementById('maintenanceSectionInspectionReportsBtn');
+    if (maintenanceSectionTicketsBtn) maintenanceSectionTicketsBtn.addEventListener('click', () => switchMaintenanceSection('tickets'));
+    if (maintenanceSectionInspectionReportsBtn) maintenanceSectionInspectionReportsBtn.addEventListener('click', () => switchMaintenanceSection('inspectionReports'));
 
     // Inspection Reports UI
     const addInspectionReportBtn = document.getElementById('addInspectionReportBtn');
@@ -7494,15 +7498,11 @@ function switchView(view) {
     const monitoringView = document.getElementById('monitoringTicketsView');
     const completedView = document.getElementById('completedTicketsView');
     const deletedView = document.getElementById('deletedTicketsView');
-    const inspectionReportsView = document.getElementById('inspectionReportsView');
     const newBtn = document.getElementById('viewNewBtn');
     const inProgressBtn = document.getElementById('viewInProgressBtn');
     const monitoringBtn = document.getElementById('viewMonitoringBtn');
     const completedBtn = document.getElementById('viewCompletedBtn');
     const deletedBtn = document.getElementById('viewDeletedBtn');
-    const inspectionReportsBtn = document.getElementById('viewInspectionReportsBtn');
-    const createTicketBtn = document.getElementById('createTicketBtn');
-    const metricsDashboard = document.querySelector('.metrics-dashboard');
     
     // Hide all views
     if (newView) newView.style.display = 'none';
@@ -7510,7 +7510,6 @@ function switchView(view) {
     if (monitoringView) monitoringView.style.display = 'none';
     if (completedView) completedView.style.display = 'none';
     if (deletedView) deletedView.style.display = 'none';
-    if (inspectionReportsView) inspectionReportsView.style.display = 'none';
     
     // Remove active class from all buttons
     if (newBtn) newBtn.classList.remove('active');
@@ -7518,45 +7517,53 @@ function switchView(view) {
     if (monitoringBtn) monitoringBtn.classList.remove('active');
     if (completedBtn) completedBtn.classList.remove('active');
     if (deletedBtn) deletedBtn.classList.remove('active');
-    if (inspectionReportsBtn) inspectionReportsBtn.classList.remove('active');
     
     // Show selected view and activate button
     if (view === 'new') {
         if (newView) newView.style.display = 'block';
         if (newBtn) newBtn.classList.add('active');
-        if (createTicketBtn) createTicketBtn.style.display = '';
-        if (metricsDashboard) metricsDashboard.style.display = '';
     } else if (view === 'inProgress') {
         if (inProgressView) inProgressView.style.display = 'block';
         if (inProgressBtn) inProgressBtn.classList.add('active');
-        if (createTicketBtn) createTicketBtn.style.display = '';
-        if (metricsDashboard) metricsDashboard.style.display = '';
     } else if (view === 'monitoring') {
         if (monitoringView) monitoringView.style.display = 'block';
         if (monitoringBtn) monitoringBtn.classList.add('active');
-        if (createTicketBtn) createTicketBtn.style.display = '';
-        if (metricsDashboard) metricsDashboard.style.display = '';
     } else if (view === 'completed') {
         if (completedView) completedView.style.display = 'block';
         if (completedBtn) completedBtn.classList.add('active');
-        if (createTicketBtn) createTicketBtn.style.display = '';
-        if (metricsDashboard) metricsDashboard.style.display = '';
     } else if (view === 'deleted') {
         if (deletedView) deletedView.style.display = 'block';
         if (deletedBtn) deletedBtn.classList.add('active');
-        if (createTicketBtn) createTicketBtn.style.display = '';
-        if (metricsDashboard) metricsDashboard.style.display = '';
-    } else if (view === 'inspectionReports') {
-        if (inspectionReportsView) inspectionReportsView.style.display = 'block';
-        if (inspectionReportsBtn) inspectionReportsBtn.classList.add('active');
-        if (createTicketBtn) createTicketBtn.style.display = 'none';
-        if (metricsDashboard) metricsDashboard.style.display = 'none';
-        initializeInspectionReportsUI();
-        loadInspectionReports();
     }
     
     // Save view preference
     localStorage.setItem('currentView', view);
+}
+
+function switchMaintenanceSection(section) {
+    const ticketsSection = document.getElementById('maintenanceTicketsSection');
+    const inspectionSection = document.getElementById('maintenanceInspectionReportsSection');
+    const ticketsBtn = document.getElementById('maintenanceSectionTicketsBtn');
+    const inspectionBtn = document.getElementById('maintenanceSectionInspectionReportsBtn');
+
+    const normalized = section === 'inspectionReports' ? 'inspectionReports' : 'tickets';
+    localStorage.setItem('maintenanceSection', normalized);
+
+    if (ticketsBtn) ticketsBtn.classList.toggle('active', normalized === 'tickets');
+    if (inspectionBtn) inspectionBtn.classList.toggle('active', normalized === 'inspectionReports');
+
+    if (ticketsSection) ticketsSection.style.display = normalized === 'tickets' ? 'block' : 'none';
+    if (inspectionSection) inspectionSection.style.display = normalized === 'inspectionReports' ? 'block' : 'none';
+
+    if (normalized === 'tickets') {
+        loadTickets();
+        // Restore the saved ticket view (new/inProgress/monitoring/completed/deleted)
+        const savedView = localStorage.getItem('currentView') || 'new';
+        switchView(savedView);
+    } else {
+        initializeInspectionReportsUI();
+        loadInspectionReports();
+    }
 }
 
 // ============================================

@@ -293,6 +293,10 @@
                             <option value="">Select a property...</option>
                         </select>
                     </div>
+                    <div class="maintenance-subnav" style="display: flex; gap: 8px; align-items: center;">
+                        <button id="maintenanceSectionTicketsBtn" class="tab-btn active" type="button">Tickets</button>
+                        <button id="maintenanceSectionInspectionReportsBtn" class="tab-btn" type="button">Inspection Reports</button>
+                    </div>
                 </div>
             </header>
 
@@ -727,6 +731,7 @@
                 </div>
             </div>
 
+            <div id="maintenanceTicketsSection">
             <!-- Metrics Dashboard -->
             <div class="metrics-dashboard">
                 <div class="metrics-header">
@@ -776,7 +781,6 @@
                         <button id="viewMonitoringBtn" class="btn-toggle">Monitoring</button>
                         <button id="viewCompletedBtn" class="btn-toggle">Completed Tickets</button>
                         <button id="viewDeletedBtn" class="btn-toggle">Deleted Tickets</button>
-                        <button id="viewInspectionReportsBtn" class="btn-toggle">Inspection Reports</button>
                     </div>
                 </div>
 
@@ -807,9 +811,11 @@
                     <p style="color: #666; margin-bottom: 15px;">Tickets in this section will be permanently removed after 30 days.</p>
                     <div id="deletedTicketsList" class="tickets-list"></div>
                 </div>
+            </div>
+            </div>
 
-                <!-- Inspection Reports View -->
-                <div id="inspectionReportsView" class="tickets-view" style="display: none;">
+            <div id="maintenanceInspectionReportsSection" style="display: none;">
+                <div id="inspectionReportsView" class="section">
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap;">
                         <div>
                             <h2>Inspection Reports</h2>
