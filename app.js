@@ -19187,7 +19187,9 @@ window.addInvoice = function() {
     document.getElementById('invoiceModalTitle').textContent = 'Add Invoice';
     loadPropertiesForInvoiceForm();
     loadVendorsForInvoiceForm();
-    loadAllCostCodes();
+    // Reset company and cost code dropdowns
+    document.getElementById('invoiceCompany').value = '';
+    updateCostCodesForCompany();
     resetInvoiceFileUpload();
     document.getElementById('invoiceModal').classList.add('show');
 };
