@@ -18955,9 +18955,6 @@ const COST_CODES_BY_COMPANY = {
 // Load cost codes from Firestore only
 async function loadCostCodesFromFirestore(company) {
     try {
-        // First, ensure cost codes are initialized if Firestore is empty
-        await ensureCostCodesInitialized();
-        
         const snapshot = await db.collection('costCodes')
             .where('company', '==', company)
             .orderBy('code')
@@ -19663,13 +19660,6 @@ async function loadCostCodes() {
             });
         });
         
-        // If Firestore is empty, ensure initialization
-        if (snapshot.empty) {
-            await ensureCostCodesInitialized();
-            // Reload after initialization
-            return loadCostCodes();
-        }
-        
         renderCostCodesList(costCodesByCompany);
         
         // Show/hide add button based on permissions
@@ -19683,31 +19673,9 @@ async function loadCostCodes() {
     }
 }
 
-// Check if cost codes are initialized, and initialize if needed
-let costCodesInitializationChecked = false;
-async function ensureCostCodesInitialized() {
-    // Only check once per session
-    if (costCodesInitializationChecked) {
-        return;
-    }
-    
-    try {
-        // Quick check if any cost codes exist
-        const checkSnapshot = await db.collection('costCodes').limit(1).get();
-        
-        if (checkSnapshot.empty) {
-            // Firestore is empty, initialize from constant
-            await initializeCostCodesFromConstant();
-        }
-        
-        costCodesInitializationChecked = true;
-    } catch (error) {
-        console.error('Error checking cost codes initialization:', error);
-        costCodesInitializationChecked = true; // Mark as checked to avoid infinite loops
-    }
-}
-
-// Initialize cost codes in Firestore from constant (one-time migration)
+// Initialize cost codes in Firestore from constant (one-time manual migration)
+// This function should be called manually once to migrate cost codes from the constant to Firestore
+// After migration, the constant is no longer used
 async function initializeCostCodesFromConstant() {
     try {
         const batch = db.batch();
