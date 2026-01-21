@@ -2359,6 +2359,7 @@
                     <div class="finance-tabs" style="margin-bottom: 20px; border-bottom: 2px solid #e2e8f0;">
                         <button class="tab-btn active" data-finance-tab="rentRoll">Rent Roll</button>
                         <button class="tab-btn" data-finance-tab="invoiceApproval">Invoice Approval</button>
+                        <button class="tab-btn" data-finance-tab="costCodeDatabase">Cost Code Database</button>
                     </div>
 
                     <!-- Rent Roll Tab -->
@@ -2422,6 +2423,26 @@
                                 </div>
                             </div>
                             <div id="rentRollTable" class="rent-roll-container" style="overflow-x: auto;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Cost Code Database Tab -->
+                    <div id="costCodeDatabaseTab" class="tab-content" style="display: none;">
+                        <div class="section">
+                            <div class="section-header-controls" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                                <h3 style="margin: 0;">Cost Code Database</h3>
+                                <button id="addCostCodeBtn" class="btn-primary" style="display: none;">Add Cost Code</button>
+                            </div>
+                            <div style="margin-bottom: 20px;">
+                                <label for="costCodeCompanyFilter" style="margin-right: 10px;">Filter by Company:</label>
+                                <select id="costCodeCompanyFilter" style="padding: 8px; border-radius: 4px; border: 1px solid #ddd;">
+                                    <option value="">All Companies</option>
+                                    <option value="JLC">JLC</option>
+                                    <option value="SHOA">SHOA</option>
+                                    <option value="CDC">CDC</option>
+                                </select>
+                            </div>
+                            <div id="costCodesList"></div>
                         </div>
                     </div>
 
@@ -2570,7 +2591,41 @@
             </div>
         </div>
 
-        <!-- Invoice Detail Modal -->
+        <!-- Cost Code Modal -->
+    <div id="costCodeModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2 id="costCodeModalTitle">Add Cost Code</h2>
+                <button id="closeCostCodeModalBtn" class="close-btn">&times;</button>
+            </div>
+            <form id="costCodeForm">
+                <input type="hidden" id="costCodeId">
+                <div class="form-group">
+                    <label for="costCodeCompany">Company *</label>
+                    <select id="costCodeCompany" required>
+                        <option value="">Select a company...</option>
+                        <option value="JLC">JLC</option>
+                        <option value="SHOA">SHOA</option>
+                        <option value="CDC">CDC</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="costCodeCode">Code *</label>
+                    <input type="text" id="costCodeCode" required placeholder="e.g., 001, 031s, Operating Expenses: Accounting">
+                </div>
+                <div class="form-group">
+                    <label for="costCodeDescription">Description *</label>
+                    <input type="text" id="costCodeDescription" required placeholder="e.g., Beginning Balance, Expense">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" id="cancelCostCodeFormBtn" class="btn-secondary">Cancel</button>
+                    <button type="submit" class="btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Invoice Detail Modal -->
         <div id="invoiceDetailModal" class="modal">
             <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
                 <div class="modal-header">

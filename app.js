@@ -2682,6 +2682,41 @@ function setupEventListeners() {
         });
     }
     
+    // Cost code database event listeners
+    const addCostCodeBtn = document.getElementById('addCostCodeBtn');
+    const costCodeForm = document.getElementById('costCodeForm');
+    const closeCostCodeModalBtn = document.getElementById('closeCostCodeModalBtn');
+    const cancelCostCodeFormBtn = document.getElementById('cancelCostCodeFormBtn');
+    const costCodeCompanyFilter = document.getElementById('costCodeCompanyFilter');
+    
+    if (addCostCodeBtn) {
+        addCostCodeBtn.addEventListener('click', () => {
+            window.addCostCode();
+        });
+    }
+    
+    if (costCodeForm) {
+        costCodeForm.addEventListener('submit', handleCostCodeSubmit);
+    }
+    
+    if (closeCostCodeModalBtn) {
+        closeCostCodeModalBtn.addEventListener('click', () => {
+            document.getElementById('costCodeModal').classList.remove('show');
+        });
+    }
+    
+    if (cancelCostCodeFormBtn) {
+        cancelCostCodeFormBtn.addEventListener('click', () => {
+            document.getElementById('costCodeModal').classList.remove('show');
+        });
+    }
+    
+    if (costCodeCompanyFilter) {
+        costCodeCompanyFilter.addEventListener('change', () => {
+            loadCostCodes();
+        });
+    }
+    
     // Invoice filters
     if (invoiceStatusFilter) {
         invoiceStatusFilter.addEventListener('change', () => {
@@ -18610,14 +18645,21 @@ async function loadFinance() {
     // Setup year navigation widget
     setupYearNavigationWidget();
     
-    // Hide year navigation widget if invoice approval tab is active
+    // Hide year navigation widget if invoice approval or cost code database tab is active
     const invoiceApprovalTab = document.getElementById('invoiceApprovalTab');
+    const costCodeDatabaseTab = document.getElementById('costCodeDatabaseTab');
     if (invoiceApprovalTab && invoiceApprovalTab.style.display !== 'none') {
         const yearNavWidget = document.getElementById('yearNavigationWidget');
         if (yearNavWidget) {
             yearNavWidget.style.display = 'none';
         }
         loadInvoices();
+    } else if (costCodeDatabaseTab && costCodeDatabaseTab.style.display !== 'none') {
+        const yearNavWidget = document.getElementById('yearNavigationWidget');
+        if (yearNavWidget) {
+            yearNavWidget.style.display = 'none';
+        }
+        loadCostCodes();
     }
 }
 
@@ -18910,8 +18952,32 @@ const COST_CODES_BY_COMPANY = {
     ]
 };
 
+// Load cost codes from Firestore (with fallback to constant)
+async function loadCostCodesFromFirestore(company) {
+    try {
+        const snapshot = await db.collection('costCodes')
+            .where('company', '==', company)
+            .orderBy('code')
+            .get();
+        
+        if (!snapshot.empty) {
+            return snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+        }
+        
+        // Fallback to constant if Firestore is empty
+        return COST_CODES_BY_COMPANY[company] || [];
+    } catch (error) {
+        console.error('Error loading cost codes from Firestore:', error);
+        // Fallback to constant on error
+        return COST_CODES_BY_COMPANY[company] || [];
+    }
+}
+
 // Update cost codes dropdown based on selected company
-function updateCostCodesForCompany() {
+async function updateCostCodesForCompany() {
     const companySelect = document.getElementById('invoiceCompany');
     const costCodeSelect = document.getElementById('invoiceCostCode');
     
@@ -18925,7 +18991,7 @@ function updateCostCodesForCompany() {
         return;
     }
     
-    const costCodes = COST_CODES_BY_COMPANY[company] || [];
+    const costCodes = await loadCostCodesFromFirestore(company);
     
     // Clear existing options
     costCodeSelect.innerHTML = '';
@@ -19556,6 +19622,282 @@ async function loadVendorsForInvoiceForm() {
     return Promise.resolve();
 }
 
+
+// ============================================
+// COST CODE DATABASE MANAGEMENT
+// ============================================
+
+// Check if user can manage cost codes
+function canManageCostCodes() {
+    if (!currentUserProfile) return false;
+    const role = currentUserProfile.role;
+    return role === 'admin' || role === 'super_admin' || role === 'property_manager';
+}
+
+// Load cost codes for the database view
+async function loadCostCodes() {
+    const costCodesList = document.getElementById('costCodesList');
+    if (!costCodesList) return;
+    
+    costCodesList.innerHTML = '<p style="color: #999; font-style: italic; text-align: center; padding: 20px;">Loading cost codes...</p>';
+    
+    try {
+        const companyFilter = document.getElementById('costCodeCompanyFilter')?.value || '';
+        
+        let query = db.collection('costCodes').orderBy('company').orderBy('code');
+        
+        if (companyFilter) {
+            query = query.where('company', '==', companyFilter);
+        }
+        
+        const snapshot = await query.get();
+        
+        // Group by company
+        const costCodesByCompany = {};
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const company = data.company || 'Unknown';
+            if (!costCodesByCompany[company]) {
+                costCodesByCompany[company] = [];
+            }
+            costCodesByCompany[company].push({
+                id: doc.id,
+                ...data
+            });
+        });
+        
+        // If Firestore is empty, initialize from constant
+        if (snapshot.empty) {
+            await initializeCostCodesFromConstant();
+            // Reload after initialization
+            return loadCostCodes();
+        }
+        
+        renderCostCodesList(costCodesByCompany);
+        
+        // Show/hide add button based on permissions
+        const addCostCodeBtn = document.getElementById('addCostCodeBtn');
+        if (addCostCodeBtn) {
+            addCostCodeBtn.style.display = canManageCostCodes() ? 'block' : 'none';
+        }
+    } catch (error) {
+        console.error('Error loading cost codes:', error);
+        costCodesList.innerHTML = '<p style="color: #e74c3c; text-align: center; padding: 20px;">Error loading cost codes. Please try again.</p>';
+    }
+}
+
+// Initialize cost codes in Firestore from constant
+async function initializeCostCodesFromConstant() {
+    try {
+        const batch = db.batch();
+        let count = 0;
+        
+        for (const [company, codes] of Object.entries(COST_CODES_BY_COMPANY)) {
+            for (const codeObj of codes) {
+                // Check if code already exists
+                const existing = await db.collection('costCodes')
+                    .where('company', '==', company)
+                    .where('code', '==', codeObj.code)
+                    .limit(1)
+                    .get();
+                
+                if (existing.empty) {
+                    const ref = db.collection('costCodes').doc();
+                    batch.set(ref, {
+                        company: company,
+                        code: codeObj.code,
+                        description: codeObj.description || '',
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    count++;
+                }
+            }
+        }
+        
+        if (count > 0) {
+            await batch.commit();
+            console.log(`Initialized ${count} cost codes in Firestore`);
+        }
+    } catch (error) {
+        console.error('Error initializing cost codes:', error);
+    }
+}
+
+// Render cost codes list
+function renderCostCodesList(costCodesByCompany) {
+    const costCodesList = document.getElementById('costCodesList');
+    if (!costCodesList) return;
+    
+    costCodesList.innerHTML = '';
+    
+    if (Object.keys(costCodesByCompany).length === 0) {
+        costCodesList.innerHTML = '<p class="no-tenants-message">No cost codes found. Add one to get started.</p>';
+        return;
+    }
+    
+    Object.keys(costCodesByCompany).sort().forEach(company => {
+        const codes = costCodesByCompany[company];
+        
+        // Company header
+        const companyHeader = document.createElement('div');
+        companyHeader.style.cssText = 'background: #f8f9fa; padding: 15px; margin-bottom: 15px; border-radius: 8px; border-left: 4px solid #667eea;';
+        companyHeader.innerHTML = `
+            <h3 style="margin: 0; color: #333; font-size: 1.2em;">${escapeHtml(company)}</h3>
+            <small style="color: #666;">${codes.length} cost code${codes.length !== 1 ? 's' : ''}</small>
+        `;
+        costCodesList.appendChild(companyHeader);
+        
+        // Cost codes for this company
+        codes.forEach(costCode => {
+            const card = document.createElement('div');
+            card.className = 'tenant-card';
+            card.style.marginBottom = '10px';
+            
+            card.innerHTML = `
+                <div class="tenant-card-header">
+                    <div>
+                        <h3 style="margin: 0 0 5px 0; font-size: 1em;">${escapeHtml(costCode.code)}</h3>
+                        <p style="margin: 0; color: #666; font-size: 0.9em;">${escapeHtml(costCode.description || 'No description')}</p>
+                    </div>
+                </div>
+                ${canManageCostCodes() ? `
+                    <div class="tenant-card-actions">
+                        <button class="btn-secondary btn-small" onclick="editCostCode('${costCode.id}')">Edit</button>
+                        <button class="btn-danger btn-small" onclick="deleteCostCode('${costCode.id}')">Delete</button>
+                    </div>
+                ` : ''}
+            `;
+            costCodesList.appendChild(card);
+        });
+    });
+}
+
+// Add cost code
+window.addCostCode = function() {
+    editingCostCodeId = null;
+    const costCodeForm = document.getElementById('costCodeForm');
+    if (costCodeForm) {
+        costCodeForm.reset();
+    }
+    document.getElementById('costCodeId').value = '';
+    document.getElementById('costCodeModalTitle').textContent = 'Add Cost Code';
+    document.getElementById('costCodeModal').classList.add('show');
+};
+
+// Edit cost code
+window.editCostCode = function(costCodeId) {
+    editingCostCodeId = costCodeId;
+    
+    db.collection('costCodes').doc(costCodeId).get().then((doc) => {
+        if (!doc.exists) {
+            alert('Cost code not found');
+            return;
+        }
+        
+        const costCode = doc.data();
+        document.getElementById('costCodeModalTitle').textContent = 'Edit Cost Code';
+        document.getElementById('costCodeId').value = costCodeId;
+        document.getElementById('costCodeCompany').value = costCode.company || '';
+        document.getElementById('costCodeCode').value = costCode.code || '';
+        document.getElementById('costCodeDescription').value = costCode.description || '';
+        
+        document.getElementById('costCodeModal').classList.add('show');
+    }).catch((error) => {
+        console.error('Error loading cost code:', error);
+        alert('Error loading cost code: ' + error.message);
+    });
+};
+
+// Delete cost code
+window.deleteCostCode = function(costCodeId) {
+    if (!canManageCostCodes()) {
+        alert('You do not have permission to delete cost codes.');
+        return;
+    }
+    
+    if (!confirm('Are you sure you want to delete this cost code? This action cannot be undone.')) {
+        return;
+    }
+    
+    db.collection('costCodes').doc(costCodeId).delete()
+        .then(() => {
+            console.log('Cost code deleted successfully');
+            loadCostCodes();
+        })
+        .catch((error) => {
+            console.error('Error deleting cost code:', error);
+            alert('Error deleting cost code: ' + error.message);
+        });
+};
+
+// Handle cost code form submission
+let editingCostCodeId = null;
+
+async function handleCostCodeSubmit(e) {
+    e.preventDefault();
+    
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const resetButtonState = () => {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save';
+        }
+    };
+    
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
+    }
+    
+    const costCodeId = document.getElementById('costCodeId').value;
+    const company = document.getElementById('costCodeCompany').value.trim();
+    const code = document.getElementById('costCodeCode').value.trim();
+    const description = document.getElementById('costCodeDescription').value.trim();
+    
+    if (!company || !code || !description) {
+        alert('Please fill in all required fields.');
+        resetButtonState();
+        return;
+    }
+    
+    try {
+        const costCodeData = {
+            company: company,
+            code: code,
+            description: description,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        
+        if (costCodeId) {
+            // Update existing cost code
+            await db.collection('costCodes').doc(costCodeId).update(costCodeData);
+            console.log('Cost code updated successfully');
+        } else {
+            // Create new cost code
+            costCodeData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+            await db.collection('costCodes').add(costCodeData);
+            console.log('Cost code created successfully');
+        }
+        
+        // Close modal and reload list
+        document.getElementById('costCodeModal').classList.remove('show');
+        loadCostCodes();
+        
+        // If invoice form is open, refresh cost codes dropdown
+        const invoiceModal = document.getElementById('invoiceModal');
+        if (invoiceModal && invoiceModal.classList.contains('show')) {
+            const invoiceCompany = document.getElementById('invoiceCompany')?.value;
+            if (invoiceCompany) {
+                updateCostCodesForCompany();
+            }
+        }
+    } catch (error) {
+        console.error('Error saving cost code:', error);
+        alert('Error saving cost code: ' + error.message);
+        resetButtonState();
+    }
+}
 
 // Reset invoice file upload UI
 function resetInvoiceFileUpload() {
@@ -20249,6 +20591,11 @@ function setupFinanceTabs() {
             
             // Show corresponding tab content
             const tabContent = document.getElementById(tabName + 'Tab');
+            
+            // Load cost codes if switching to cost code database tab
+            if (tabName === 'costCodeDatabase') {
+                loadCostCodes();
+            }
             if (tabContent) {
                 tabContent.classList.add('active');
                 tabContent.style.display = 'block';
