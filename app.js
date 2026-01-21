@@ -19055,22 +19055,9 @@ async function loadInvoices() {
         const dateTo = document.getElementById('invoiceDateTo')?.value || '';
         
         // Build query
-        let query = db.collection('invoices').orderBy('invoiceDate', 'desc');
-        
-        // Apply status filter
-        if (statusFilter) {
-            query = query.where('status', '==', statusFilter);
-        }
-        
-        // Apply property filter
-        if (propertyFilter) {
-            query = query.where('propertyId', '==', propertyFilter);
-        }
-        
-        // Apply vendor filter
-        if (vendorFilter) {
-            query = query.where('vendorId', '==', vendorFilter);
-        }
+        // NOTE: We intentionally avoid combining multiple where clauses with orderBy,
+        // because that requires composite indexes. We fetch recent invoices and filter in-memory.
+        let query = db.collection('invoices').orderBy('invoiceDate', 'desc').limit(1000);
         
         const snapshot = await query.get();
         
@@ -19087,11 +19074,23 @@ async function loadInvoices() {
             vendors[doc.id] = doc.data();
         });
         
-        // Filter by date range in memory (Firestore doesn't support multiple range queries easily)
+        // Filter in memory to avoid Firestore composite indexes
         let invoices = [];
         snapshot.forEach((doc) => {
             const invoice = { id: doc.id, ...doc.data() };
             
+            // Apply status filter
+            if (statusFilter) {
+                const status = invoice.status || 'pending';
+                if (status !== statusFilter) return;
+            }
+
+            // Apply property filter
+            if (propertyFilter && invoice.propertyId !== propertyFilter) return;
+
+            // Apply vendor filter
+            if (vendorFilter && invoice.vendorId !== vendorFilter) return;
+
             // Apply date filters
             if (dateFrom || dateTo) {
                 const invoiceDate = invoice.invoiceDate?.toDate ? invoice.invoiceDate.toDate() : null;
@@ -19188,6 +19187,9 @@ function renderInvoicesList(invoices, properties, vendors) {
                 ${canManageInvoices() && status === 'pending' ? `
                     <button class="btn-primary btn-small" onclick="approveInvoice('${invoice.id}')" style="background-color: #27ae60;">Approve</button>
                     <button class="btn-danger btn-small" onclick="rejectInvoice('${invoice.id}')">Reject</button>
+                ` : ''}
+                ${canManageInvoices() && status === 'approved' ? `
+                    <button class="btn-primary btn-small" onclick="markInvoiceAsProcessed('${invoice.id}')" style="background-color: #3498db;">Mark Processed</button>
                 ` : ''}
                 ${canManageInvoices() ? `
                     <button class="btn-secondary btn-small" onclick="editInvoice('${invoice.id}')">Edit</button>
