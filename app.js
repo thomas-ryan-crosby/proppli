@@ -13,7 +13,9 @@ let afterFileUrls = []; // Array of existing file URLs from database
 // Inspection Reports state
 let inspectionReportsUnsubscribe = null;
 let inspectionReportsCache = []; // Array of { id, ...data }
-let inspectionReportSelectedFile = null; // File selected in the add/edit modal
+let inspectionReportSelectedFiles = []; // Array of { file: File, preview: string, isImage: boolean }
+let inspectionReportExistingFiles = []; // Array of { fileUrl, fileName, storagePath, isImage } from DB
+let inspectionReportOriginalFiles = []; // Array of original files when editing (to track deletions)
 let inspectionReportsInitialized = false;
 let inspectionReportVendorsLoaded = false;
 
@@ -2234,10 +2236,53 @@ function setupEventListeners() {
                 // Reset billing type to hourly
                 const billingTypeHourly = document.getElementById('billingTypeHourly');
                 if (billingTypeHourly) billingTypeHourly.checked = true;
+                // Clear preset button states
+                document.querySelectorAll('.time-preset-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                    btn.style.background = '';
+                    btn.style.color = '';
+                });
             }
         });
         // Set initial state (default to hidden since toggle defaults to unchecked)
         timeAllocationGroup.style.display = enableTimeAllocationToggle.checked ? 'block' : 'none';
+    }
+
+    // Time preset button handlers
+    document.querySelectorAll('.time-preset-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const hours = parseFloat(this.dataset.hours);
+            const timeInput = document.getElementById('timeAllocated');
+            if (timeInput) {
+                timeInput.value = hours;
+            }
+            // Update button states
+            document.querySelectorAll('.time-preset-btn').forEach(b => {
+                b.classList.remove('active');
+                b.style.background = '';
+                b.style.color = '';
+            });
+            this.classList.add('active');
+            this.style.background = '#2563EB';
+            this.style.color = 'white';
+        });
+    });
+
+    // Clear preset selection when custom input changes
+    const timeAllocatedInput = document.getElementById('timeAllocated');
+    if (timeAllocatedInput) {
+        timeAllocatedInput.addEventListener('input', function() {
+            const value = parseFloat(this.value);
+            const presetValues = [0.25, 0.5, 0.75, 1];
+            if (!presetValues.includes(value)) {
+                // Clear preset button states if custom value doesn't match
+                document.querySelectorAll('.time-preset-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                    btn.style.background = '';
+                    btn.style.color = '';
+                });
+            }
+        });
     }
     
     // Completion modal file handlers (check if elements exist)
@@ -2278,6 +2323,49 @@ function setupEventListeners() {
                 // Reset billing type to hourly
                 const workflowBillingTypeHourly = document.getElementById('workflowBillingTypeHourly');
                 if (workflowBillingTypeHourly) workflowBillingTypeHourly.checked = true;
+                // Clear preset button states
+                document.querySelectorAll('.workflow-time-preset-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                    btn.style.background = '';
+                    btn.style.color = '';
+                });
+            }
+        });
+    }
+
+    // Workflow time preset button handlers
+    document.querySelectorAll('.workflow-time-preset-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const hours = parseFloat(this.dataset.hours);
+            const timeInput = document.getElementById('workflowTimeAllocated');
+            if (timeInput) {
+                timeInput.value = hours;
+            }
+            // Update button states
+            document.querySelectorAll('.workflow-time-preset-btn').forEach(b => {
+                b.classList.remove('active');
+                b.style.background = '';
+                b.style.color = '';
+            });
+            this.classList.add('active');
+            this.style.background = '#2563EB';
+            this.style.color = 'white';
+        });
+    });
+
+    // Clear workflow preset selection when custom input changes
+    const workflowTimeAllocatedInput = document.getElementById('workflowTimeAllocated');
+    if (workflowTimeAllocatedInput) {
+        workflowTimeAllocatedInput.addEventListener('input', function() {
+            const value = parseFloat(this.value);
+            const presetValues = [0.25, 0.5, 0.75, 1];
+            if (!presetValues.includes(value)) {
+                // Clear preset button states if custom value doesn't match
+                document.querySelectorAll('.workflow-time-preset-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                    btn.style.background = '';
+                    btn.style.color = '';
+                });
             }
         });
     }
@@ -5922,6 +6010,22 @@ function openTicketModal(ticketId = null) {
     document.getElementById('ticketId').value = '';
     editingTicketId = null;
     
+    // Reset time allocation toggle and hide group
+    const enableTimeAllocationToggle = document.getElementById('enableTimeAllocation');
+    const timeAllocationGroup = document.getElementById('timeAllocationGroup');
+    if (enableTimeAllocationToggle) {
+        enableTimeAllocationToggle.checked = false;
+    }
+    if (timeAllocationGroup) {
+        timeAllocationGroup.style.display = 'none';
+    }
+    // Clear preset button states
+    document.querySelectorAll('.time-preset-btn').forEach(btn => {
+        btn.classList.remove('active');
+        btn.style.background = '';
+        btn.style.color = '';
+    });
+    
     // Reset billing type to hourly
     document.getElementById('billingTypeHourly').checked = true;
     const billingRateLabel = document.getElementById('billingRateLabel');
@@ -6133,10 +6237,8 @@ function loadTicketForEdit(ticketId) {
             document.getElementById('detailedDescription').value = ticket.detailedDescription || '';
             document.getElementById('workUpdates').value = ticket.workUpdates || '';
             
-            // Check if time allocation should be enabled (either explicitly enabled OR if fields are populated)
-            const timeAllocated = ticket.timeAllocated;
-            const billingRate = ticket.billingRate;
-            const enableTimeAllocation = ticket.enableTimeAllocation === true || (timeAllocated && timeAllocated > 0) || (billingRate && billingRate > 0);
+            // Only enable if explicitly set to true (don't auto-enable based on populated fields)
+            const enableTimeAllocation = ticket.enableTimeAllocation === true;
             
             const enableTimeAllocationToggle = document.getElementById('enableTimeAllocation');
             if (enableTimeAllocationToggle) {
@@ -6146,9 +6248,25 @@ function loadTicketForEdit(ticketId) {
             const timeAllocatedInput = document.getElementById('timeAllocated');
             if (timeAllocatedInput) {
                 timeAllocatedInput.value = ticket.timeAllocated || '';
+                // Update preset button states if value matches a preset
+                const value = parseFloat(ticket.timeAllocated);
+                if (value) {
+                    document.querySelectorAll('.time-preset-btn').forEach(btn => {
+                        const btnHours = parseFloat(btn.dataset.hours);
+                        if (Math.abs(value - btnHours) < 0.01) {
+                            btn.classList.add('active');
+                            btn.style.background = '#2563EB';
+                            btn.style.color = 'white';
+                        } else {
+                            btn.classList.remove('active');
+                            btn.style.background = '';
+                            btn.style.color = '';
+                        }
+                    });
+                }
             }
             
-            // Update time allocation group visibility
+            // Update time allocation group visibility - only show if toggle is checked
             const timeAllocationGroup = document.getElementById('timeAllocationGroup');
             if (timeAllocationGroup) {
                 timeAllocationGroup.style.display = enableTimeAllocation ? 'block' : 'none';
@@ -7123,13 +7241,13 @@ function openWorkflowModal(ticketId, targetStatus) {
         const workflowTimeAllocationFields = document.getElementById('workflowTimeAllocationFields');
         
         if (workflowTimeAllocationGroup) {
-            // Show group if time allocation is enabled OR if fields are populated
-            const shouldShow = enableTimeAllocation || (timeAllocated && timeAllocated > 0) || (billingRate && billingRate > 0);
+            // Only show if explicitly enabled (don't auto-show based on populated fields)
+            const shouldShow = enableTimeAllocation === true;
             workflowTimeAllocationGroup.style.display = shouldShow ? 'block' : 'none';
             
             if (workflowEnableTimeAllocation) {
-                // Set toggle based on enableTimeAllocation OR if fields are populated
-                workflowEnableTimeAllocation.checked = enableTimeAllocation || (timeAllocated && timeAllocated > 0) || (billingRate && billingRate > 0);
+                // Only check toggle if explicitly enabled
+                workflowEnableTimeAllocation.checked = enableTimeAllocation === true;
             }
             
             if (workflowTimeAllocationFields) {
@@ -7144,6 +7262,22 @@ function openWorkflowModal(ticketId, targetStatus) {
             
             if (workflowTimeAllocated && timeAllocated) {
                 workflowTimeAllocated.value = timeAllocated;
+                // Update preset button states if value matches a preset
+                const value = parseFloat(timeAllocated);
+                if (value) {
+                    document.querySelectorAll('.workflow-time-preset-btn').forEach(btn => {
+                        const btnHours = parseFloat(btn.dataset.hours);
+                        if (Math.abs(value - btnHours) < 0.01) {
+                            btn.classList.add('active');
+                            btn.style.background = '#2563EB';
+                            btn.style.color = 'white';
+                        } else {
+                            btn.classList.remove('active');
+                            btn.style.background = '';
+                            btn.style.color = '';
+                        }
+                    });
+                }
             }
             if (workflowBillingRate && billingRate) {
                 workflowBillingRate.value = billingRate;
@@ -7911,13 +8045,14 @@ function renderInspectionReportsTable(reports) {
 }
 
 function resetInspectionReportFileUpload() {
-    inspectionReportSelectedFile = null;
+    inspectionReportSelectedFiles = [];
+    inspectionReportExistingFiles = [];
+    inspectionReportOriginalFiles = [];
     const input = document.getElementById('inspectionReportFile');
     if (input) input.value = '';
-    const preview = document.getElementById('inspectionReportFilePreview');
-    if (preview) preview.innerHTML = '';
+    updateInspectionReportFilePreview();
     const labelText = document.getElementById('inspectionReportFileLabelText');
-    if (labelText) labelText.textContent = 'Upload Inspection Report';
+    if (labelText) labelText.textContent = 'Upload Inspection Report Files';
 }
 
 function resetInspectionReportVendorSelection() {
@@ -7948,29 +8083,123 @@ function setupInspectionReportDragDrop() {
         dropZone.classList.remove('dragover');
         const files = Array.from(e.dataTransfer.files || []);
         if (files.length === 0) return;
-        fileInput.files = e.dataTransfer.files;
+        // Create a DataTransfer object to set multiple files
+        const dataTransfer = new DataTransfer();
+        files.forEach(f => dataTransfer.items.add(f));
+        fileInput.files = dataTransfer.files;
         handleInspectionReportFileSelect({ target: fileInput });
     });
 }
 
 function handleInspectionReportFileSelect(event) {
-    const file = event?.target?.files?.[0];
-    if (!file) return;
+    const files = Array.from(event?.target?.files || []);
+    if (!files || files.length === 0) return;
 
-    if (file.size > 20 * 1024 * 1024) {
-        alert(`File "${file.name}" is too large. Maximum size is 20MB.`);
-        event.target.value = '';
-        return;
-    }
+    files.forEach(file => {
+        // Validate file size (max 20MB)
+        if (file.size > 20 * 1024 * 1024) {
+            alert(`File "${file.name}" is too large. Maximum size is 20MB.`);
+            return;
+        }
 
-    inspectionReportSelectedFile = file;
+        const isImage = file.type.startsWith('image/');
+        const fileData = {
+            file: file,
+            isImage: isImage,
+            preview: null
+        };
+
+        if (isImage) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                fileData.preview = e.target.result;
+                inspectionReportSelectedFiles.push(fileData);
+                updateInspectionReportFilePreview();
+            };
+            reader.readAsDataURL(file);
+        } else {
+            inspectionReportSelectedFiles.push(fileData);
+            updateInspectionReportFilePreview();
+        }
+    });
+
+    // Reset input to allow selecting the same files again
+    event.target.value = '';
+}
+
+function updateInspectionReportFilePreview() {
     const preview = document.getElementById('inspectionReportFilePreview');
+    if (!preview) return;
+
+    let html = '';
+
+    // Show existing files from database
+    inspectionReportExistingFiles.forEach((fileData, index) => {
+        if (fileData.isImage) {
+            html += `
+                <div class="file-preview-item" style="display: inline-block; margin: 8px; position: relative;">
+                    <img src="${escapeHtml(fileData.fileUrl)}" alt="${escapeHtml(fileData.fileName)}" style="max-width: 150px; max-height: 150px; border-radius: 4px; border: 1px solid #ddd;">
+                    <button type="button" onclick="removeInspectionReportExistingFile(${index})" style="position: absolute; top: -8px; right: -8px; background: #e74c3c; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 14px;">×</button>
+                    <div style="font-size: 0.75em; color: #666; margin-top: 4px; max-width: 150px; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(fileData.fileName)}</div>
+                </div>
+            `;
+        } else {
+            html += `
+                <div class="file-preview-item" style="display: inline-block; margin: 8px; position: relative; padding: 12px; border: 1px solid #ddd; border-radius: 4px; background: #f8f9fa;">
+                    <div style="font-size: 2em; margin-bottom: 4px;">📄</div>
+                    <button type="button" onclick="removeInspectionReportExistingFile(${index})" style="position: absolute; top: -8px; right: -8px; background: #e74c3c; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 14px;">×</button>
+                    <div style="font-size: 0.75em; color: #666; max-width: 120px; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(fileData.fileName)}</div>
+                    <a href="${escapeHtml(fileData.fileUrl)}" target="_blank" style="font-size: 0.7em; color: #2563eb; text-decoration: none; margin-top: 4px; display: block;">View</a>
+                </div>
+            `;
+        }
+    });
+
+    // Show new files being uploaded
+    inspectionReportSelectedFiles.forEach((fileData, index) => {
+        if (fileData.isImage && fileData.preview) {
+            html += `
+                <div class="file-preview-item" style="display: inline-block; margin: 8px; position: relative;">
+                    <img src="${escapeHtml(fileData.preview)}" alt="${escapeHtml(fileData.file.name)}" style="max-width: 150px; max-height: 150px; border-radius: 4px; border: 1px solid #ddd;">
+                    <button type="button" onclick="removeInspectionReportNewFile(${index})" style="position: absolute; top: -8px; right: -8px; background: #e74c3c; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 14px;">×</button>
+                    <div style="font-size: 0.75em; color: #666; margin-top: 4px; max-width: 150px; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(fileData.file.name)}</div>
+                </div>
+            `;
+        } else {
+            html += `
+                <div class="file-preview-item" style="display: inline-block; margin: 8px; position: relative; padding: 12px; border: 1px solid #ddd; border-radius: 4px; background: #f8f9fa;">
+                    <div style="font-size: 2em; margin-bottom: 4px;">📄</div>
+                    <button type="button" onclick="removeInspectionReportNewFile(${index})" style="position: absolute; top: -8px; right: -8px; background: #e74c3c; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 14px;">×</button>
+                    <div style="font-size: 0.75em; color: #666; max-width: 120px; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(fileData.file.name)}</div>
+                    <div style="font-size: 0.65em; color: #999; margin-top: 2px;">${formatFileSize(fileData.file.size)}</div>
+                </div>
+            `;
+        }
+    });
+
+    preview.innerHTML = html;
+
+    // Update label text
     const labelText = document.getElementById('inspectionReportFileLabelText');
-    if (labelText) labelText.textContent = file.name;
-    if (preview) {
-        preview.innerHTML = `<div style="margin-top: 8px; font-size: 13px; color: #1F2937;"><strong>Selected:</strong> ${escapeHtml(file.name)}</div>`;
+    const totalFiles = inspectionReportExistingFiles.length + inspectionReportSelectedFiles.length;
+    if (labelText) {
+        if (totalFiles === 0) {
+            labelText.textContent = 'Upload Inspection Report Files';
+        } else {
+            labelText.textContent = `${totalFiles} file${totalFiles !== 1 ? 's' : ''} selected`;
+        }
     }
 }
+
+window.removeInspectionReportNewFile = function(index) {
+    inspectionReportSelectedFiles.splice(index, 1);
+    updateInspectionReportFilePreview();
+};
+
+window.removeInspectionReportExistingFile = function(index) {
+    inspectionReportExistingFiles.splice(index, 1);
+    updateInspectionReportFilePreview();
+};
 
 function openInspectionReportModal(report = null) {
     if (!canManageInspectionReports()) {
@@ -8012,16 +8241,36 @@ function openInspectionReportModal(report = null) {
         if (notesInput) notesInput.value = report.notes || '';
         if (vendorNotListedHelp) vendorNotListedHelp.style.display = 'none';
 
-        form.dataset.existingFileUrl = report.fileUrl || '';
-        form.dataset.existingFileName = report.fileName || '';
-        form.dataset.existingStoragePath = report.storagePath || '';
-
-        const labelText = document.getElementById('inspectionReportFileLabelText');
-        const preview = document.getElementById('inspectionReportFilePreview');
-        if (report.fileName && labelText) labelText.textContent = `Current file: ${report.fileName}`;
-        if (report.fileName && preview) {
-            preview.innerHTML = `<div style="margin-top: 8px; font-size: 13px; color: #6B7280;"><strong>Current:</strong> ${escapeHtml(report.fileName)}</div>`;
+        // Load existing files (support both old single-file format and new array format)
+        inspectionReportExistingFiles = [];
+        inspectionReportOriginalFiles = [];
+        if (report.files && Array.isArray(report.files)) {
+            // New format: array of files
+            inspectionReportExistingFiles = report.files.map(f => ({
+                fileUrl: f.fileUrl || '',
+                fileName: f.fileName || '',
+                storagePath: f.storagePath || '',
+                isImage: f.isImage || false
+            }));
+            // Keep a copy of original files to track deletions
+            inspectionReportOriginalFiles = report.files.map(f => ({
+                fileUrl: f.fileUrl || '',
+                fileName: f.fileName || '',
+                storagePath: f.storagePath || '',
+                isImage: f.isImage || false
+            }));
+        } else if (report.fileUrl && report.fileName) {
+            // Legacy format: single file (migrate to array)
+            const legacyFile = {
+                fileUrl: report.fileUrl,
+                fileName: report.fileName,
+                storagePath: report.storagePath || '',
+                isImage: (report.fileName || '').match(/\.(jpg|jpeg|png|gif|webp)$/i) !== null
+            };
+            inspectionReportExistingFiles = [legacyFile];
+            inspectionReportOriginalFiles = [{ ...legacyFile }];
         }
+        updateInspectionReportFilePreview();
     } else {
         if (title) title.textContent = 'Add Inspection Report';
         if (idInput) idInput.value = '';
@@ -8033,10 +8282,6 @@ function openInspectionReportModal(report = null) {
         if (vendorSelect) vendorSelect.value = '';
         if (notesInput) notesInput.value = '';
         if (vendorNotListedHelp) vendorNotListedHelp.style.display = 'none';
-
-        form.dataset.existingFileUrl = '';
-        form.dataset.existingFileName = '';
-        form.dataset.existingStoragePath = '';
     }
 
     modal.classList.add('show');
@@ -8092,16 +8337,14 @@ async function handleInspectionReportSubmit(e) {
         return;
     }
 
-    const existingFileUrl = form?.dataset?.existingFileUrl || '';
-    const existingStoragePath = form?.dataset?.existingStoragePath || '';
-
-    // Require a file for new reports; for edits, allow keeping existing file
-    if (!id && !inspectionReportSelectedFile) {
-        alert('Please select an inspection report file to upload.');
+    // Require at least one file (new or existing) for new reports; for edits, allow keeping existing files
+    const totalFiles = inspectionReportSelectedFiles.length + inspectionReportExistingFiles.length;
+    if (!id && totalFiles === 0) {
+        alert('Please upload at least one inspection report file.');
         return;
     }
-    if (id && !inspectionReportSelectedFile && !existingFileUrl) {
-        alert('Please select an inspection report file to upload.');
+    if (id && totalFiles === 0) {
+        alert('Please keep at least one file or upload a new one.');
         return;
     }
 
@@ -8148,35 +8391,57 @@ async function handleInspectionReportSubmit(e) {
             baseData.createdByName = currentUserProfile ? (currentUserProfile.name || currentUserProfile.email) : null;
         }
 
-        let fileUrlToSave = existingFileUrl || null;
-        let fileNameToSave = form?.dataset?.existingFileName || null;
-        let storagePathToSave = existingStoragePath || null;
-
-        if (inspectionReportSelectedFile) {
-            const file = inspectionReportSelectedFile;
+        // Upload new files
+        const newFiles = [];
+        for (const fileData of inspectionReportSelectedFiles) {
+            const file = fileData.file;
             const safeName = String(file.name || 'report').replace(/[^\w.\- ()]/g, '_');
-            const storagePath = `inspectionReports/${propertyId}/${docRef.id}/${Date.now()}_${safeName}`;
+            const timestamp = Date.now();
+            const storagePath = `inspectionReports/${propertyId}/${docRef.id}/${timestamp}_${safeName}`;
             const storageRef = firebase.storage().ref().child(storagePath);
 
             await storageRef.put(file);
             const downloadUrl = await storageRef.getDownloadURL();
 
-            fileUrlToSave = downloadUrl;
-            fileNameToSave = file.name;
-            storagePathToSave = storagePath;
-
-            // Best-effort cleanup of old file (if replacing)
-            if (id && existingStoragePath && existingStoragePath !== storagePath) {
-                firebase.storage().ref().child(existingStoragePath).delete().catch(() => {});
-            }
+            newFiles.push({
+                fileUrl: downloadUrl,
+                fileName: file.name,
+                storagePath: storagePath,
+                isImage: fileData.isImage || false
+            });
         }
+
+        // Combine existing files (that weren't removed) with new files
+        const allFiles = [...inspectionReportExistingFiles, ...newFiles];
+
+        // For backward compatibility, also set the first file as the primary (legacy fields)
+        const primaryFile = allFiles.length > 0 ? allFiles[0] : null;
 
         const writeData = {
             ...baseData,
-            fileUrl: fileUrlToSave,
-            fileName: fileNameToSave,
-            storagePath: storagePathToSave
+            files: allFiles,
+            // Legacy fields for backward compatibility (use first file)
+            fileUrl: primaryFile?.fileUrl || null,
+            fileName: primaryFile?.fileName || null,
+            storagePath: primaryFile?.storagePath || null
         };
+
+        // If editing, delete removed files from Storage
+        if (id && inspectionReportOriginalFiles.length > 0) {
+            const existingPaths = new Set(inspectionReportExistingFiles.map(f => f.storagePath).filter(Boolean));
+            const removedFiles = inspectionReportOriginalFiles.filter(orig => 
+                orig.storagePath && !existingPaths.has(orig.storagePath)
+            );
+            
+            // Best-effort deletion of removed files
+            for (const removed of removedFiles) {
+                if (removed.storagePath) {
+                    firebase.storage().ref().child(removed.storagePath).delete().catch((err) => {
+                        console.warn('Could not delete removed file from Storage:', removed.storagePath, err);
+                    });
+                }
+            }
+        }
 
         if (id) {
             await docRef.update(writeData);
@@ -8220,9 +8485,24 @@ window.deleteInspectionReport = function(reportId) {
 
     db.collection('inspectionReports').doc(reportId).delete()
         .then(() => {
-            if (report.storagePath) {
-                firebase.storage().ref().child(report.storagePath).delete().catch(() => {});
+            // Delete all associated files from Storage
+            const filesToDelete = [];
+            if (report.files && Array.isArray(report.files)) {
+                // New format: delete all files in array
+                report.files.forEach(f => {
+                    if (f.storagePath) filesToDelete.push(f.storagePath);
+                });
+            } else if (report.storagePath) {
+                // Legacy format: single file
+                filesToDelete.push(report.storagePath);
             }
+            
+            // Best-effort deletion of all files
+            filesToDelete.forEach(storagePath => {
+                firebase.storage().ref().child(storagePath).delete().catch((err) => {
+                    console.warn('Could not delete file from Storage:', storagePath, err);
+                });
+            });
         })
         .catch((error) => {
             console.error('Error deleting inspection report:', error);

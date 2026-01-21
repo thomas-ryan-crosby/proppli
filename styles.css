@@ -3609,6 +3609,25 @@ hr {
     line-height: 32px;
 }
 
+/* Time preset buttons */
+.time-preset-btn,
+.workflow-time-preset-btn {
+    transition: all 0.2s ease;
+}
+
+.time-preset-btn:hover,
+.workflow-time-preset-btn:hover {
+    background: #E5E7EB;
+    border-color: #2563EB;
+}
+
+.time-preset-btn.active,
+.workflow-time-preset-btn.active {
+    background: #2563EB;
+    color: white;
+    border-color: #2563EB;
+}
+
 /* Escalation indicator */
 .rent-roll-table td[style*="position: relative"] {
     position: relative;

@@ -362,9 +362,18 @@
                                     <span style="font-weight: 600;">Enable Time Allocation</span>
                                 </label>
                                 <div id="timeAllocationGroup" style="display: none;">
-                                <label for="timeAllocated">Time Allocated (hours)</label>
-                                <input type="number" id="timeAllocated" min="0" step="0.5" placeholder="Required before marking complete">
-                                    <small style="color: #666; font-size: 12px;">Time allocation must be set before marking ticket as complete</small>
+                                <label for="timeAllocated">Time Allocated</label>
+                                <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
+                                    <button type="button" class="btn-secondary btn-small time-preset-btn" data-hours="0.25" style="min-width: 60px;">15 min</button>
+                                    <button type="button" class="btn-secondary btn-small time-preset-btn" data-hours="0.5" style="min-width: 60px;">30 min</button>
+                                    <button type="button" class="btn-secondary btn-small time-preset-btn" data-hours="0.75" style="min-width: 60px;">45 min</button>
+                                    <button type="button" class="btn-secondary btn-small time-preset-btn" data-hours="1" style="min-width: 60px;">1 hr</button>
+                                </div>
+                                <div style="display: flex; gap: 8px; align-items: center;">
+                                    <label for="timeAllocated" style="margin: 0; white-space: nowrap;">Custom:</label>
+                                    <input type="number" id="timeAllocated" min="0" step="0.25" placeholder="Hours (e.g., 1.5)" style="flex: 1;">
+                                </div>
+                                    <small style="color: #666; font-size: 12px; display: block; margin-top: 8px;">Time allocation must be set before marking ticket as complete</small>
                                     <div style="margin-top: 15px;">
                                 <label>Billing Type</label>
                                 <div style="display: flex; gap: 20px; margin-bottom: 10px;">
@@ -616,9 +625,18 @@
                                     <span style="font-weight: 600;">Enable Time Allocation</span>
                                 </label>
                                 <div id="workflowTimeAllocationFields" style="display: none;">
-                                    <label for="workflowTimeAllocated">Time Allocated (hours)</label>
-                                    <input type="number" id="workflowTimeAllocated" min="0" step="0.5" placeholder="Required before marking complete">
-                                    <small style="color: #666; font-size: 12px;">Time allocation must be set before marking ticket as complete</small>
+                                    <label for="workflowTimeAllocated">Time Allocated</label>
+                                    <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
+                                        <button type="button" class="btn-secondary btn-small workflow-time-preset-btn" data-hours="0.25" style="min-width: 60px;">15 min</button>
+                                        <button type="button" class="btn-secondary btn-small workflow-time-preset-btn" data-hours="0.5" style="min-width: 60px;">30 min</button>
+                                        <button type="button" class="btn-secondary btn-small workflow-time-preset-btn" data-hours="0.75" style="min-width: 60px;">45 min</button>
+                                        <button type="button" class="btn-secondary btn-small workflow-time-preset-btn" data-hours="1" style="min-width: 60px;">1 hr</button>
+                                    </div>
+                                    <div style="display: flex; gap: 8px; align-items: center;">
+                                        <label for="workflowTimeAllocated" style="margin: 0; white-space: nowrap;">Custom:</label>
+                                        <input type="number" id="workflowTimeAllocated" min="0" step="0.25" placeholder="Hours (e.g., 1.5)" style="flex: 1;">
+                                    </div>
+                                    <small style="color: #666; font-size: 12px; display: block; margin-top: 8px;">Time allocation must be set before marking ticket as complete</small>
                                     <div style="margin-top: 15px;">
                                         <label>Billing Type</label>
                                         <div style="display: flex; gap: 20px; margin-bottom: 10px;">
@@ -702,19 +720,19 @@
                             </div>
 
                             <div class="form-group">
-                                <label>Inspection Report File *</label>
+                                <label>Inspection Report Files *</label>
                                 <div class="file-upload-section" style="grid-template-columns: 1fr;">
                                     <div class="file-upload-item" id="inspectionReportDropZone">
                                         <label for="inspectionReportFile" class="file-upload-label">
                                             <span class="file-upload-icon">📎</span>
-                                            <span id="inspectionReportFileLabelText">Upload Inspection Report</span>
-                                            <span style="display: block; margin-top: 8px; font-size: 12px; color: #666;">or drag and drop a file here</span>
+                                            <span id="inspectionReportFileLabelText">Upload Inspection Report Files</span>
+                                            <span style="display: block; margin-top: 8px; font-size: 12px; color: #666;">or drag and drop files here (multiple files allowed)</span>
                                         </label>
-                                        <input type="file" id="inspectionReportFile" style="display: none;">
+                                        <input type="file" id="inspectionReportFile" multiple style="display: none;">
                                         <div id="inspectionReportFilePreview" class="file-preview"></div>
                                     </div>
                                 </div>
-                                <small style="color: #6B7280; font-size: 12px;">Accepted formats: PDF, images, or documents. For edits, you can keep the existing file.</small>
+                                <small style="color: #6B7280; font-size: 12px;">Accepted formats: PDF, images, or documents. You can upload multiple files. For edits, you can keep existing files or add/remove them.</small>
                             </div>
 
                             <div class="form-actions">
