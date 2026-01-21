@@ -18952,27 +18952,24 @@ const COST_CODES_BY_COMPANY = {
     ]
 };
 
-// Load cost codes from Firestore (with fallback to constant)
+// Load cost codes from Firestore only
 async function loadCostCodesFromFirestore(company) {
     try {
+        // First, ensure cost codes are initialized if Firestore is empty
+        await ensureCostCodesInitialized();
+        
         const snapshot = await db.collection('costCodes')
             .where('company', '==', company)
             .orderBy('code')
             .get();
         
-        if (!snapshot.empty) {
-            return snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
-        }
-        
-        // Fallback to constant if Firestore is empty
-        return COST_CODES_BY_COMPANY[company] || [];
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
     } catch (error) {
         console.error('Error loading cost codes from Firestore:', error);
-        // Fallback to constant on error
-        return COST_CODES_BY_COMPANY[company] || [];
+        return [];
     }
 }
 
@@ -19666,9 +19663,9 @@ async function loadCostCodes() {
             });
         });
         
-        // If Firestore is empty, initialize from constant
+        // If Firestore is empty, ensure initialization
         if (snapshot.empty) {
-            await initializeCostCodesFromConstant();
+            await ensureCostCodesInitialized();
             // Reload after initialization
             return loadCostCodes();
         }
@@ -19686,11 +19683,38 @@ async function loadCostCodes() {
     }
 }
 
-// Initialize cost codes in Firestore from constant
+// Check if cost codes are initialized, and initialize if needed
+let costCodesInitializationChecked = false;
+async function ensureCostCodesInitialized() {
+    // Only check once per session
+    if (costCodesInitializationChecked) {
+        return;
+    }
+    
+    try {
+        // Quick check if any cost codes exist
+        const checkSnapshot = await db.collection('costCodes').limit(1).get();
+        
+        if (checkSnapshot.empty) {
+            // Firestore is empty, initialize from constant
+            await initializeCostCodesFromConstant();
+        }
+        
+        costCodesInitializationChecked = true;
+    } catch (error) {
+        console.error('Error checking cost codes initialization:', error);
+        costCodesInitializationChecked = true; // Mark as checked to avoid infinite loops
+    }
+}
+
+// Initialize cost codes in Firestore from constant (one-time migration)
 async function initializeCostCodesFromConstant() {
     try {
         const batch = db.batch();
         let count = 0;
+        const batchSize = 500; // Firestore batch limit
+        let currentBatch = db.batch();
+        let currentBatchCount = 0;
         
         for (const [company, codes] of Object.entries(COST_CODES_BY_COMPANY)) {
             for (const codeObj of codes) {
@@ -19703,7 +19727,7 @@ async function initializeCostCodesFromConstant() {
                 
                 if (existing.empty) {
                     const ref = db.collection('costCodes').doc();
-                    batch.set(ref, {
+                    currentBatch.set(ref, {
                         company: company,
                         code: codeObj.code,
                         description: codeObj.description || '',
@@ -19711,16 +19735,29 @@ async function initializeCostCodesFromConstant() {
                         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
                     count++;
+                    currentBatchCount++;
+                    
+                    // Commit batch if we hit the limit
+                    if (currentBatchCount >= batchSize) {
+                        await currentBatch.commit();
+                        currentBatch = db.batch();
+                        currentBatchCount = 0;
+                    }
                 }
             }
         }
         
+        // Commit remaining items
+        if (currentBatchCount > 0) {
+            await currentBatch.commit();
+        }
+        
         if (count > 0) {
-            await batch.commit();
             console.log(`Initialized ${count} cost codes in Firestore`);
         }
     } catch (error) {
         console.error('Error initializing cost codes:', error);
+        throw error;
     }
 }
 
