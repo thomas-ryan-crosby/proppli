@@ -18939,7 +18939,11 @@ window.addInvoice = function() {
     document.getElementById('invoiceId').value = '';
     document.getElementById('invoiceModalTitle').textContent = 'Add Invoice';
     loadPropertiesForInvoiceForm();
-    loadVendorsForInvoiceForm();
+    loadVendorsForInvoiceForm().then(() => {
+        // Clear cost codes when adding new invoice
+        const costCodeList = document.getElementById('invoiceCostCodeList');
+        if (costCodeList) costCodeList.innerHTML = '';
+    });
     resetInvoiceFileUpload();
     document.getElementById('invoiceModal').classList.add('show');
 };
