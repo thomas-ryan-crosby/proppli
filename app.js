@@ -19641,8 +19641,9 @@ async function loadCostCodes() {
         let query = db.collection('costCodes');
         
         if (companyFilter) {
-            // If filtering by company, use where clause and order by code only
-            query = query.where('company', '==', companyFilter).orderBy('code');
+            // If filtering by company, DO NOT orderBy another field (would require composite index).
+            // We'll sort in-memory instead.
+            query = query.where('company', '==', companyFilter);
         } else {
             // If no filter, just order by company (single field index)
             query = query.orderBy('company');
