@@ -18957,7 +18957,6 @@ async function loadCostCodesFromFirestore(company) {
     try {
         const snapshot = await db.collection('costCodes')
             .where('company', '==', company)
-            .orderBy('code')
             .get();
         
         return snapshot.docs.map(doc => ({
