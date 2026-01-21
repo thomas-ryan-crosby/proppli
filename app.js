@@ -18657,7 +18657,7 @@ const COST_CODES_BY_COMPANY = {
         {"code": "032", "description": "Lumber,Nails,Hardware"},
         {"code": "033", "description": "Exterior Trim & Doors"},
         {"code": "034", "description": "Aluminum Window & Doors"},
-        {"code": "035", "description": "Structural Steel, Fl Beam"},
+        {"code": "035", "description": "Structural Steel, FI Beam"},
         {"code": "036", "description": "Equipment Rental"},
         {"code": "041", "description": "Plumbing Sub & Drainage"},
         {"code": "042", "description": "Bath Tops & Alcove"},
@@ -18747,9 +18747,7 @@ const COST_CODES_BY_COMPANY = {
         {"code": "421", "description": "Management Fee"},
         {"code": "422", "description": "RV Propane"},
         {"code": "500", "description": "Tent Installation"},
-        {"code": "62B", "description": "Exterior Light Fixtures"},
-        {"code": "Reimb Subt", "description": "Reimbursable Expenses Subtotal"},
-        {"code": "Reimb Group", "description": "Total Reimbursable Expenses"}
+        {"code": "62B", "description": "Exterior Light Fixtures"}
     ],
     "SHOA": [
         {"code": "Generator", "description": "Expense"},
