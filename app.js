@@ -19759,42 +19759,77 @@ function renderCostCodesList(costCodesByCompany) {
         costCodesList.innerHTML = '<p class="no-tenants-message">No cost codes found. Add one to get started.</p>';
         return;
     }
-    
-    Object.keys(costCodesByCompany).sort().forEach(company => {
-        const codes = costCodesByCompany[company];
-        
-        // Company header
-        const companyHeader = document.createElement('div');
-        companyHeader.style.cssText = 'background: #f8f9fa; padding: 15px; margin-bottom: 15px; border-radius: 8px; border-left: 4px solid #667eea;';
-        companyHeader.innerHTML = `
-            <h3 style="margin: 0; color: #333; font-size: 1.2em;">${escapeHtml(company)}</h3>
-            <small style="color: #666;">${codes.length} cost code${codes.length !== 1 ? 's' : ''}</small>
-        `;
-        costCodesList.appendChild(companyHeader);
-        
-        // Cost codes for this company
-        codes.forEach(costCode => {
-            const card = document.createElement('div');
-            card.className = 'tenant-card';
-            card.style.marginBottom = '10px';
-            
-            card.innerHTML = `
-                <div class="tenant-card-header">
-                    <div>
-                        <h3 style="margin: 0 0 5px 0; font-size: 1em;">${escapeHtml(costCode.code)}</h3>
-                        <p style="margin: 0; color: #666; font-size: 0.9em;">${escapeHtml(costCode.description || 'No description')}</p>
-                    </div>
-                </div>
-                ${canManageCostCodes() ? `
-                    <div class="tenant-card-actions">
-                        <button class="btn-secondary btn-small" onclick="editCostCode('${costCode.id}')">Edit</button>
-                        <button class="btn-danger btn-small" onclick="deleteCostCode('${costCode.id}')">Delete</button>
-                    </div>
-                ` : ''}
-            `;
-            costCodesList.appendChild(card);
+
+    // Flatten rows for a single table view (more scannable)
+    const rows = [];
+    Object.keys(costCodesByCompany).forEach(company => {
+        (costCodesByCompany[company] || []).forEach(cc => {
+            rows.push({
+                id: cc.id,
+                company: company,
+                code: cc.code || '',
+                description: cc.description || ''
+            });
         });
     });
+
+    // Sort: company, then code (numeric-ish)
+    rows.sort((a, b) => {
+        const companyCmp = (a.company || '').localeCompare((b.company || ''), undefined, { sensitivity: 'base' });
+        if (companyCmp !== 0) return companyCmp;
+
+        const aCode = a.code || '';
+        const bCode = b.code || '';
+        const aNum = parseInt(aCode);
+        const bNum = parseInt(bCode);
+        if (!isNaN(aNum) && !isNaN(bNum) && aCode.replace(/\D/g, '') === String(aNum) && bCode.replace(/\D/g, '') === String(bNum)) {
+            return aNum - bNum;
+        }
+        return aCode.localeCompare(bCode, undefined, { numeric: true, sensitivity: 'base' });
+    });
+
+    const canEdit = canManageCostCodes();
+
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden;';
+
+    wrapper.innerHTML = `
+        <div style="padding: 12px 16px; background: #f8f9fa; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <div style="font-weight: 700; color: #111827;">Cost Codes</div>
+                <div style="color: #6b7280; font-size: 12px;">${rows.length} total</div>
+            </div>
+        </div>
+        <div style="overflow-x: auto;">
+            <table class="data-table" style="width: 100%; margin: 0;">
+                <thead>
+                    <tr>
+                        <th style="padding: 12px 10px;">Company</th>
+                        <th style="padding: 12px 10px;">Code</th>
+                        <th style="padding: 12px 10px;">Description</th>
+                        ${canEdit ? '<th style="padding: 12px 10px; text-align: right;">Actions</th>' : ''}
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows.map(r => `
+                        <tr>
+                            <td style="padding: 10px; white-space: nowrap; font-weight: 600;">${escapeHtml(r.company)}</td>
+                            <td style="padding: 10px; white-space: nowrap; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace;">${escapeHtml(r.code)}</td>
+                            <td style="padding: 10px;">${escapeHtml(r.description || '—')}</td>
+                            ${canEdit ? `
+                                <td style="padding: 10px; text-align: right; white-space: nowrap;">
+                                    <button class="btn-secondary btn-small" onclick="editCostCode('${r.id}')">Edit</button>
+                                    <button class="btn-danger btn-small" onclick="deleteCostCode('${r.id}')">Delete</button>
+                                </td>
+                            ` : ''}
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    costCodesList.appendChild(wrapper);
 }
 
 // Add cost code
