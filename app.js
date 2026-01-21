@@ -19638,15 +19638,19 @@ async function loadCostCodes() {
     try {
         const companyFilter = document.getElementById('costCodeCompanyFilter')?.value || '';
         
-        let query = db.collection('costCodes').orderBy('company').orderBy('code');
+        let query = db.collection('costCodes');
         
         if (companyFilter) {
-            query = query.where('company', '==', companyFilter);
+            // If filtering by company, use where clause and order by code only
+            query = query.where('company', '==', companyFilter).orderBy('code');
+        } else {
+            // If no filter, just order by company (single field index)
+            query = query.orderBy('company');
         }
         
         const snapshot = await query.get();
         
-        // Group by company
+        // Group by company and sort codes within each company
         const costCodesByCompany = {};
         snapshot.forEach(doc => {
             const data = doc.data();
@@ -19657,6 +19661,21 @@ async function loadCostCodes() {
             costCodesByCompany[company].push({
                 id: doc.id,
                 ...data
+            });
+        });
+        
+        // Sort codes within each company
+        Object.keys(costCodesByCompany).forEach(company => {
+            costCodesByCompany[company].sort((a, b) => {
+                const aCode = a.code || '';
+                const bCode = b.code || '';
+                // Try numeric sort first
+                const aNum = parseInt(aCode);
+                const bNum = parseInt(bCode);
+                if (!isNaN(aNum) && !isNaN(bNum)) {
+                    return aNum - bNum;
+                }
+                return aCode.localeCompare(bCode, undefined, { numeric: true, sensitivity: 'base' });
             });
         });
         
