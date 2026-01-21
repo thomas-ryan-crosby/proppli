@@ -7618,15 +7618,15 @@ function initializeInspectionReportsUI() {
     if (inspectionReportsInitialized) return;
     inspectionReportsInitialized = true;
 
-    // Permissions: keep the primary action visible, but disable if not allowed
+    // Keep the primary action visible and clickable.
+    // Permission enforcement happens inside openInspectionReportModal/submit.
     const addBtn = document.getElementById('addInspectionReportBtn');
     if (addBtn) {
-        const allowed = canManageInspectionReports();
         addBtn.style.display = '';
-        addBtn.disabled = !allowed;
-        addBtn.title = allowed ? '' : 'You do not have permission to add inspection reports.';
-        addBtn.style.opacity = allowed ? '' : '0.6';
-        addBtn.style.cursor = allowed ? '' : 'not-allowed';
+        addBtn.disabled = false;
+        addBtn.title = '';
+        addBtn.style.opacity = '';
+        addBtn.style.cursor = '';
     }
 
     populateInspectionReportTypeOptions();
