@@ -19238,6 +19238,8 @@ window.addInvoice = function() {
     const invoiceForm = document.getElementById('invoiceForm');
     if (invoiceForm) {
         invoiceForm.reset();
+        // New invoice: no existing file
+        invoiceForm.dataset.existingInvoiceFileUrl = '';
     }
     document.getElementById('invoiceId').value = '';
     document.getElementById('invoiceModalTitle').textContent = 'Add Invoice';
@@ -19256,6 +19258,7 @@ window.editInvoice = function(invoiceId) {
     const invoiceForm = document.getElementById('invoiceForm');
     if (invoiceForm) {
         invoiceForm.reset();
+        invoiceForm.dataset.existingInvoiceFileUrl = '';
     }
     
     db.collection('invoices').doc(invoiceId).get().then((doc) => {
@@ -19294,6 +19297,9 @@ window.editInvoice = function(invoiceId) {
         
         // Show existing file if present
         if (invoice.fileUrl) {
+            if (invoiceForm) {
+                invoiceForm.dataset.existingInvoiceFileUrl = invoice.fileUrl;
+            }
             const fileNameDiv = document.getElementById('invoiceFileName');
             const fileNameText = document.getElementById('invoiceFileNameText');
             const dropZoneContent = document.getElementById('invoiceFileDropZoneContent');
@@ -20007,6 +20013,20 @@ async function handleInvoiceSubmit(e) {
         resetButtonState();
         return;
     }
+
+    // Require an invoice file only if creating a new invoice OR editing without an existing file
+    const hasNewFile = !!(fileInput && fileInput.files && fileInput.files.length > 0);
+    const hasExistingFile = !!(invoiceForm.dataset.existingInvoiceFileUrl);
+    if (!id && !hasNewFile) {
+        alert('Please upload an invoice file.');
+        resetButtonState();
+        return;
+    }
+    if (id && !hasNewFile && !hasExistingFile) {
+        alert('Please upload an invoice file (existing file missing).');
+        resetButtonState();
+        return;
+    }
     
     // Validate amount
     const amountNum = parseFloat(amount);
@@ -20185,6 +20205,9 @@ function setupInvoiceFileDragDrop() {
             e.preventDefault();
             e.stopPropagation();
             fileInput.value = '';
+            // If user removes the file while editing, treat as no existing file going forward
+            const invoiceForm = document.getElementById('invoiceForm');
+            if (invoiceForm) invoiceForm.dataset.existingInvoiceFileUrl = '';
             if (dropZoneContent) dropZoneContent.style.display = 'block';
             if (fileNameDiv) fileNameDiv.style.display = 'none';
         });
