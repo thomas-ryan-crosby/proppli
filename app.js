@@ -20060,9 +20060,13 @@ async function handleInvoiceSubmit(e) {
             accountCode: accountCode,
             company: company,
             costCode: costCode,
-            status: id ? undefined : 'pending', // Only set status for new invoices
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
+
+        // Only set status for new invoices (Firestore rejects undefined fields)
+        if (!id) {
+            invoiceData.status = 'pending';
+        }
         
         // Handle file upload
         let fileUrl = null;
