@@ -18939,15 +18939,8 @@ window.addInvoice = function() {
     document.getElementById('invoiceId').value = '';
     document.getElementById('invoiceModalTitle').textContent = 'Add Invoice';
     loadPropertiesForInvoiceForm();
-    loadVendorsForInvoiceForm().then(() => {
-        // Clear cost codes when adding new invoice
-        const costCodeSelect = document.getElementById('invoiceCostCode');
-        if (costCodeSelect) {
-            costCodeSelect.disabled = true;
-            costCodeSelect.innerHTML = '<option value="">Please select a vendor first</option>';
-            costCodeSelect.value = '';
-        }
-    });
+    loadVendorsForInvoiceForm();
+    loadAllCostCodes();
     resetInvoiceFileUpload();
     document.getElementById('invoiceModal').classList.add('show');
 };
@@ -18982,14 +18975,16 @@ window.editInvoice = function(invoiceId) {
         loadPropertiesForInvoiceForm().then(() => {
             document.getElementById('invoiceProperty').value = invoice.propertyId || '';
         });
-        loadVendorsForInvoiceForm().then(async () => {
+        loadVendorsForInvoiceForm().then(() => {
             document.getElementById('invoiceVendor').value = invoice.vendorId || '';
-            // Update cost codes after vendor is set, then set the cost code value
-            await updateCostCodesForVendor();
-            if (invoice.costCode) {
-                document.getElementById('invoiceCostCode').value = invoice.costCode;
-            }
         });
+        loadAllCostCodes();
+        if (invoice.costCode) {
+            // Set cost code after a brief delay to ensure dropdown is populated
+            setTimeout(() => {
+                document.getElementById('invoiceCostCode').value = invoice.costCode;
+            }, 100);
+        }
         
         // Show existing file if present
         if (invoice.fileUrl) {
@@ -19301,8 +19296,7 @@ async function loadVendorsForInvoiceForm() {
             vendorSelect.appendChild(option);
         });
         
-        // Add event listener to update cost codes when vendor changes
-        vendorSelect.addEventListener('change', updateCostCodesForVendor);
+        // Cost codes are loaded independently, no need to update on vendor change
     } catch (error) {
         console.error('Error loading vendors for invoice form:', error);
     }
@@ -19310,69 +19304,44 @@ async function loadVendorsForInvoiceForm() {
     return Promise.resolve();
 }
 
-// Update cost codes dropdown based on selected vendor
-async function updateCostCodesForVendor() {
-    const vendorSelect = document.getElementById('invoiceVendor');
+// Load all cost codes into dropdown
+function loadAllCostCodes() {
     const costCodeSelect = document.getElementById('invoiceCostCode');
+    if (!costCodeSelect) return;
     
-    if (!vendorSelect || !costCodeSelect) return;
+    // Clear existing options
+    costCodeSelect.innerHTML = '<option value="">Select a cost code...</option>';
     
-    const vendorId = vendorSelect.value;
-    if (!vendorId) {
-        // No vendor selected - disable and show message
-        costCodeSelect.disabled = true;
-        costCodeSelect.innerHTML = '<option value="">Please select a vendor first</option>';
-        return;
-    }
-    
-    try {
-        const vendorDoc = await db.collection('vendors').doc(vendorId).get();
-        if (!vendorDoc.exists) {
-            costCodeSelect.disabled = true;
-            costCodeSelect.innerHTML = '<option value="">Vendor not found</option>';
-            return;
-        }
-        
-        const vendor = vendorDoc.data();
-        const vendorName = vendor.name || '';
-        const costCodes = getCostCodesForVendor(vendorName);
-        
-        // Clear existing options
-        costCodeSelect.innerHTML = '';
-        
-        if (costCodes.length === 0) {
-            // No cost codes found for this vendor
-            costCodeSelect.disabled = true;
-            costCodeSelect.innerHTML = '<option value="">No cost codes available for this vendor</option>';
-            return;
-        }
-        
-        // Add empty option
-        const emptyOption = document.createElement('option');
-        emptyOption.value = '';
-        emptyOption.textContent = 'Select a cost code...';
-        costCodeSelect.appendChild(emptyOption);
-        
-        // Add cost codes to dropdown
-        costCodes.forEach(code => {
-            const option = document.createElement('option');
-            option.value = code;
-            option.textContent = code;
-            costCodeSelect.appendChild(option);
+    // Combine all cost codes from all companies
+    const allCostCodes = [];
+    Object.keys(COST_CODES_BY_COMPANY).forEach(company => {
+        COST_CODES_BY_COMPANY[company].forEach(code => {
+            if (!allCostCodes.includes(code)) {
+                allCostCodes.push(code);
+            }
         });
-        
-        // Enable the dropdown
-        costCodeSelect.disabled = false;
-        
-        // Show message if codes were found
-        if (costCodes.length > 0) {
-            console.log(`Loaded ${costCodes.length} cost codes for vendor: ${vendorName}`);
+    });
+    
+    // Sort cost codes
+    allCostCodes.sort((a, b) => {
+        // Try to sort numerically first, then alphabetically
+        const aNum = parseInt(a);
+        const bNum = parseInt(b);
+        if (!isNaN(aNum) && !isNaN(bNum)) {
+            return aNum - bNum;
         }
-    } catch (error) {
-        console.error('Error updating cost codes for vendor:', error);
-        costCodeSelect.disabled = true;
-        costCodeSelect.innerHTML = '<option value="">Error loading cost codes</option>';
-    }
+        return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+    });
+    
+    // Add all cost codes to dropdown
+    allCostCodes.forEach(code => {
+        const option = document.createElement('option');
+        option.value = code;
+        option.textContent = code;
+        costCodeSelect.appendChild(option);
+    });
+    
+    console.log(`Loaded ${allCostCodes.length} cost codes from all companies`);
 }
 
 // Reset invoice file upload UI
