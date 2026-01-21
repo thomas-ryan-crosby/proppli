@@ -18941,8 +18941,12 @@ window.addInvoice = function() {
     loadPropertiesForInvoiceForm();
     loadVendorsForInvoiceForm().then(() => {
         // Clear cost codes when adding new invoice
-        const costCodeList = document.getElementById('invoiceCostCodeList');
-        if (costCodeList) costCodeList.innerHTML = '';
+        const costCodeSelect = document.getElementById('invoiceCostCode');
+        if (costCodeSelect) {
+            costCodeSelect.disabled = true;
+            costCodeSelect.innerHTML = '<option value="">Please select a vendor first</option>';
+            costCodeSelect.value = '';
+        }
     });
     resetInvoiceFileUpload();
     document.getElementById('invoiceModal').classList.add('show');
@@ -18980,8 +18984,12 @@ window.editInvoice = function(invoiceId) {
         });
         loadVendorsForInvoiceForm().then(() => {
             document.getElementById('invoiceVendor').value = invoice.vendorId || '';
-            // Update cost codes after vendor is set
-            updateCostCodesForVendor();
+            // Update cost codes after vendor is set, then set the cost code value
+            updateCostCodesForVendor().then(() => {
+                if (invoice.costCode) {
+                    document.getElementById('invoiceCostCode').value = invoice.costCode;
+                }
+            });
         });
         
         // Show existing file if present
@@ -19306,21 +19314,23 @@ async function loadVendorsForInvoiceForm() {
 // Update cost codes dropdown based on selected vendor
 async function updateCostCodesForVendor() {
     const vendorSelect = document.getElementById('invoiceVendor');
-    const costCodeInput = document.getElementById('invoiceCostCode');
-    const costCodeList = document.getElementById('invoiceCostCodeList');
+    const costCodeSelect = document.getElementById('invoiceCostCode');
     
-    if (!vendorSelect || !costCodeInput || !costCodeList) return;
+    if (!vendorSelect || !costCodeSelect) return;
     
     const vendorId = vendorSelect.value;
     if (!vendorId) {
-        costCodeList.innerHTML = '';
+        // No vendor selected - disable and show message
+        costCodeSelect.disabled = true;
+        costCodeSelect.innerHTML = '<option value="">Please select a vendor first</option>';
         return;
     }
     
     try {
         const vendorDoc = await db.collection('vendors').doc(vendorId).get();
         if (!vendorDoc.exists) {
-            costCodeList.innerHTML = '';
+            costCodeSelect.disabled = true;
+            costCodeSelect.innerHTML = '<option value="">Vendor not found</option>';
             return;
         }
         
@@ -19329,14 +19339,31 @@ async function updateCostCodesForVendor() {
         const costCodes = getCostCodesForVendor(vendorName);
         
         // Clear existing options
-        costCodeList.innerHTML = '';
+        costCodeSelect.innerHTML = '';
         
-        // Add cost codes to datalist
+        if (costCodes.length === 0) {
+            // No cost codes found for this vendor
+            costCodeSelect.disabled = true;
+            costCodeSelect.innerHTML = '<option value="">No cost codes available for this vendor</option>';
+            return;
+        }
+        
+        // Add empty option
+        const emptyOption = document.createElement('option');
+        emptyOption.value = '';
+        emptyOption.textContent = 'Select a cost code...';
+        costCodeSelect.appendChild(emptyOption);
+        
+        // Add cost codes to dropdown
         costCodes.forEach(code => {
             const option = document.createElement('option');
             option.value = code;
-            costCodeList.appendChild(option);
+            option.textContent = code;
+            costCodeSelect.appendChild(option);
         });
+        
+        // Enable the dropdown
+        costCodeSelect.disabled = false;
         
         // Show message if codes were found
         if (costCodes.length > 0) {
@@ -19344,6 +19371,8 @@ async function updateCostCodesForVendor() {
         }
     } catch (error) {
         console.error('Error updating cost codes for vendor:', error);
+        costCodeSelect.disabled = true;
+        costCodeSelect.innerHTML = '<option value="">Error loading cost codes</option>';
     }
 }
 
