@@ -826,16 +826,18 @@
 
             <div id="maintenanceInspectionReportsSection" style="display: none;">
                 <div id="inspectionReportsView" class="section">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap;">
+                    <div class="inspection-reports-header">
                         <div>
-                            <h2>Inspection Reports</h2>
-                            <p style="color: #6B7280; margin-bottom: 20px; font-size: 14px;">Upload and track pest inspections, fire inspections, life-safety reports, and more.</p>
+                            <h2 style="margin-bottom: 6px;">Inspection Reports</h2>
+                            <p class="muted-help">Upload and track pest inspections, fire inspections, life-safety reports, and more.</p>
                         </div>
-                        <button id="addInspectionReportBtn" class="btn-primary btn-large">+ Add Inspection Report</button>
+                        <div class="inspection-reports-actions">
+                            <button id="addInspectionReportBtn" class="btn-primary">+ Add Inspection Report</button>
+                        </div>
                     </div>
 
-                    <div class="section" style="margin-top: 12px;">
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; align-items: end;">
+                    <div class="inspection-reports-filters">
+                        <div class="inspection-reports-filters-grid">
                             <div class="form-group" style="margin: 0;">
                                 <label for="inspectionReportTypeFilter">Inspection Type</label>
                                 <select id="inspectionReportTypeFilter">
@@ -867,9 +869,9 @@
                         </div>
                     </div>
 
-                    <div class="section" style="margin-top: 16px;">
+                    <div class="inspection-reports-table">
                         <div class="tenants-table-container" style="max-height: none;">
-                            <table class="rent-roll-table" style="width: 100%;">
+                            <table class="rent-roll-table inspection-reports-table-inner" style="width: 100%;">
                                 <thead>
                                     <tr>
                                         <th>Inspection Date</th>

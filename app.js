@@ -7884,10 +7884,10 @@ function renderInspectionReportsTable(reports) {
         const dueCell = dueLabel ? `${escapeHtml(dueLabel)}: ${escapeHtml(dueText)}` : '—';
 
         const canManage = canManageInspectionReports();
-        const viewBtn = `<button class="btn-secondary btn-small" onclick="viewInspectionReportDetail('${r.id}')">View</button>`;
-        const downloadBtn = r.fileUrl ? `<a class="btn-secondary btn-small" href="${escapeHtml(r.fileUrl)}" target="_blank" rel="noopener noreferrer">Download</a>` : '';
-        const editBtn = canManage ? `<button class="btn-secondary btn-small" onclick="editInspectionReport('${r.id}')">Edit</button>` : '';
-        const deleteBtn = canManage ? `<button class="btn-danger btn-small" onclick="deleteInspectionReport('${r.id}')">Delete</button>` : '';
+        const viewBtn = `<button class="btn-secondary btn-small" onclick="viewInspectionReportDetail('${r.id}')" title="View details">View</button>`;
+        const downloadBtn = r.fileUrl ? `<a class="btn-secondary btn-small" href="${escapeHtml(r.fileUrl)}" target="_blank" rel="noopener noreferrer" title="Download file">Download</a>` : '';
+        const editBtn = canManage ? `<button class="btn-secondary btn-small" onclick="editInspectionReport('${r.id}')" title="Edit report">Edit</button>` : '';
+        const deleteBtn = canManage ? `<button class="btn-danger btn-small" onclick="deleteInspectionReport('${r.id}')" title="Delete report">Delete</button>` : '';
 
         return `
             <tr>
@@ -7897,8 +7897,8 @@ function renderInspectionReportsTable(reports) {
                 <td>${escapeHtml(r.vendorName || '—')}</td>
                 <td>${escapeHtml(dueCell)}</td>
                 <td>${status.badgeHtml}</td>
-                <td style="text-align: right; white-space: nowrap;">
-                    <div style="display: inline-flex; gap: 8px; align-items: center; justify-content: flex-end;">
+                <td style="text-align: right;">
+                    <div class="inspection-actions">
                         ${viewBtn}
                         ${downloadBtn}
                         ${editBtn}
