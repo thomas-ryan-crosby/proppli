@@ -641,6 +641,92 @@
                 </div>
             </div>
 
+            <!-- Inspection Report Add/Edit Modal -->
+            <div id="inspectionReportModal" class="modal">
+                <div class="modal-content" style="max-width: 800px;">
+                    <div class="modal-header">
+                        <h2 id="inspectionReportModalTitle">Add Inspection Report</h2>
+                        <button class="close-btn" id="closeInspectionReportModal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="inspectionReportForm">
+                            <input type="hidden" id="inspectionReportId">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                                <div class="form-group">
+                                    <label for="inspectionReportProperty">Property *</label>
+                                    <select id="inspectionReportProperty" required>
+                                        <option value="">Select a property...</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="inspectionReportType">Inspection Type *</label>
+                                    <select id="inspectionReportType" required>
+                                        <option value="">Select type...</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="inspectionReportInspectionDate">Inspection Date *</label>
+                                    <input type="date" id="inspectionReportInspectionDate" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="inspectionReportVendorName">Vendor / Inspector</label>
+                                    <input type="text" id="inspectionReportVendorName" placeholder="e.g., ABC Pest Control">
+                                </div>
+                                <div class="form-group">
+                                    <label for="inspectionReportValidThrough">Valid Through</label>
+                                    <input type="date" id="inspectionReportValidThrough">
+                                </div>
+                                <div class="form-group">
+                                    <label for="inspectionReportNextDueDate">Next Due Date</label>
+                                    <input type="date" id="inspectionReportNextDueDate">
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="inspectionReportNotes">Notes</label>
+                                <textarea id="inspectionReportNotes" rows="3" placeholder="Optional notes..."></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Inspection Report File *</label>
+                                <div class="file-upload-section" style="grid-template-columns: 1fr;">
+                                    <div class="file-upload-item" id="inspectionReportDropZone">
+                                        <label for="inspectionReportFile" class="file-upload-label">
+                                            <span class="file-upload-icon">📎</span>
+                                            <span id="inspectionReportFileLabelText">Upload Inspection Report</span>
+                                            <span style="display: block; margin-top: 8px; font-size: 12px; color: #666;">or drag and drop a file here</span>
+                                        </label>
+                                        <input type="file" id="inspectionReportFile" style="display: none;">
+                                        <div id="inspectionReportFilePreview" class="file-preview"></div>
+                                    </div>
+                                </div>
+                                <small style="color: #6B7280; font-size: 12px;">Accepted formats: PDF, images, or documents. For edits, you can keep the existing file.</small>
+                            </div>
+
+                            <div class="form-actions">
+                                <button type="submit" class="btn-primary" id="saveInspectionReportBtn">Save Report</button>
+                                <button type="button" class="btn-secondary" id="cancelInspectionReportForm">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Inspection Report Detail Modal -->
+            <div id="inspectionReportDetailModal" class="modal">
+                <div class="modal-content" style="max-width: 800px;">
+                    <div class="modal-header">
+                        <h2>Inspection Report Details</h2>
+                        <button class="close-btn" id="closeInspectionReportDetailModal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="inspectionReportDetailContent" style="min-height: 120px;">
+                            <p style="color: #6B7280; text-align: center; padding: 20px;">Loading...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Metrics Dashboard -->
             <div class="metrics-dashboard">
                 <div class="metrics-header">
@@ -690,6 +776,7 @@
                         <button id="viewMonitoringBtn" class="btn-toggle">Monitoring</button>
                         <button id="viewCompletedBtn" class="btn-toggle">Completed Tickets</button>
                         <button id="viewDeletedBtn" class="btn-toggle">Deleted Tickets</button>
+                        <button id="viewInspectionReportsBtn" class="btn-toggle">Inspection Reports</button>
                     </div>
                 </div>
 
@@ -719,6 +806,73 @@
                     <h2>Deleted Tickets</h2>
                     <p style="color: #666; margin-bottom: 15px;">Tickets in this section will be permanently removed after 30 days.</p>
                     <div id="deletedTicketsList" class="tickets-list"></div>
+                </div>
+
+                <!-- Inspection Reports View -->
+                <div id="inspectionReportsView" class="tickets-view" style="display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap;">
+                        <div>
+                            <h2>Inspection Reports</h2>
+                            <p style="color: #6B7280; margin-bottom: 20px; font-size: 14px;">Upload and track pest inspections, fire inspections, life-safety reports, and more.</p>
+                        </div>
+                        <button id="addInspectionReportBtn" class="btn-primary btn-large">+ Add Inspection Report</button>
+                    </div>
+
+                    <div class="section" style="margin-top: 12px;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; align-items: end;">
+                            <div class="form-group" style="margin: 0;">
+                                <label for="inspectionReportTypeFilter">Inspection Type</label>
+                                <select id="inspectionReportTypeFilter">
+                                    <option value="">All types</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin: 0;">
+                                <label for="inspectionReportStatusFilter">Status</label>
+                                <select id="inspectionReportStatusFilter">
+                                    <option value="">All statuses</option>
+                                    <option value="current">Current</option>
+                                    <option value="expiringSoon">Expiring Soon</option>
+                                    <option value="overdue">Overdue</option>
+                                    <option value="noDueDate">No Due Date</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin: 0;">
+                                <label for="inspectionReportDateFrom">Inspection Date From</label>
+                                <input type="date" id="inspectionReportDateFrom">
+                            </div>
+                            <div class="form-group" style="margin: 0;">
+                                <label for="inspectionReportDateTo">Inspection Date To</label>
+                                <input type="date" id="inspectionReportDateTo">
+                            </div>
+                            <div class="form-group" style="margin: 0;">
+                                <label for="inspectionReportSearch">Search</label>
+                                <input type="text" id="inspectionReportSearch" placeholder="Vendor, notes, filename...">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section" style="margin-top: 16px;">
+                        <div class="tenants-table-container" style="max-height: none;">
+                            <table class="rent-roll-table" style="width: 100%;">
+                                <thead>
+                                    <tr>
+                                        <th>Inspection Date</th>
+                                        <th>Property</th>
+                                        <th>Type</th>
+                                        <th>Vendor / Inspector</th>
+                                        <th>Valid Through / Next Due</th>
+                                        <th>Status</th>
+                                        <th style="text-align: right;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="inspectionReportsTableBody">
+                                    <tr>
+                                        <td colspan="7" style="padding: 18px; color: #6B7280; text-align: center;">Loading inspection reports...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
             </main>

@@ -10,6 +10,12 @@ let beforeFileUrls = []; // Array of existing file URLs from database
 let afterFileUrls = []; // Array of existing file URLs from database
 // completionAfterFiles is defined later with the function
 
+// Inspection Reports state
+let inspectionReportsUnsubscribe = null;
+let inspectionReportsCache = []; // Array of { id, ...data }
+let inspectionReportSelectedFile = null; // File selected in the add/edit modal
+let inspectionReportsInitialized = false;
+
 // ============================================
 // STANDARDIZED DATE/TIME UTILITIES
 // ============================================
@@ -2327,6 +2333,36 @@ function setupEventListeners() {
     // View toggles - add deleted view
     const viewDeletedBtn = document.getElementById('viewDeletedBtn');
     if (viewDeletedBtn) viewDeletedBtn.addEventListener('click', () => switchView('deleted'));
+
+    // View toggles - inspection reports
+    const viewInspectionReportsBtn = document.getElementById('viewInspectionReportsBtn');
+    if (viewInspectionReportsBtn) viewInspectionReportsBtn.addEventListener('click', () => switchView('inspectionReports'));
+
+    // Inspection Reports UI
+    const addInspectionReportBtn = document.getElementById('addInspectionReportBtn');
+    if (addInspectionReportBtn) addInspectionReportBtn.addEventListener('click', () => openInspectionReportModal());
+
+    const closeInspectionReportModalBtn = document.getElementById('closeInspectionReportModal');
+    const cancelInspectionReportFormBtn = document.getElementById('cancelInspectionReportForm');
+    const inspectionReportForm = document.getElementById('inspectionReportForm');
+    if (closeInspectionReportModalBtn) closeInspectionReportModalBtn.addEventListener('click', closeInspectionReportModal);
+    if (cancelInspectionReportFormBtn) cancelInspectionReportFormBtn.addEventListener('click', closeInspectionReportModal);
+    if (inspectionReportForm) inspectionReportForm.addEventListener('submit', handleInspectionReportSubmit);
+
+    const closeInspectionReportDetailModalBtn = document.getElementById('closeInspectionReportDetailModal');
+    if (closeInspectionReportDetailModalBtn) closeInspectionReportDetailModalBtn.addEventListener('click', closeInspectionReportDetailModal);
+
+    // Inspection report filters
+    const inspectionReportTypeFilter = document.getElementById('inspectionReportTypeFilter');
+    const inspectionReportStatusFilter = document.getElementById('inspectionReportStatusFilter');
+    const inspectionReportDateFrom = document.getElementById('inspectionReportDateFrom');
+    const inspectionReportDateTo = document.getElementById('inspectionReportDateTo');
+    const inspectionReportSearch = document.getElementById('inspectionReportSearch');
+    if (inspectionReportTypeFilter) inspectionReportTypeFilter.addEventListener('change', renderInspectionReportsFromCache);
+    if (inspectionReportStatusFilter) inspectionReportStatusFilter.addEventListener('change', renderInspectionReportsFromCache);
+    if (inspectionReportDateFrom) inspectionReportDateFrom.addEventListener('change', renderInspectionReportsFromCache);
+    if (inspectionReportDateTo) inspectionReportDateTo.addEventListener('change', renderInspectionReportsFromCache);
+    if (inspectionReportSearch) inspectionReportSearch.addEventListener('input', renderInspectionReportsFromCache);
 
     // Building management
     const addBuildingBtn = document.getElementById('addBuildingBtn');
@@ -7458,11 +7494,15 @@ function switchView(view) {
     const monitoringView = document.getElementById('monitoringTicketsView');
     const completedView = document.getElementById('completedTicketsView');
     const deletedView = document.getElementById('deletedTicketsView');
+    const inspectionReportsView = document.getElementById('inspectionReportsView');
     const newBtn = document.getElementById('viewNewBtn');
     const inProgressBtn = document.getElementById('viewInProgressBtn');
     const monitoringBtn = document.getElementById('viewMonitoringBtn');
     const completedBtn = document.getElementById('viewCompletedBtn');
     const deletedBtn = document.getElementById('viewDeletedBtn');
+    const inspectionReportsBtn = document.getElementById('viewInspectionReportsBtn');
+    const createTicketBtn = document.getElementById('createTicketBtn');
+    const metricsDashboard = document.querySelector('.metrics-dashboard');
     
     // Hide all views
     if (newView) newView.style.display = 'none';
@@ -7470,6 +7510,7 @@ function switchView(view) {
     if (monitoringView) monitoringView.style.display = 'none';
     if (completedView) completedView.style.display = 'none';
     if (deletedView) deletedView.style.display = 'none';
+    if (inspectionReportsView) inspectionReportsView.style.display = 'none';
     
     // Remove active class from all buttons
     if (newBtn) newBtn.classList.remove('active');
@@ -7477,28 +7518,683 @@ function switchView(view) {
     if (monitoringBtn) monitoringBtn.classList.remove('active');
     if (completedBtn) completedBtn.classList.remove('active');
     if (deletedBtn) deletedBtn.classList.remove('active');
+    if (inspectionReportsBtn) inspectionReportsBtn.classList.remove('active');
     
     // Show selected view and activate button
     if (view === 'new') {
         if (newView) newView.style.display = 'block';
         if (newBtn) newBtn.classList.add('active');
+        if (createTicketBtn) createTicketBtn.style.display = '';
+        if (metricsDashboard) metricsDashboard.style.display = '';
     } else if (view === 'inProgress') {
         if (inProgressView) inProgressView.style.display = 'block';
         if (inProgressBtn) inProgressBtn.classList.add('active');
+        if (createTicketBtn) createTicketBtn.style.display = '';
+        if (metricsDashboard) metricsDashboard.style.display = '';
     } else if (view === 'monitoring') {
         if (monitoringView) monitoringView.style.display = 'block';
         if (monitoringBtn) monitoringBtn.classList.add('active');
+        if (createTicketBtn) createTicketBtn.style.display = '';
+        if (metricsDashboard) metricsDashboard.style.display = '';
     } else if (view === 'completed') {
         if (completedView) completedView.style.display = 'block';
         if (completedBtn) completedBtn.classList.add('active');
+        if (createTicketBtn) createTicketBtn.style.display = '';
+        if (metricsDashboard) metricsDashboard.style.display = '';
     } else if (view === 'deleted') {
         if (deletedView) deletedView.style.display = 'block';
         if (deletedBtn) deletedBtn.classList.add('active');
+        if (createTicketBtn) createTicketBtn.style.display = '';
+        if (metricsDashboard) metricsDashboard.style.display = '';
+    } else if (view === 'inspectionReports') {
+        if (inspectionReportsView) inspectionReportsView.style.display = 'block';
+        if (inspectionReportsBtn) inspectionReportsBtn.classList.add('active');
+        if (createTicketBtn) createTicketBtn.style.display = 'none';
+        if (metricsDashboard) metricsDashboard.style.display = 'none';
+        initializeInspectionReportsUI();
+        loadInspectionReports();
     }
     
     // Save view preference
     localStorage.setItem('currentView', view);
 }
+
+// ============================================
+// MAINTENANCE: INSPECTION REPORTS
+// ============================================
+
+function canManageInspectionReports() {
+    if (!currentUserProfile) return false;
+    const role = currentUserProfile.role;
+    return role === 'admin' || role === 'super_admin' || role === 'property_manager' || role === 'maintenance';
+}
+
+function getDefaultInspectionTypes() {
+    return [
+        'Pest Inspection',
+        'Fire Inspection',
+        'Life Safety',
+        'Elevator Inspection',
+        'Backflow',
+        'Pool Inspection',
+        'Roof Inspection',
+        'Sprinkler / Suppression',
+        'Alarm / Monitoring',
+        'General Inspection'
+    ];
+}
+
+function initializeInspectionReportsUI() {
+    if (inspectionReportsInitialized) return;
+    inspectionReportsInitialized = true;
+
+    // Permissions: hide add button if needed
+    const addBtn = document.getElementById('addInspectionReportBtn');
+    if (addBtn && !canManageInspectionReports()) {
+        addBtn.style.display = 'none';
+    }
+
+    populateInspectionReportTypeOptions();
+    populateInspectionReportPropertyOptions();
+    setupInspectionReportDragDrop();
+
+    // Re-render when global property selector changes
+    const propertySelect = document.getElementById('propertySelect');
+    if (propertySelect) {
+        propertySelect.addEventListener('change', () => {
+            populateInspectionReportPropertyOptions();
+            renderInspectionReportsFromCache();
+        });
+    }
+}
+
+function populateInspectionReportTypeOptions() {
+    const typeFilter = document.getElementById('inspectionReportTypeFilter');
+    const typeSelect = document.getElementById('inspectionReportType');
+
+    const types = getDefaultInspectionTypes();
+
+    if (typeFilter) {
+        const current = typeFilter.value;
+        typeFilter.innerHTML = '<option value="">All types</option>';
+        types.forEach((t) => {
+            const opt = document.createElement('option');
+            opt.value = t;
+            opt.textContent = t;
+            typeFilter.appendChild(opt);
+        });
+        typeFilter.value = current;
+    }
+
+    if (typeSelect) {
+        const current = typeSelect.value;
+        typeSelect.innerHTML = '<option value="">Select type...</option>';
+        types.forEach((t) => {
+            const opt = document.createElement('option');
+            opt.value = t;
+            opt.textContent = t;
+            typeSelect.appendChild(opt);
+        });
+        typeSelect.value = current;
+    }
+}
+
+function populateInspectionReportPropertyOptions() {
+    const formSelect = document.getElementById('inspectionReportProperty');
+    if (!formSelect) return;
+
+    const globalSelect = document.getElementById('propertySelect');
+    formSelect.innerHTML = '<option value="">Select a property...</option>';
+
+    if (globalSelect && globalSelect.options) {
+        Array.from(globalSelect.options).forEach((opt) => {
+            if (!opt.value) return;
+            formSelect.appendChild(new Option(opt.textContent, opt.value));
+        });
+    }
+
+    // Default to currently selected property context (if set)
+    if (selectedPropertyId) {
+        formSelect.value = selectedPropertyId;
+    }
+}
+
+function getPropertyNameFromGlobalSelect(propertyId) {
+    const globalSelect = document.getElementById('propertySelect');
+    if (!globalSelect || !propertyId) return '—';
+    const match = Array.from(globalSelect.options).find((o) => o.value === propertyId);
+    return match ? match.textContent : '—';
+}
+
+function toDateInputValue(timestamp) {
+    const d = toStandardDate(timestamp);
+    if (!d) return '';
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+}
+
+function fromDateInputValue(value) {
+    if (!value) return null;
+    // Use local date to avoid timezone shifting day
+    const [yyyy, mm, dd] = value.split('-').map((x) => parseInt(x, 10));
+    if (!yyyy || !mm || !dd) return null;
+    return new Date(yyyy, mm - 1, dd, 12, 0, 0); // noon local
+}
+
+function computeInspectionReportStatus(report) {
+    const thresholdDays = 30;
+    const now = new Date();
+
+    const validThrough = toStandardDate(report.validThrough);
+    const nextDue = toStandardDate(report.nextDueDate);
+    const due = validThrough || nextDue;
+
+    if (!due) {
+        return { key: 'noDueDate', label: 'No Due Date', badgeHtml: '<span class="status-badge" style="background:#F9FAFB;color:#6B7280;">No Due Date</span>' };
+    }
+
+    const threshold = new Date(now.getTime() + thresholdDays * 24 * 60 * 60 * 1000);
+
+    if (due.getTime() < now.getTime()) {
+        return { key: 'overdue', label: 'Overdue', badgeHtml: '<span class="status-badge status-expired">Overdue</span>' };
+    }
+    if (due.getTime() <= threshold.getTime()) {
+        return { key: 'expiringSoon', label: 'Expiring Soon', badgeHtml: '<span class="status-badge status-warning">Expiring Soon</span>' };
+    }
+    return { key: 'current', label: 'Current', badgeHtml: '<span class="status-badge status-active">Current</span>' };
+}
+
+function renderInspectionReportsFromCache() {
+    renderInspectionReportsTable(inspectionReportsCache || []);
+}
+
+function loadInspectionReports() {
+    // Don’t load if user isn’t ready
+    if (!currentUser || !auth || !auth.currentUser || !currentUserProfile) return;
+
+    if (inspectionReportsUnsubscribe) {
+        // Keep existing listener if already active
+        renderInspectionReportsFromCache();
+        return;
+    }
+
+    let query = db.collection('inspectionReports');
+
+    // For maintenance users, try to reduce data by assigned properties (avoid orderBy to dodge composite indexes)
+    if (currentUserProfile.role === 'maintenance' &&
+        Array.isArray(currentUserProfile.assignedProperties) &&
+        currentUserProfile.assignedProperties.length > 0 &&
+        currentUserProfile.assignedProperties.length <= 10) {
+        query = query.where('propertyId', 'in', currentUserProfile.assignedProperties);
+    } else {
+        // Single-field order (no composite index required)
+        query = query.orderBy('inspectionDate', 'desc');
+    }
+
+    const tableBody = document.getElementById('inspectionReportsTableBody');
+    if (tableBody) {
+        tableBody.innerHTML = '<tr><td colspan="7" style="padding: 18px; color: #6B7280; text-align: center;">Loading inspection reports...</td></tr>';
+    }
+
+    inspectionReportsUnsubscribe = query.onSnapshot((snapshot) => {
+        const reports = [];
+        snapshot.forEach((doc) => {
+            reports.push({ id: doc.id, ...doc.data() });
+        });
+
+        // Always sort client-side to guarantee stable order
+        reports.sort((a, b) => {
+            const aTime = a.inspectionDate?.toMillis ? a.inspectionDate.toMillis() : (a.inspectionDate || 0);
+            const bTime = b.inspectionDate?.toMillis ? b.inspectionDate.toMillis() : (b.inspectionDate || 0);
+            return bTime - aTime;
+        });
+
+        inspectionReportsCache = reports;
+        renderInspectionReportsFromCache();
+    }, (error) => {
+        console.error('Error loading inspection reports:', error);
+        if (tableBody) {
+            tableBody.innerHTML = `<tr><td colspan="7" style="padding: 18px; color: #DC2626; text-align: center;">Error loading inspection reports: ${escapeHtml(error.message || 'Unknown error')}</td></tr>`;
+        }
+    });
+}
+
+function renderInspectionReportsTable(reports) {
+    const tbody = document.getElementById('inspectionReportsTableBody');
+    if (!tbody) return;
+
+    const typeFilter = document.getElementById('inspectionReportTypeFilter')?.value || '';
+    const statusFilter = document.getElementById('inspectionReportStatusFilter')?.value || '';
+    const dateFrom = document.getElementById('inspectionReportDateFrom')?.value || '';
+    const dateTo = document.getElementById('inspectionReportDateTo')?.value || '';
+    const search = (document.getElementById('inspectionReportSearch')?.value || '').trim().toLowerCase();
+
+    const fromDate = fromDateInputValue(dateFrom);
+    const toDate = fromDateInputValue(dateTo);
+
+    const filtered = (reports || []).filter((r) => {
+        // Property context filter (global maintenance property selector)
+        if (selectedPropertyId && r.propertyId !== selectedPropertyId) return false;
+
+        if (typeFilter && (r.inspectionType || '') !== typeFilter) return false;
+
+        const status = computeInspectionReportStatus(r);
+        if (statusFilter && status.key !== statusFilter) return false;
+
+        const inspDate = toStandardDate(r.inspectionDate);
+        if (fromDate && inspDate && inspDate.getTime() < fromDate.getTime()) return false;
+        if (toDate && inspDate && inspDate.getTime() > toDate.getTime()) return false;
+
+        if (search) {
+            const propertyName = getPropertyNameFromGlobalSelect(r.propertyId);
+            const hay = [
+                r.vendorName,
+                r.notes,
+                r.fileName,
+                r.inspectionType,
+                propertyName
+            ].filter(Boolean).join(' ').toLowerCase();
+            if (!hay.includes(search)) return false;
+        }
+
+        return true;
+    });
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="padding: 18px; color: #6B7280; text-align: center;">No inspection reports found.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = filtered.map((r) => {
+        const status = computeInspectionReportStatus(r);
+        const inspDate = toStandardDate(r.inspectionDate);
+        const inspDateText = inspDate ? inspDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
+
+        const dueDate = toStandardDate(r.validThrough) || toStandardDate(r.nextDueDate);
+        const dueLabel = r.validThrough ? 'Valid Through' : (r.nextDueDate ? 'Next Due' : '');
+        const dueText = dueDate ? dueDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
+        const dueCell = dueLabel ? `${escapeHtml(dueLabel)}: ${escapeHtml(dueText)}` : '—';
+
+        const canManage = canManageInspectionReports();
+        const viewBtn = `<button class="btn-secondary btn-small" onclick="viewInspectionReportDetail('${r.id}')">View</button>`;
+        const downloadBtn = r.fileUrl ? `<a class="btn-secondary btn-small" href="${escapeHtml(r.fileUrl)}" target="_blank" rel="noopener noreferrer">Download</a>` : '';
+        const editBtn = canManage ? `<button class="btn-secondary btn-small" onclick="editInspectionReport('${r.id}')">Edit</button>` : '';
+        const deleteBtn = canManage ? `<button class="btn-danger btn-small" onclick="deleteInspectionReport('${r.id}')">Delete</button>` : '';
+
+        return `
+            <tr>
+                <td>${escapeHtml(inspDateText)}</td>
+                <td>${escapeHtml(getPropertyNameFromGlobalSelect(r.propertyId))}</td>
+                <td>${escapeHtml(r.inspectionType || '—')}</td>
+                <td>${escapeHtml(r.vendorName || '—')}</td>
+                <td>${escapeHtml(dueCell)}</td>
+                <td>${status.badgeHtml}</td>
+                <td style="text-align: right; white-space: nowrap;">
+                    <div style="display: inline-flex; gap: 8px; align-items: center; justify-content: flex-end;">
+                        ${viewBtn}
+                        ${downloadBtn}
+                        ${editBtn}
+                        ${deleteBtn}
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function resetInspectionReportFileUpload() {
+    inspectionReportSelectedFile = null;
+    const input = document.getElementById('inspectionReportFile');
+    if (input) input.value = '';
+    const preview = document.getElementById('inspectionReportFilePreview');
+    if (preview) preview.innerHTML = '';
+    const labelText = document.getElementById('inspectionReportFileLabelText');
+    if (labelText) labelText.textContent = 'Upload Inspection Report';
+}
+
+function setupInspectionReportDragDrop() {
+    const dropZone = document.getElementById('inspectionReportDropZone');
+    const fileInput = document.getElementById('inspectionReportFile');
+    if (!dropZone || !fileInput) return;
+
+    fileInput.addEventListener('change', handleInspectionReportFileSelect);
+
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        const files = Array.from(e.dataTransfer.files || []);
+        if (files.length === 0) return;
+        fileInput.files = e.dataTransfer.files;
+        handleInspectionReportFileSelect({ target: fileInput });
+    });
+}
+
+function handleInspectionReportFileSelect(event) {
+    const file = event?.target?.files?.[0];
+    if (!file) return;
+
+    if (file.size > 20 * 1024 * 1024) {
+        alert(`File "${file.name}" is too large. Maximum size is 20MB.`);
+        event.target.value = '';
+        return;
+    }
+
+    inspectionReportSelectedFile = file;
+    const preview = document.getElementById('inspectionReportFilePreview');
+    const labelText = document.getElementById('inspectionReportFileLabelText');
+    if (labelText) labelText.textContent = file.name;
+    if (preview) {
+        preview.innerHTML = `<div style="margin-top: 8px; font-size: 13px; color: #1F2937;"><strong>Selected:</strong> ${escapeHtml(file.name)}</div>`;
+    }
+}
+
+function openInspectionReportModal(report = null) {
+    if (!canManageInspectionReports()) {
+        alert('You do not have permission to manage inspection reports.');
+        return;
+    }
+
+    populateInspectionReportTypeOptions();
+    populateInspectionReportPropertyOptions();
+
+    const modal = document.getElementById('inspectionReportModal');
+    const title = document.getElementById('inspectionReportModalTitle');
+    const form = document.getElementById('inspectionReportForm');
+    if (!modal || !form) return;
+
+    resetInspectionReportFileUpload();
+
+    const idInput = document.getElementById('inspectionReportId');
+    const propertyInput = document.getElementById('inspectionReportProperty');
+    const typeInput = document.getElementById('inspectionReportType');
+    const inspectionDateInput = document.getElementById('inspectionReportInspectionDate');
+    const validThroughInput = document.getElementById('inspectionReportValidThrough');
+    const nextDueInput = document.getElementById('inspectionReportNextDueDate');
+    const vendorInput = document.getElementById('inspectionReportVendorName');
+    const notesInput = document.getElementById('inspectionReportNotes');
+
+    if (report) {
+        if (title) title.textContent = 'Edit Inspection Report';
+        if (idInput) idInput.value = report.id;
+        if (propertyInput) propertyInput.value = report.propertyId || selectedPropertyId || '';
+        if (typeInput) typeInput.value = report.inspectionType || '';
+        if (inspectionDateInput) inspectionDateInput.value = toDateInputValue(report.inspectionDate);
+        if (validThroughInput) validThroughInput.value = toDateInputValue(report.validThrough);
+        if (nextDueInput) nextDueInput.value = toDateInputValue(report.nextDueDate);
+        if (vendorInput) vendorInput.value = report.vendorName || '';
+        if (notesInput) notesInput.value = report.notes || '';
+
+        form.dataset.existingFileUrl = report.fileUrl || '';
+        form.dataset.existingFileName = report.fileName || '';
+        form.dataset.existingStoragePath = report.storagePath || '';
+
+        const labelText = document.getElementById('inspectionReportFileLabelText');
+        const preview = document.getElementById('inspectionReportFilePreview');
+        if (report.fileName && labelText) labelText.textContent = `Current file: ${report.fileName}`;
+        if (report.fileName && preview) {
+            preview.innerHTML = `<div style="margin-top: 8px; font-size: 13px; color: #6B7280;"><strong>Current:</strong> ${escapeHtml(report.fileName)}</div>`;
+        }
+    } else {
+        if (title) title.textContent = 'Add Inspection Report';
+        if (idInput) idInput.value = '';
+        if (propertyInput) propertyInput.value = selectedPropertyId || '';
+        if (typeInput) typeInput.value = '';
+        if (inspectionDateInput) inspectionDateInput.value = '';
+        if (validThroughInput) validThroughInput.value = '';
+        if (nextDueInput) nextDueInput.value = '';
+        if (vendorInput) vendorInput.value = '';
+        if (notesInput) notesInput.value = '';
+
+        form.dataset.existingFileUrl = '';
+        form.dataset.existingFileName = '';
+        form.dataset.existingStoragePath = '';
+    }
+
+    modal.classList.add('show');
+}
+
+function closeInspectionReportModal() {
+    const modal = document.getElementById('inspectionReportModal');
+    if (modal) modal.classList.remove('show');
+    const form = document.getElementById('inspectionReportForm');
+    if (form) form.reset();
+    resetInspectionReportFileUpload();
+}
+
+function closeInspectionReportDetailModal() {
+    const modal = document.getElementById('inspectionReportDetailModal');
+    if (modal) modal.classList.remove('show');
+}
+
+async function handleInspectionReportSubmit(e) {
+    e.preventDefault();
+
+    if (!canManageInspectionReports()) {
+        alert('You do not have permission to manage inspection reports.');
+        return;
+    }
+
+    const form = document.getElementById('inspectionReportForm');
+    const id = document.getElementById('inspectionReportId')?.value || '';
+    const propertyId = document.getElementById('inspectionReportProperty')?.value || '';
+    const inspectionType = document.getElementById('inspectionReportType')?.value || '';
+    const inspectionDateValue = document.getElementById('inspectionReportInspectionDate')?.value || '';
+    const validThroughValue = document.getElementById('inspectionReportValidThrough')?.value || '';
+    const nextDueValue = document.getElementById('inspectionReportNextDueDate')?.value || '';
+    const vendorName = (document.getElementById('inspectionReportVendorName')?.value || '').trim();
+    const notes = (document.getElementById('inspectionReportNotes')?.value || '').trim();
+
+    if (!propertyId) {
+        alert('Property is required.');
+        return;
+    }
+    if (!inspectionType) {
+        alert('Inspection type is required.');
+        return;
+    }
+    if (!inspectionDateValue) {
+        alert('Inspection date is required.');
+        return;
+    }
+
+    const existingFileUrl = form?.dataset?.existingFileUrl || '';
+    const existingStoragePath = form?.dataset?.existingStoragePath || '';
+
+    // Require a file for new reports; for edits, allow keeping existing file
+    if (!id && !inspectionReportSelectedFile) {
+        alert('Please select an inspection report file to upload.');
+        return;
+    }
+    if (id && !inspectionReportSelectedFile && !existingFileUrl) {
+        alert('Please select an inspection report file to upload.');
+        return;
+    }
+
+    const submitBtn = document.getElementById('saveInspectionReportBtn');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
+    }
+
+    try {
+        const inspectionDate = fromDateInputValue(inspectionDateValue);
+        const validThrough = fromDateInputValue(validThroughValue);
+        const nextDueDate = fromDateInputValue(nextDueValue);
+
+        const baseData = {
+            propertyId,
+            inspectionType,
+            inspectionDate: inspectionDate ? firebase.firestore.Timestamp.fromDate(inspectionDate) : null,
+            validThrough: validThrough ? firebase.firestore.Timestamp.fromDate(validThrough) : null,
+            nextDueDate: nextDueDate ? firebase.firestore.Timestamp.fromDate(nextDueDate) : null,
+            vendorName: vendorName || null,
+            notes: notes || null,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedBy: currentUser ? currentUser.uid : null,
+            updatedByName: currentUserProfile ? (currentUserProfile.name || currentUserProfile.email) : null
+        };
+
+        let docRef;
+        if (id) {
+            docRef = db.collection('inspectionReports').doc(id);
+        } else {
+            docRef = db.collection('inspectionReports').doc();
+            baseData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+            baseData.createdBy = currentUser ? currentUser.uid : null;
+            baseData.createdByName = currentUserProfile ? (currentUserProfile.name || currentUserProfile.email) : null;
+        }
+
+        let fileUrlToSave = existingFileUrl || null;
+        let fileNameToSave = form?.dataset?.existingFileName || null;
+        let storagePathToSave = existingStoragePath || null;
+
+        if (inspectionReportSelectedFile) {
+            const file = inspectionReportSelectedFile;
+            const safeName = String(file.name || 'report').replace(/[^\w.\- ()]/g, '_');
+            const storagePath = `inspectionReports/${propertyId}/${docRef.id}/${Date.now()}_${safeName}`;
+            const storageRef = firebase.storage().ref().child(storagePath);
+
+            await storageRef.put(file);
+            const downloadUrl = await storageRef.getDownloadURL();
+
+            fileUrlToSave = downloadUrl;
+            fileNameToSave = file.name;
+            storagePathToSave = storagePath;
+
+            // Best-effort cleanup of old file (if replacing)
+            if (id && existingStoragePath && existingStoragePath !== storagePath) {
+                firebase.storage().ref().child(existingStoragePath).delete().catch(() => {});
+            }
+        }
+
+        const writeData = {
+            ...baseData,
+            fileUrl: fileUrlToSave,
+            fileName: fileNameToSave,
+            storagePath: storagePathToSave
+        };
+
+        if (id) {
+            await docRef.update(writeData);
+        } else {
+            await docRef.set(writeData);
+        }
+
+        closeInspectionReportModal();
+    } catch (error) {
+        console.error('Error saving inspection report:', error);
+        alert('Error saving inspection report: ' + (error.message || 'Unknown error'));
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save Report';
+        }
+    }
+}
+
+window.editInspectionReport = function(reportId) {
+    const report = (inspectionReportsCache || []).find((r) => r.id === reportId);
+    if (!report) {
+        alert('Inspection report not found.');
+        return;
+    }
+    openInspectionReportModal(report);
+};
+
+window.deleteInspectionReport = function(reportId) {
+    if (!canManageInspectionReports()) {
+        alert('You do not have permission to delete inspection reports.');
+        return;
+    }
+    const report = (inspectionReportsCache || []).find((r) => r.id === reportId);
+    if (!report) {
+        alert('Inspection report not found.');
+        return;
+    }
+
+    if (!confirm('Delete this inspection report? This cannot be undone.')) return;
+
+    db.collection('inspectionReports').doc(reportId).delete()
+        .then(() => {
+            if (report.storagePath) {
+                firebase.storage().ref().child(report.storagePath).delete().catch(() => {});
+            }
+        })
+        .catch((error) => {
+            console.error('Error deleting inspection report:', error);
+            alert('Error deleting inspection report: ' + (error.message || 'Unknown error'));
+        });
+};
+
+window.viewInspectionReportDetail = async function(reportId) {
+    const modal = document.getElementById('inspectionReportDetailModal');
+    const content = document.getElementById('inspectionReportDetailContent');
+    if (!modal || !content) return;
+
+    modal.classList.add('show');
+    content.innerHTML = '<p style="color: #6B7280; text-align: center; padding: 20px;">Loading...</p>';
+
+    try {
+        const doc = await db.collection('inspectionReports').doc(reportId).get();
+        if (!doc.exists) {
+            content.innerHTML = '<p style="color: #DC2626; text-align: center; padding: 20px;">Inspection report not found.</p>';
+            return;
+        }
+        const r = { id: doc.id, ...doc.data() };
+        const status = computeInspectionReportStatus(r);
+
+        const inspDate = toStandardDate(r.inspectionDate);
+        const validThrough = toStandardDate(r.validThrough);
+        const nextDue = toStandardDate(r.nextDueDate);
+
+        const rows = [
+            { label: 'Property', valueHtml: escapeHtml(getPropertyNameFromGlobalSelect(r.propertyId) || '—') },
+            { label: 'Inspection Type', valueHtml: escapeHtml(r.inspectionType || '—') },
+            { label: 'Inspection Date', valueHtml: escapeHtml(inspDate ? inspDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—') },
+            { label: 'Valid Through', valueHtml: escapeHtml(validThrough ? validThrough.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—') },
+            { label: 'Next Due Date', valueHtml: escapeHtml(nextDue ? nextDue.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—') },
+            { label: 'Vendor / Inspector', valueHtml: escapeHtml(r.vendorName || '—') },
+            { label: 'Status', valueHtml: escapeHtml(status.label || '—') },
+            { label: 'Notes', valueHtml: escapeHtml(r.notes || '—') },
+            {
+                label: 'File',
+                valueHtml: r.fileUrl
+                    ? `<a href="${escapeHtml(r.fileUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(r.fileName || 'Download')}</a>`
+                    : '—'
+            }
+        ];
+
+        content.innerHTML = `
+            <div style="display: grid; gap: 10px;">
+                <div>${status.badgeHtml}</div>
+                <table class="rent-roll-table" style="width: 100%;">
+                    <tbody>
+                        ${rows.map((row) => `
+                            <tr>
+                                <td style="width: 220px; font-weight: 600;">${escapeHtml(row.label)}</td>
+                                <td>${row.valueHtml}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    } catch (error) {
+        console.error('Error loading inspection report detail:', error);
+        content.innerHTML = '<p style="color: #DC2626; text-align: center; padding: 20px;">Error loading inspection report details.</p>';
+    }
+};
 
 // Metrics Dashboard Toggle
 function toggleMetrics() {

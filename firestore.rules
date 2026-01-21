@@ -236,6 +236,36 @@ service cloud.firestore {
                        request.resource.data.propertyId in 
                        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties));
     }
+
+    // Maintenance inspection reports collection
+    match /inspectionReports/{reportId} {
+      // Users can read if they're admin OR have access to the report's property
+      // Maintenance staff can only read reports for assigned properties
+      allow read: if isAuthenticated() && isUserActive() &&
+                    (isSuperAdmin() ||
+                     isAdmin() ||
+                     getUserRole() == 'property_manager' ||
+                     getUserRole() == 'viewer' ||
+                     (getUserRole() == 'maintenance' &&
+                      resource.data.propertyId != null &&
+                      isPropertyAssigned(resource.data.propertyId)));
+
+      // Admins, property managers, and maintenance staff can write
+      // Property managers and maintenance staff can only write reports for assigned properties
+      allow write: if isAuthenticated() && isUserActive() &&
+                     (isSuperAdmin() ||
+                      isAdmin() ||
+                      (getUserRole() == 'property_manager' &&
+                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties != null &&
+                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties is list &&
+                       request.resource.data.propertyId in
+                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties) ||
+                      (getUserRole() == 'maintenance' &&
+                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties != null &&
+                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties is list &&
+                       request.resource.data.propertyId in
+                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.assignedProperties));
+    }
     
     // Occupancies collection
     match /occupancies/{occupancyId} {
