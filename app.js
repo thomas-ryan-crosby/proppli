@@ -14380,9 +14380,10 @@ function loadVendors() {
 // Render vendors list
 function renderVendorsList(vendors) {
     const vendorsList = document.getElementById('vendorsList');
-    if (!vendorsList) return;
-    
-    vendorsList.innerHTML = '';
+    const vendorsTableBody = document.getElementById('vendorsTableBody');
+    if (!vendorsList && !vendorsTableBody) return;
+    if (vendorsList) vendorsList.innerHTML = '';
+    if (vendorsTableBody) vendorsTableBody.innerHTML = '';
     
     // Get filter values
     const searchTerm = document.getElementById('vendorSearchInput')?.value.toLowerCase() || '';
@@ -14440,53 +14441,103 @@ function renderVendorsList(vendors) {
     });
     
     if (filteredVendors.length === 0) {
-        vendorsList.innerHTML = '<p class="no-tenants-message">No vendors found. Add one to get started.</p>';
+        if (vendorsTableBody) {
+            vendorsTableBody.innerHTML = '<tr><td colspan="8" style="padding: 18px; color: #6B7280; text-align: center;">No vendors found.</td></tr>';
+        } else if (vendorsList) {
+            vendorsList.innerHTML = '<p class="no-tenants-message">No vendors found. Add one to get started.</p>';
+        }
         return;
     }
-    
-    filteredVendors.forEach(vendor => {
-        const card = document.createElement('div');
-        card.className = 'tenant-card';
-        const status = vendor.status || 'active';
-        const statusBadge = `<span class="status-badge status-${status.toLowerCase()}">${status === 'active' ? 'Active' : 'Inactive'}</span>`;
-        const typeBadge = vendor.type ? `<span class="status-badge" style="background: #667eea; color: white;">${escapeHtml(vendor.type)}</span>` : '';
-        const needsInfoBadge = vendor.needsInfo
-            ? `<span class="status-badge" style="background: #F59E0B; color: white;">Needs info</span>`
-            : '';
-        
-        // Get assigned properties names (we'll load them asynchronously)
-        const assignedProperties = vendor.assignedProperties || [];
-        const assignedPropertiesText = assignedProperties.length > 0 
-            ? `<p><strong>🏢 Assigned Properties:</strong> <span style="color: #667eea;">${assignedProperties.length} property${assignedProperties.length !== 1 ? 'ies' : ''}</span></p>`
-            : '<p><strong>🏢 Assigned Properties:</strong> <span style="color: #999;">All Properties</span></p>';
-        
-        card.innerHTML = `
-            <div class="tenant-card-header">
-                <h3>${escapeHtml(vendor.name || 'Unnamed Vendor')}</h3>
-                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                    ${statusBadge}
-                    ${typeBadge}
-                    ${needsInfoBadge}
+
+    // Prefer the table view if present
+    if (vendorsTableBody) {
+        const canManage = canEditVendor();
+        vendorsTableBody.innerHTML = filteredVendors.map((vendor) => {
+            const status = (vendor.status || 'active').toLowerCase();
+            const statusBadge = status === 'active'
+                ? '<span class="status-badge status-active">Active</span>'
+                : '<span class="status-badge status-inactive">Inactive</span>';
+            const type = vendor.type || '—';
+            const needsInfo = vendor.needsInfo
+                ? '<span class="status-badge" style="background:#F59E0B;color:#fff;">Yes</span>'
+                : '<span style="color:#94a3b8;">—</span>';
+
+            const assignedProperties = vendor.assignedProperties || [];
+            const assignedLabel = assignedProperties.length > 0
+                ? `${assignedProperties.length} assigned`
+                : 'All properties';
+
+            const viewBtn = `<button class="btn-secondary btn-small" onclick="viewVendorDetail('${vendor.id}')">View</button>`;
+            const editBtn = canManage ? `<button class="btn-secondary btn-small" onclick="editVendor('${vendor.id}')">Edit</button>` : '';
+            const deleteBtn = canManage ? `<button class="btn-danger btn-small" onclick="deleteVendor('${vendor.id}')">Delete</button>` : '';
+
+            return `
+                <tr>
+                    <td style="font-weight: 600;">${escapeHtml(vendor.name || 'Unnamed Vendor')}</td>
+                    <td>${escapeHtml(type)}</td>
+                    <td>${statusBadge}</td>
+                    <td>${needsInfo}</td>
+                    <td>${vendor.primaryPhone ? escapeHtml(vendor.primaryPhone) : '<span style="color:#94a3b8;">—</span>'}</td>
+                    <td>${vendor.primaryEmail ? `<a href="mailto:${escapeHtml(vendor.primaryEmail)}" style="color:#2563EB;">${escapeHtml(vendor.primaryEmail)}</a>` : '<span style="color:#94a3b8;">—</span>'}</td>
+                    <td>${escapeHtml(assignedLabel)}</td>
+                    <td style="text-align: right;">
+                        <div class="inspection-actions">
+                            ${viewBtn}
+                            ${editBtn}
+                            ${deleteBtn}
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+        return;
+    }
+
+    // Fallback to old cards (hidden in UI, but keep as backup)
+    if (vendorsList) {
+        filteredVendors.forEach(vendor => {
+            const card = document.createElement('div');
+            card.className = 'tenant-card';
+            const status = vendor.status || 'active';
+            const statusBadge = `<span class="status-badge status-${status.toLowerCase()}">${status === 'active' ? 'Active' : 'Inactive'}</span>`;
+            const typeBadge = vendor.type ? `<span class="status-badge" style="background: #667eea; color: white;">${escapeHtml(vendor.type)}</span>` : '';
+            const needsInfoBadge = vendor.needsInfo
+                ? `<span class="status-badge" style="background: #F59E0B; color: white;">Needs info</span>`
+                : '';
+            
+            const assignedProperties = vendor.assignedProperties || [];
+            const assignedPropertiesText = assignedProperties.length > 0 
+                ? `<p><strong>🏢 Assigned Properties:</strong> <span style="color: #667eea;">${assignedProperties.length} property${assignedProperties.length !== 1 ? 'ies' : ''}</span></p>`
+                : '<p><strong>🏢 Assigned Properties:</strong> <span style="color: #999;">All Properties</span></p>';
+            
+            card.innerHTML = `
+                <div class="tenant-card-header">
+                    <h3>${escapeHtml(vendor.name || 'Unnamed Vendor')}</h3>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        ${statusBadge}
+                        ${typeBadge}
+                        ${needsInfoBadge}
+                    </div>
                 </div>
-            </div>
-            <div class="tenant-card-body">
-                ${vendor.primaryPhone ? `<p><strong>📞 Phone:</strong> ${escapeHtml(vendor.primaryPhone)}</p>` : ''}
-                ${vendor.primaryEmail ? `<p><strong>✉️ Email:</strong> <a href="mailto:${escapeHtml(vendor.primaryEmail)}" style="color: #667eea;">${escapeHtml(vendor.primaryEmail)}</a></p>` : ''}
-                ${vendor.website ? `<p><strong>🌐 Website:</strong> <a href="${escapeHtml(vendor.website)}" target="_blank" style="color: #667eea;">${escapeHtml(vendor.website)}</a></p>` : ''}
-                ${vendor.address ? `<p><strong>📍 Address:</strong> ${escapeHtml(vendor.address)}</p>` : ''}
-                ${assignedPropertiesText}
-                ${vendor.notes ? `<p><strong>📝 Notes:</strong> ${escapeHtml(vendor.notes.substring(0, 100))}${vendor.notes.length > 100 ? '...' : ''}</p>` : ''}
-            </div>
-            <div class="tenant-card-actions">
-                <button class="btn-primary btn-small" onclick="viewVendorDetail('${vendor.id}')">View Details</button>
-                ${canEditVendor() ? `
-                    <button class="btn-secondary btn-small" onclick="editVendor('${vendor.id}')">Edit</button>
-                    <button class="btn-danger btn-small" onclick="deleteVendor('${vendor.id}')">Delete</button>
-                ` : ''}
-            </div>
-        `;
-        vendorsList.appendChild(card);
-    });
+                <div class="tenant-card-body">
+                    ${vendor.primaryPhone ? `<p><strong>📞 Phone:</strong> ${escapeHtml(vendor.primaryPhone)}</p>` : ''}
+                    ${vendor.primaryEmail ? `<p><strong>✉️ Email:</strong> <a href="mailto:${escapeHtml(vendor.primaryEmail)}" style="color: #667eea;">${escapeHtml(vendor.primaryEmail)}</a></p>` : ''}
+                    ${vendor.website ? `<p><strong>🌐 Website:</strong> <a href="${escapeHtml(vendor.website)}" target="_blank" style="color: #667eea;">${escapeHtml(vendor.website)}</a></p>` : ''}
+                    ${vendor.address ? `<p><strong>📍 Address:</strong> ${escapeHtml(vendor.address)}</p>` : ''}
+                    ${assignedPropertiesText}
+                    ${vendor.notes ? `<p><strong>📝 Notes:</strong> ${escapeHtml(vendor.notes.substring(0, 100))}${vendor.notes.length > 100 ? '...' : ''}</p>` : ''}
+                </div>
+                <div class="tenant-card-actions">
+                    <button class="btn-primary btn-small" onclick="viewVendorDetail('${vendor.id}')">View Details</button>
+                    ${canEditVendor() ? `
+                        <button class="btn-secondary btn-small" onclick="editVendor('${vendor.id}')">Edit</button>
+                        <button class="btn-danger btn-small" onclick="deleteVendor('${vendor.id}')">Delete</button>
+                    ` : ''}
+                </div>
+            `;
+            vendorsList.appendChild(card);
+        });
+    }
 }
 
 // Check if user can edit vendors

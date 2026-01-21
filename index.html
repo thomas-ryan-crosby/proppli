@@ -1687,7 +1687,30 @@
                                 </select>
                             </div>
                         </div>
-                        <div id="vendorsList" class="tenants-grid"></div>
+                        <div class="inspection-reports-table" style="margin-top: 12px;">
+                            <div class="tenants-table-container" style="max-height: none;">
+                                <table class="rent-roll-table inspection-reports-table-inner" style="width: 100%;">
+                                    <thead>
+                                        <tr>
+                                            <th>Vendor</th>
+                                            <th>Type</th>
+                                            <th>Status</th>
+                                            <th>Needs info</th>
+                                            <th>Phone</th>
+                                            <th>Email</th>
+                                            <th>Assigned Properties</th>
+                                            <th style="text-align: right;">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="vendorsTableBody">
+                                        <tr>
+                                            <td colspan="8" style="padding: 18px; color: #6B7280; text-align: center;">Loading vendors...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div id="vendorsList" class="tenants-grid" style="display: none;"></div>
                     </div>
                 </div>
             </main>
