@@ -18625,10 +18625,13 @@ async function loadFinance() {
 // INVOICE APPROVAL MANAGEMENT
 // ============================================
 
-// Cost codes by company
+// Cost codes by company (with descriptions)
 const COST_CODES_BY_COMPANY = {
     "JLC": [
-        "031s", "Carpentry", "1001", "Customer Deposit..", "135s", "Trash Hauling", "001", "Beginning Balance",
+        {"code": "031s", "description": "Carpentry"},
+        {"code": "1001", "description": "Customer Deposit.."},
+        {"code": "135s", "description": "Trash Hauling"},
+        {"code": "001", "description": "Beginning Balance"},
         "005", "Lot Cost", "006", "Engineering", "009", "Fill", "010", "Legal Fees", "011", "Surveying",
         "012", "Clearing & Fill", "013", "Water Meters", "014", "Permit Fees", "015", "Underground Electric",
         "016", "Electric Meters", "017", "Fence & Gates", "018", "Inspections", "019", "Drainage", "021",
@@ -18710,23 +18713,67 @@ const COST_CODES_BY_COMPANY = {
     ]
 };
 
-// Map vendor names to company codes (case-insensitive matching)
-function getCompanyCodeForVendor(vendorName) {
-    if (!vendorName) return null;
-    const name = vendorName.toUpperCase();
-    if (name.includes('JLC')) return 'JLC';
-    if (name.includes('SHOA')) return 'SHOA';
-    if (name.includes('CDC')) return 'CDC';
-    return null;
-}
-
-// Get cost codes for a vendor
-function getCostCodesForVendor(vendorName) {
-    const companyCode = getCompanyCodeForVendor(vendorName);
-    if (companyCode && COST_CODES_BY_COMPANY[companyCode]) {
-        return COST_CODES_BY_COMPANY[companyCode];
+// Update cost codes dropdown based on selected company
+function updateCostCodesForCompany() {
+    const companySelect = document.getElementById('invoiceCompany');
+    const costCodeSelect = document.getElementById('invoiceCostCode');
+    
+    if (!companySelect || !costCodeSelect) return;
+    
+    const company = companySelect.value;
+    if (!company) {
+        // No company selected - disable and show message
+        costCodeSelect.disabled = true;
+        costCodeSelect.innerHTML = '<option value="">Please select a company first</option>';
+        return;
     }
-    return [];
+    
+    const costCodes = COST_CODES_BY_COMPANY[company] || [];
+    
+    // Clear existing options
+    costCodeSelect.innerHTML = '';
+    
+    if (costCodes.length === 0) {
+        // No cost codes found for this company
+        costCodeSelect.disabled = true;
+        costCodeSelect.innerHTML = '<option value="">No cost codes available for this company</option>';
+        return;
+    }
+    
+    // Add empty option
+    const emptyOption = document.createElement('option');
+    emptyOption.value = '';
+    emptyOption.textContent = 'Select a cost code...';
+    costCodeSelect.appendChild(emptyOption);
+    
+    // Sort cost codes by code (numeric/alphabetical)
+    const sortedCodes = [...costCodes].sort((a, b) => {
+        const aCode = a.code || '';
+        const bCode = b.code || '';
+        // Try numeric sort first
+        const aNum = parseInt(aCode);
+        const bNum = parseInt(bCode);
+        if (!isNaN(aNum) && !isNaN(bNum)) {
+            return aNum - bNum;
+        }
+        return aCode.localeCompare(bCode, undefined, { numeric: true, sensitivity: 'base' });
+    });
+    
+    // Add cost codes to dropdown with code and description
+    sortedCodes.forEach(item => {
+        const option = document.createElement('option');
+        option.value = item.code;
+        const displayText = item.description && item.description !== item.code 
+            ? `${item.code} - ${item.description}`
+            : item.code;
+        option.textContent = displayText;
+        costCodeSelect.appendChild(option);
+    });
+    
+    // Enable the dropdown
+    costCodeSelect.disabled = false;
+    
+    console.log(`Loaded ${costCodes.length} cost codes for company: ${company}`);
 }
 
 // Check if user can manage invoices
@@ -18969,7 +19016,15 @@ window.editInvoice = function(invoiceId) {
         document.getElementById('invoiceAmount').value = invoice.amount || '';
         document.getElementById('invoiceDescription').value = invoice.description || '';
         document.getElementById('invoiceAccountCode').value = invoice.accountCode || '';
-        document.getElementById('invoiceCostCode').value = invoice.costCode || '';
+        document.getElementById('invoiceCompany').value = invoice.company || '';
+        // Update cost codes dropdown, then set the value
+        updateCostCodesForCompany();
+        if (invoice.costCode) {
+            // Set cost code after a brief delay to ensure dropdown is populated
+            setTimeout(() => {
+                document.getElementById('invoiceCostCode').value = invoice.costCode;
+            }, 100);
+        }
         
         // Load dropdowns first, then set values
         loadPropertiesForInvoiceForm().then(() => {
@@ -19184,6 +19239,7 @@ window.viewInvoiceDetail = async function(invoiceId) {
                 </div>
                 <div>
                     ${invoice.accountCode ? `<p><strong>Account Code:</strong> ${escapeHtml(invoice.accountCode)}</p>` : '<p><strong>Account Code:</strong> <span style="color: #999;">Not assigned</span></p>'}
+                    ${invoice.company ? `<p><strong>Company:</strong> ${escapeHtml(invoice.company)}</p>` : '<p><strong>Company:</strong> <span style="color: #999;">Not assigned</span></p>'}
                     ${invoice.costCode ? `<p><strong>Cost Code:</strong> ${escapeHtml(invoice.costCode)}</p>` : '<p><strong>Cost Code:</strong> <span style="color: #999;">Not assigned</span></p>'}
                 </div>
             </div>
@@ -19296,7 +19352,11 @@ async function loadVendorsForInvoiceForm() {
             vendorSelect.appendChild(option);
         });
         
-        // Cost codes are loaded independently, no need to update on vendor change
+        // Add event listener to update cost codes when company changes
+        const companySelect = document.getElementById('invoiceCompany');
+        if (companySelect) {
+            companySelect.addEventListener('change', updateCostCodesForCompany);
+        }
     } catch (error) {
         console.error('Error loading vendors for invoice form:', error);
     }
@@ -19384,10 +19444,11 @@ async function handleInvoiceSubmit(e) {
     const amount = invoiceForm.querySelector('#invoiceAmount').value;
     const description = invoiceForm.querySelector('#invoiceDescription').value.trim() || null;
     const accountCode = invoiceForm.querySelector('#invoiceAccountCode').value.trim() || null;
+    const company = invoiceForm.querySelector('#invoiceCompany').value || null;
     const costCode = invoiceForm.querySelector('#invoiceCostCode').value.trim() || null;
     const fileInput = invoiceForm.querySelector('#invoiceFile');
     
-    if (!vendorId || !propertyId || !invoiceNumber || !invoiceDate || !amount) {
+    if (!vendorId || !propertyId || !invoiceNumber || !invoiceDate || !amount || !company || !costCode) {
         alert('Please fill in all required fields.');
         resetButtonState();
         return;
