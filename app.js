@@ -15,6 +15,7 @@ let inspectionReportsUnsubscribe = null;
 let inspectionReportsCache = []; // Array of { id, ...data }
 let inspectionReportSelectedFile = null; // File selected in the add/edit modal
 let inspectionReportsInitialized = false;
+let inspectionReportVendorsLoaded = false;
 
 // ============================================
 // STANDARDIZED DATE/TIME UTILITIES
@@ -2345,6 +2346,28 @@ function setupEventListeners() {
     // Inspection Reports UI
     const addInspectionReportBtn = document.getElementById('addInspectionReportBtn');
     if (addInspectionReportBtn) addInspectionReportBtn.addEventListener('click', () => openInspectionReportModal());
+
+    const inspectionReportVendorSelect = document.getElementById('inspectionReportVendorSelect');
+    const inspectionReportVendorNotListedHelp = document.getElementById('inspectionReportVendorNotListedHelp');
+    if (inspectionReportVendorSelect && inspectionReportVendorNotListedHelp) {
+        inspectionReportVendorSelect.addEventListener('change', () => {
+            inspectionReportVendorNotListedHelp.style.display = inspectionReportVendorSelect.value === '__not_listed__' ? 'block' : 'none';
+        });
+    }
+
+    const goToVendorsFromInspectionReportBtn = document.getElementById('goToVendorsFromInspectionReportBtn');
+    if (goToVendorsFromInspectionReportBtn) {
+        goToVendorsFromInspectionReportBtn.addEventListener('click', () => {
+            closeInspectionReportModal();
+            switchPage('vendors');
+            if (typeof window.addVendor === 'function') {
+                // Best-effort: open vendor modal for creation
+                window.addVendor();
+                const needsInfo = document.getElementById('vendorNeedsInfo');
+                if (needsInfo) needsInfo.checked = true;
+            }
+        });
+    }
 
     const closeInspectionReportModalBtn = document.getElementById('closeInspectionReportModal');
     const cancelInspectionReportFormBtn = document.getElementById('cancelInspectionReportForm');
@@ -7595,14 +7618,20 @@ function initializeInspectionReportsUI() {
     if (inspectionReportsInitialized) return;
     inspectionReportsInitialized = true;
 
-    // Permissions: hide add button if needed
+    // Permissions: keep the primary action visible, but disable if not allowed
     const addBtn = document.getElementById('addInspectionReportBtn');
-    if (addBtn && !canManageInspectionReports()) {
-        addBtn.style.display = 'none';
+    if (addBtn) {
+        const allowed = canManageInspectionReports();
+        addBtn.style.display = '';
+        addBtn.disabled = !allowed;
+        addBtn.title = allowed ? '' : 'You do not have permission to add inspection reports.';
+        addBtn.style.opacity = allowed ? '' : '0.6';
+        addBtn.style.cursor = allowed ? '' : 'not-allowed';
     }
 
     populateInspectionReportTypeOptions();
     populateInspectionReportPropertyOptions();
+    loadVendorsForInspectionReportForm();
     setupInspectionReportDragDrop();
 
     // Re-render when global property selector changes
@@ -7612,6 +7641,36 @@ function initializeInspectionReportsUI() {
             populateInspectionReportPropertyOptions();
             renderInspectionReportsFromCache();
         });
+    }
+}
+
+async function loadVendorsForInspectionReportForm() {
+    const vendorSelect = document.getElementById('inspectionReportVendorSelect');
+    if (!vendorSelect) return;
+
+    // Preserve current selection while reloading
+    const current = vendorSelect.value;
+    vendorSelect.innerHTML = '<option value="">Select vendor (optional)...</option>';
+    vendorSelect.appendChild(new Option('Vendor not listed (add in Vendors)…', '__not_listed__'));
+
+    try {
+        const snapshot = await db.collection('vendors').orderBy('name').get();
+        snapshot.forEach((doc) => {
+            const v = doc.data() || {};
+            const name = v.name || 'Unnamed Vendor';
+            const opt = document.createElement('option');
+            opt.value = doc.id;
+            opt.textContent = name;
+            vendorSelect.appendChild(opt);
+        });
+        inspectionReportVendorsLoaded = true;
+    } catch (error) {
+        console.error('Error loading vendors for inspection report:', error);
+    }
+
+    // Restore selection if possible
+    if (current) {
+        vendorSelect.value = current;
     }
 }
 
@@ -7861,6 +7920,13 @@ function resetInspectionReportFileUpload() {
     if (labelText) labelText.textContent = 'Upload Inspection Report';
 }
 
+function resetInspectionReportVendorSelection() {
+    const vendorSelect = document.getElementById('inspectionReportVendorSelect');
+    if (vendorSelect) vendorSelect.value = '';
+    const help = document.getElementById('inspectionReportVendorNotListedHelp');
+    if (help) help.style.display = 'none';
+}
+
 function setupInspectionReportDragDrop() {
     const dropZone = document.getElementById('inspectionReportDropZone');
     const fileInput = document.getElementById('inspectionReportFile');
@@ -7914,6 +7980,8 @@ function openInspectionReportModal(report = null) {
 
     populateInspectionReportTypeOptions();
     populateInspectionReportPropertyOptions();
+    // Ensure vendor dropdown is populated
+    loadVendorsForInspectionReportForm();
 
     const modal = document.getElementById('inspectionReportModal');
     const title = document.getElementById('inspectionReportModalTitle');
@@ -7928,8 +7996,9 @@ function openInspectionReportModal(report = null) {
     const inspectionDateInput = document.getElementById('inspectionReportInspectionDate');
     const validThroughInput = document.getElementById('inspectionReportValidThrough');
     const nextDueInput = document.getElementById('inspectionReportNextDueDate');
-    const vendorInput = document.getElementById('inspectionReportVendorName');
+    const vendorSelect = document.getElementById('inspectionReportVendorSelect');
     const notesInput = document.getElementById('inspectionReportNotes');
+    const vendorNotListedHelp = document.getElementById('inspectionReportVendorNotListedHelp');
 
     if (report) {
         if (title) title.textContent = 'Edit Inspection Report';
@@ -7939,8 +8008,9 @@ function openInspectionReportModal(report = null) {
         if (inspectionDateInput) inspectionDateInput.value = toDateInputValue(report.inspectionDate);
         if (validThroughInput) validThroughInput.value = toDateInputValue(report.validThrough);
         if (nextDueInput) nextDueInput.value = toDateInputValue(report.nextDueDate);
-        if (vendorInput) vendorInput.value = report.vendorName || '';
+        if (vendorSelect) vendorSelect.value = report.vendorId || '';
         if (notesInput) notesInput.value = report.notes || '';
+        if (vendorNotListedHelp) vendorNotListedHelp.style.display = 'none';
 
         form.dataset.existingFileUrl = report.fileUrl || '';
         form.dataset.existingFileName = report.fileName || '';
@@ -7960,8 +8030,9 @@ function openInspectionReportModal(report = null) {
         if (inspectionDateInput) inspectionDateInput.value = '';
         if (validThroughInput) validThroughInput.value = '';
         if (nextDueInput) nextDueInput.value = '';
-        if (vendorInput) vendorInput.value = '';
+        if (vendorSelect) vendorSelect.value = '';
         if (notesInput) notesInput.value = '';
+        if (vendorNotListedHelp) vendorNotListedHelp.style.display = 'none';
 
         form.dataset.existingFileUrl = '';
         form.dataset.existingFileName = '';
@@ -7977,6 +8048,7 @@ function closeInspectionReportModal() {
     const form = document.getElementById('inspectionReportForm');
     if (form) form.reset();
     resetInspectionReportFileUpload();
+    resetInspectionReportVendorSelection();
 }
 
 function closeInspectionReportDetailModal() {
@@ -7999,8 +8071,13 @@ async function handleInspectionReportSubmit(e) {
     const inspectionDateValue = document.getElementById('inspectionReportInspectionDate')?.value || '';
     const validThroughValue = document.getElementById('inspectionReportValidThrough')?.value || '';
     const nextDueValue = document.getElementById('inspectionReportNextDueDate')?.value || '';
-    const vendorName = (document.getElementById('inspectionReportVendorName')?.value || '').trim();
+    const vendorId = document.getElementById('inspectionReportVendorSelect')?.value || '';
     const notes = (document.getElementById('inspectionReportNotes')?.value || '').trim();
+    if (vendorId === '__not_listed__') {
+        alert('Please add the vendor in the Vendors section, then select them here.');
+        return;
+    }
+
 
     if (!propertyId) {
         alert('Property is required.');
@@ -8045,12 +8122,21 @@ async function handleInspectionReportSubmit(e) {
             inspectionDate: inspectionDate ? firebase.firestore.Timestamp.fromDate(inspectionDate) : null,
             validThrough: validThrough ? firebase.firestore.Timestamp.fromDate(validThrough) : null,
             nextDueDate: nextDueDate ? firebase.firestore.Timestamp.fromDate(nextDueDate) : null,
-            vendorName: vendorName || null,
+            vendorId: vendorId || null,
+            vendorName: null,
             notes: notes || null,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
             updatedBy: currentUser ? currentUser.uid : null,
             updatedByName: currentUserProfile ? (currentUserProfile.name || currentUserProfile.email) : null
         };
+
+        // Denormalize vendor name for display and resilience
+        if (vendorId) {
+            const vendorOpt = document.querySelector(`#inspectionReportVendorSelect option[value="${vendorId.replace(/"/g, '\\"')}"]`);
+            baseData.vendorName = vendorOpt ? vendorOpt.textContent : null;
+        } else {
+            baseData.vendorName = null;
+        }
 
         let docRef;
         if (id) {
@@ -14364,6 +14450,9 @@ function renderVendorsList(vendors) {
         const status = vendor.status || 'active';
         const statusBadge = `<span class="status-badge status-${status.toLowerCase()}">${status === 'active' ? 'Active' : 'Inactive'}</span>`;
         const typeBadge = vendor.type ? `<span class="status-badge" style="background: #667eea; color: white;">${escapeHtml(vendor.type)}</span>` : '';
+        const needsInfoBadge = vendor.needsInfo
+            ? `<span class="status-badge" style="background: #F59E0B; color: white;">Needs info</span>`
+            : '';
         
         // Get assigned properties names (we'll load them asynchronously)
         const assignedProperties = vendor.assignedProperties || [];
@@ -14377,6 +14466,7 @@ function renderVendorsList(vendors) {
                 <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                     ${statusBadge}
                     ${typeBadge}
+                    ${needsInfoBadge}
                 </div>
             </div>
             <div class="tenant-card-body">
@@ -14516,6 +14606,8 @@ window.addVendor = function() {
     }
     document.getElementById('vendorId').value = '';
     document.getElementById('vendorModalTitle').textContent = 'Add Vendor';
+    const needsInfo = document.getElementById('vendorNeedsInfo');
+    if (needsInfo) needsInfo.checked = false;
     loadPropertiesForVendorForm();
     setSelectedVendorProperties([]);
     document.getElementById('vendorModal').classList.add('show');
@@ -14545,6 +14637,8 @@ window.editVendor = function(vendorId) {
         document.getElementById('vendorWebsite').value = vendor.website || '';
         document.getElementById('vendorAddress').value = vendor.address || '';
         document.getElementById('vendorNotes').value = vendor.notes || '';
+        const needsInfo = document.getElementById('vendorNeedsInfo');
+        if (needsInfo) needsInfo.checked = !!vendor.needsInfo;
         
         // Load properties and set selected ones
         loadPropertiesForVendorForm().then(() => {
@@ -14820,6 +14914,7 @@ function handleVendorSubmit(e) {
     const website = vendorForm.querySelector('#vendorWebsite').value.trim() || null;
     const address = vendorForm.querySelector('#vendorAddress').value.trim() || null;
     const notes = vendorForm.querySelector('#vendorNotes').value.trim() || null;
+    const needsInfo = !!vendorForm.querySelector('#vendorNeedsInfo')?.checked;
     const assignedProperties = getSelectedVendorProperties();
     
     if (!name) {
@@ -14851,6 +14946,7 @@ function handleVendorSubmit(e) {
         website: website,
         address: address,
         notes: notes,
+        needsInfo: needsInfo,
         assignedProperties: assignedProperties.length > 0 ? assignedProperties : [],
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };

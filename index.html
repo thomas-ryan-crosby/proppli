@@ -673,8 +673,18 @@
                                     <input type="date" id="inspectionReportInspectionDate" required>
                                 </div>
                                 <div class="form-group">
-                                    <label for="inspectionReportVendorName">Vendor / Inspector</label>
-                                    <input type="text" id="inspectionReportVendorName" placeholder="e.g., ABC Pest Control">
+                                    <label for="inspectionReportVendorSelect">Vendor / Inspector</label>
+                                    <select id="inspectionReportVendorSelect">
+                                        <option value="">Select vendor (optional)...</option>
+                                    </select>
+                                    <div id="inspectionReportVendorNotListedHelp" style="display: none; margin-top: 8px;">
+                                        <small style="color: #6B7280; font-size: 12px; display: block;">
+                                            Vendor not listed? Add them in the Vendors section and mark them as “Needs info”.
+                                        </small>
+                                        <button type="button" class="btn-secondary btn-small" id="goToVendorsFromInspectionReportBtn" style="margin-top: 8px;">
+                                            Go to Vendors to add
+                                        </button>
+                                    </div>
                                 </div>
                                 <div class="form-group">
                                     <label for="inspectionReportValidThrough">Valid Through</label>
@@ -1735,6 +1745,16 @@
                             <div class="form-group">
                                 <label for="vendorAddress">Address</label>
                                 <input type="text" id="vendorAddress" placeholder="e.g., 123 Main St, City, State ZIP">
+                            </div>
+
+                            <div class="form-group">
+                                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                                    <input type="checkbox" id="vendorNeedsInfo">
+                                    <span style="font-weight: 600;">Needs info</span>
+                                </label>
+                                <small style="color: #6B7280; font-size: 12px; display: block; margin-top: 6px;">
+                                    Use this when a vendor was added quickly and you still need to collect contact and insurance details.
+                                </small>
                             </div>
                             
                             <div class="form-group">
