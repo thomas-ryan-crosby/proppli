@@ -18982,14 +18982,13 @@ window.editInvoice = function(invoiceId) {
         loadPropertiesForInvoiceForm().then(() => {
             document.getElementById('invoiceProperty').value = invoice.propertyId || '';
         });
-        loadVendorsForInvoiceForm().then(() => {
+        loadVendorsForInvoiceForm().then(async () => {
             document.getElementById('invoiceVendor').value = invoice.vendorId || '';
             // Update cost codes after vendor is set, then set the cost code value
-            updateCostCodesForVendor().then(() => {
-                if (invoice.costCode) {
-                    document.getElementById('invoiceCostCode').value = invoice.costCode;
-                }
-            });
+            await updateCostCodesForVendor();
+            if (invoice.costCode) {
+                document.getElementById('invoiceCostCode').value = invoice.costCode;
+            }
         });
         
         // Show existing file if present
