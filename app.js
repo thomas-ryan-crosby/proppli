@@ -18625,6 +18625,110 @@ async function loadFinance() {
 // INVOICE APPROVAL MANAGEMENT
 // ============================================
 
+// Cost codes by company
+const COST_CODES_BY_COMPANY = {
+    "JLC": [
+        "031s", "Carpentry", "1001", "Customer Deposit..", "135s", "Trash Hauling", "001", "Beginning Balance",
+        "005", "Lot Cost", "006", "Engineering", "009", "Fill", "010", "Legal Fees", "011", "Surveying",
+        "012", "Clearing & Fill", "013", "Water Meters", "014", "Permit Fees", "015", "Underground Electric",
+        "016", "Electric Meters", "017", "Fence & Gates", "018", "Inspections", "019", "Drainage", "021",
+        "Piling & Layout", "021B", "Test Item", "022", "Forming", "023", "Digging & Steel", "024", "Termite Treatment",
+        "025", "Pour Slab", "026", "Concrete Pump", "027", "Retainer Wall", "031", "032", "Lumber,Nails,Hardware",
+        "033", "Exterior Trim & Doors", "034", "Aluminum Window & Doors", "035", "Structural Steel, Fl Beam", "036",
+        "Equipment Rental", "041", "Plumbing Sub & Drainage", "042", "Bath Tops & Alcove", "043", "Tubs & Shower Bases",
+        "044", "Miscellaneous Plumbing", "045", "Lawn Sprinklers", "046", "Sewer Line", "048", "Ph.III & IV-Engineering",
+        "051", "A/C Subcontractor", "06", "Streets", "061", "Electrical Subcontractor", "062", "Light Fixtures",
+        "063", "Phone Prewire,Conduit", "064", "Intercom,Video,Cent.Vac.", "065", "Burglar Alarm Prewire", "066",
+        "Appliances", "07", "Water Line", "071", "Brick Work", "072", "Stucco", "073", "Block Work", "075",
+        "Vinyl Siding & Facia", "076", "Shutter, Pediments, Column", "08", "Clearing Contract", "081", "Interior Trim",
+        "082", "Cabinets", "083", "Kitchen Tops", "084", "Interior Hardware", "085", "Closet Shelving", "086", "Fire Door",
+        "090", "Painting Materials", "091", "Interior Painting", "092", "Exterior Painting", "093", "Wallpaper",
+        "094", "Mold Remediation", "101", "Carpet/Wood/Marble", "102", "Visqueen & Cardboard", "103", "Ceramic Tile",
+        "104", "Patio & Porch Tile/Brick", "105", "Vinyl Floors", "111", "Insulation", "112", "Light Weight Concrete",
+        "113", "Drywall & Soundboard", "121", "Roofing & Balconies", "122", "Gutters", "123", "Roof Vents", "130",
+        "Trash Haul Dirt..", "131", "Walk, Parking, Patio, Drives", "132", "Garage Doors & Openers", "133",
+        "Iron Work & Spiral Stairs", "134", "Landscaping", "135", "Trash Hauling Vegetation", "136", "Pool, Spa",
+        "137", "Sprinkler System", "138", "Window Cleaning", "140", "Fireplaces", "141", "Elevators", "142",
+        "Tennis Court", "143", "Mirrors", "144", "Bath Accessories", "145", "Fine Clean", "146", "Shower Enclosures",
+        "147", "Furniture", "148", "Street Signs", "149", "Mailboxes & House #'s", "150", "Specialties", "151",
+        "Port-O-Let", "206", "Marketing", "207", "Parking Lot", "208", "Miscellaneous", "210", "Incidentals & Touch Up",
+        "400", "Sales Tax", "401", "Association Fees", "402", "Commission & Advertising", "403", "Interest", "404",
+        "Insurance", "406", "Property Taxes", "408", "Repairs & Maintenance", "409", "Utilities", "410", "Rent",
+        "411", "Design Services", "412", "Security", "414", "Interior Design", "417", "Travel Expenses", "418",
+        "Auto Expense", "419", "Moving Expense", "420", "Deposit Refund", "421", "Management Fee", "422", "RV Propane",
+        "500", "Tent Installation", "62B", "Exterior Light Fixtures", "Reimb Subt", "Reimbursable Expenses Subtotal",
+        "Reimb Group", "Total Reimbursable Expenses"
+    ],
+    "SHOA": [
+        "Generator", "Expense", "Clubhouse upgrades", "Resident Dumpsters", "Merchant deposit fees",
+        "Operating Expenses", "Operating Expenses:Accounting & Software", "Operating Expenses:Bank Service Charges",
+        "Operating Expenses:Decorations", "Operating Expenses:Dues and Subscriptions", "Operating Expenses:Guard Service",
+        "Operating Expenses:Insurance", "Operating Expenses:Legal Fees", "Operating Expenses:Licenses and Permits",
+        "Operating Expenses:Lifeguards", "Operating Expenses:Management Expenses", "Operating Expenses:Office Supplies",
+        "Operating Expenses:Police Detail", "Operating Expenses:Printing, Postage and Delivery",
+        "Operating Expenses:Social Functions", "Operating Expenses:Website", "Amenities Maintenance",
+        "Amenities Maintenance:Bird Houses", "Amenities Maintenance:Crystal Lake", "Amenities Maintenance:Nature Trail",
+        "Clubhouse Maintenance", "Clubhouse Maintenance:Ballfield", "Clubhouse Maintenance:Exercise Equipment",
+        "Clubhouse Maintenance:Furniture (Clubhouse)", "Clubhouse Maintenance:Furniture (Pool)",
+        "Clubhouse Maintenance:Janitorial Expenses", "Clubhouse Maintenance:Parking Area",
+        "Clubhouse Maintenance:Party Cleaning", "Clubhouse Maintenance:Playground Equipment",
+        "Clubhouse Maintenance:Repairs & Maintenance", "Clubhouse Maintenance:Swimming Pool",
+        "Clubhouse Maintenance:Tennis Courts", "Clubhouse Maintenance:Termite Treatment/Pest Control",
+        "Common Area Maintenance", "Common Area Maintenance:Fence Repair", "Common Area Maintenance:Fountain Maintenance",
+        "Common Area Maintenance:Lighting", "Common Area Maintenance:Mailbox Repair", "Common Area Maintenance:Sign Repairs",
+        "Common Area Maintenance:Wildlife Management", "Grounds & Landscape Maintenance",
+        "Grounds & Landscape Maintenance:7 Cardinal Lane", "Grounds & Landscape Maintenance:Grass Cutting & Landscaping",
+        "Grounds & Landscape Maintenance:Landscape Upgrades & Flowers", "Grounds & Landscape Maintenance:Powerline Grass Cutting",
+        "Grounds & Landscape Maintenance:Storm Cleanup", "Grounds & Landscape Maintenance:Tree Removal",
+        "Grounds & Landscape Maintenance:Undeveloped Lot Cutting", "Security", "Security:New Guard House",
+        "Security:Cameras", "Security:Entry Cards/Remotes", "Security:Gate Maintenance & Repair",
+        "Security:Guardhouse Maintenance", "Security:Parade Security (Lights)", "Streets & Drainage",
+        "Streets & Drainage:Brick Headwalls", "Streets & Drainage:Street Maintenance", "Streets & Drainage:Drainage Repairs",
+        "Taxes", "Taxes:Federal", "Taxes:Local", "Taxes:Property", "Taxes:State", "Utilities",
+        "Utilities:Charter Communications", "Utilities:Electric", "Utilities:Gas", "Utilities:Telephone", "Utilities:Water"
+    ],
+    "CDC": [
+        "012", "Engineering", "206", "Marketing", "421", "Interest Expense (Land Inventory)", "001", "Beginning Balance",
+        "002", "Land Cost", "009", "Phase 4-A streets..", "010", "Legal Fees", "011", "Surveying", "013", "Tree Removal",
+        "014", "Permits", "015", "Clearing & Fill", "017", "Fences", "032", "Lumber", "036", "Equipment Rental",
+        "061", "Electrical..", "062", "Lighting", "066", "Appliances", "091", "Interior Painting..", "1000", "Rental Income",
+        "1000:1", "January Rent", "1000:2", "February Rent", "1000:3", "March Rent", "1000:4", "April Rent",
+        "1000:5", "May Rent", "1000:6", "June Rent", "1000:7", "July Rent", "1000:8", "August Rent", "1000:9",
+        "September Rent", "1000:10", "October Rent", "1000:11", "November Rent", "1000:12", "December Rent", "1001",
+        "Interest", "1002", "Customer Deposit", "1003", "Property Tax", "101", "Construction Payments", "102",
+        "Customer Refunds", "103", "Commission", "104", "Builder Rebate", "133", "Street Signs", "135", "Landscaping",
+        "136", "Trash Hauling", "137", "Sprinkler system", "138", "Phase 4A", "143", "Mirrors..", "208", "Miscellaneous",
+        "400", "Site Improvement Allowance", "401", "Association Fees", "402", "Mitigation", "404", "Insurance", "404A",
+        "JLC Personal Insurance", "405", "Management Fees", "406", "Property Taxes", "408", "Repairs & Maintenance",
+        "409", "Utilities", "410", "Closing Costs", "411", "Design Services", "412", "Equipment Expense", "415", "Furniture",
+        "416", "Security", "417", "Travel Expense", "418", "Auto Expense", "419", "Price Fundraiser", "420",
+        "Interest Expense", "444", "Phase 4", "445", "Payment to Bernard Smith", "R401", "Interior Remodeling", "R402",
+        "Commissions", "R403", "Moving Allowance", "R404", "R405", "Swimming Pool", "R408", "R409", "R411", "R412",
+        "Janitorial", "R413", "Landscape Maintenance", "R414", "Telephone Expense", "R415", "R416", "Tax & License..",
+        "R417", "Rent Refund", "R418", "Advertising..", "R500", "Office Rental Distributions", "R501",
+        "Office Rental Distributions.."
+    ]
+};
+
+// Map vendor names to company codes (case-insensitive matching)
+function getCompanyCodeForVendor(vendorName) {
+    if (!vendorName) return null;
+    const name = vendorName.toUpperCase();
+    if (name.includes('JLC')) return 'JLC';
+    if (name.includes('SHOA')) return 'SHOA';
+    if (name.includes('CDC')) return 'CDC';
+    return null;
+}
+
+// Get cost codes for a vendor
+function getCostCodesForVendor(vendorName) {
+    const companyCode = getCompanyCodeForVendor(vendorName);
+    if (companyCode && COST_CODES_BY_COMPANY[companyCode]) {
+        return COST_CODES_BY_COMPANY[companyCode];
+    }
+    return [];
+}
+
 // Check if user can manage invoices
 function canManageInvoices() {
     if (!currentUserProfile) return false;
@@ -18872,6 +18976,8 @@ window.editInvoice = function(invoiceId) {
         });
         loadVendorsForInvoiceForm().then(() => {
             document.getElementById('invoiceVendor').value = invoice.vendorId || '';
+            // Update cost codes after vendor is set
+            updateCostCodesForVendor();
         });
         
         // Show existing file if present
@@ -19183,11 +19289,58 @@ async function loadVendorsForInvoiceForm() {
             option.textContent = vendor.name || 'Unnamed Vendor';
             vendorSelect.appendChild(option);
         });
+        
+        // Add event listener to update cost codes when vendor changes
+        vendorSelect.addEventListener('change', updateCostCodesForVendor);
     } catch (error) {
         console.error('Error loading vendors for invoice form:', error);
     }
     
     return Promise.resolve();
+}
+
+// Update cost codes dropdown based on selected vendor
+async function updateCostCodesForVendor() {
+    const vendorSelect = document.getElementById('invoiceVendor');
+    const costCodeInput = document.getElementById('invoiceCostCode');
+    const costCodeList = document.getElementById('invoiceCostCodeList');
+    
+    if (!vendorSelect || !costCodeInput || !costCodeList) return;
+    
+    const vendorId = vendorSelect.value;
+    if (!vendorId) {
+        costCodeList.innerHTML = '';
+        return;
+    }
+    
+    try {
+        const vendorDoc = await db.collection('vendors').doc(vendorId).get();
+        if (!vendorDoc.exists) {
+            costCodeList.innerHTML = '';
+            return;
+        }
+        
+        const vendor = vendorDoc.data();
+        const vendorName = vendor.name || '';
+        const costCodes = getCostCodesForVendor(vendorName);
+        
+        // Clear existing options
+        costCodeList.innerHTML = '';
+        
+        // Add cost codes to datalist
+        costCodes.forEach(code => {
+            const option = document.createElement('option');
+            option.value = code;
+            costCodeList.appendChild(option);
+        });
+        
+        // Show message if codes were found
+        if (costCodes.length > 0) {
+            console.log(`Loaded ${costCodes.length} cost codes for vendor: ${vendorName}`);
+        }
+    } catch (error) {
+        console.error('Error updating cost codes for vendor:', error);
+    }
 }
 
 // Reset invoice file upload UI

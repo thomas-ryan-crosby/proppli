@@ -2523,8 +2523,9 @@
                         
                         <div class="form-group">
                             <label for="invoiceCostCode">Cost Code</label>
-                            <input type="text" id="invoiceCostCode" placeholder="e.g., PROP-001, MAINT-002">
-                            <small style="color: #666; font-size: 12px; display: block; margin-top: 5px;">Cost center or project code</small>
+                            <input type="text" id="invoiceCostCode" list="invoiceCostCodeList" placeholder="Select or type cost code...">
+                            <datalist id="invoiceCostCodeList"></datalist>
+                            <small style="color: #666; font-size: 12px; display: block; margin-top: 5px;">Cost center or project code (filtered by vendor)</small>
                         </div>
                         
                         <div class="form-group">
