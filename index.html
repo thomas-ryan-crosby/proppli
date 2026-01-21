@@ -251,6 +251,10 @@
                     <span class="nav-icon">💰</span>
                     <span class="nav-label">Finance</span>
                 </button>
+                <button class="sidebar-nav-link" data-page="projects" title="Projects">
+                    <span class="nav-icon">📋</span>
+                    <span class="nav-label">Projects</span>
+                </button>
                 <button class="sidebar-nav-link" data-page="users" id="usersNavLink" style="display: none;" title="Users">
                     <span class="nav-icon">👤</span>
                     <span class="nav-label">Users</span>
@@ -2858,6 +2862,167 @@
                 <div class="modal-body">
                     <div id="invoiceDetailContent"></div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Projects Page -->
+        <div id="projectsPage" class="page" style="display: none;">
+            <main>
+                <div class="section">
+                    <div class="inspection-reports-header">
+                        <div>
+                            <h2 style="margin-bottom: 6px;">Projects Center</h2>
+                            <p class="muted-help">Manage capital projects, track budgets, invoices, and change orders.</p>
+                        </div>
+                        <div class="inspection-reports-actions">
+                            <button id="addProjectBtn" class="btn-primary">+ Add Project</button>
+                        </div>
+                    </div>
+
+                    <div class="inspection-reports-filters">
+                        <div class="inspection-reports-filters-grid">
+                            <div class="form-group" style="margin: 0;">
+                                <label for="projectPropertyFilter">Property</label>
+                                <select id="projectPropertyFilter">
+                                    <option value="">All Properties</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin: 0;">
+                                <label for="projectStatusFilter">Status</label>
+                                <select id="projectStatusFilter">
+                                    <option value="">All statuses</option>
+                                    <option value="Planning">Planning</option>
+                                    <option value="In Progress">In Progress</option>
+                                    <option value="Closed">Closed</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin: 0;">
+                                <label for="projectTypeFilter">Project Type</label>
+                                <select id="projectTypeFilter">
+                                    <option value="">All types</option>
+                                    <option value="Renovation">Renovation</option>
+                                    <option value="Repair">Repair</option>
+                                    <option value="Improvement">Improvement</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin: 0;">
+                                <label for="projectDateFrom">Start Date From</label>
+                                <input type="date" id="projectDateFrom">
+                            </div>
+                            <div class="form-group" style="margin: 0;">
+                                <label for="projectDateTo">Start Date To</label>
+                                <input type="date" id="projectDateTo">
+                            </div>
+                            <div class="form-group" style="margin: 0;">
+                                <label for="projectSearch">Search</label>
+                                <input type="text" id="projectSearch" placeholder="Project name, description, notes...">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="inspection-reports-table">
+                        <div class="tenants-table-container" style="max-height: none;">
+                            <table class="rent-roll-table inspection-reports-table-inner" style="width: 100%;">
+                                <thead>
+                                    <tr>
+                                        <th>Project Name</th>
+                                        <th>Property</th>
+                                        <th>Type</th>
+                                        <th>Status</th>
+                                        <th>Start Date</th>
+                                        <th>Budget</th>
+                                        <th>Actual Cost</th>
+                                        <th>Variance</th>
+                                        <th style="text-align: right;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="projectsTableBody">
+                                    <tr>
+                                        <td colspan="9" style="padding: 18px; color: #6B7280; text-align: center;">Loading projects...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- Project Modal -->
+        <div id="projectModal" class="modal">
+            <div class="modal-content" style="max-width: 700px;">
+                <div class="modal-header">
+                    <h2 id="projectModalTitle">Add Project</h2>
+                    <button class="close-btn" id="closeProjectModal">&times;</button>
+                </div>
+                <form id="projectForm">
+                    <div class="modal-body">
+                        <input type="hidden" id="projectId">
+                        
+                        <div class="form-group">
+                            <label for="projectName">Project Name *</label>
+                            <input type="text" id="projectName" required placeholder="e.g., Commercial Renovation - Building A">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="projectProperty">Property *</label>
+                            <select id="projectProperty" required>
+                                <option value="">Select a property...</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="projectType">Project Type *</label>
+                            <select id="projectType" required>
+                                <option value="">Select type...</option>
+                                <option value="Renovation">Renovation</option>
+                                <option value="Repair">Repair</option>
+                                <option value="Improvement">Improvement</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="projectStatus">Status *</label>
+                            <select id="projectStatus" required>
+                                <option value="Planning">Planning</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Closed">Closed</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="projectStartDate">Start Date *</label>
+                            <input type="date" id="projectStartDate" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="projectTargetCompletionDate">Target Completion Date</label>
+                            <input type="date" id="projectTargetCompletionDate">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="projectOriginalBudget">Original Budget *</label>
+                            <input type="number" id="projectOriginalBudget" required min="0" step="0.01" placeholder="0.00">
+                            <small style="color: #666; font-size: 12px;">Enter the initial budget for this project</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="projectDescription">Description</label>
+                            <textarea id="projectDescription" rows="3" placeholder="Brief description of the project..."></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="projectNotes">Notes</label>
+                            <textarea id="projectNotes" rows="3" placeholder="Additional notes or comments..."></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="submit" class="btn-primary">Save Project</button>
+                        <button type="button" class="btn-secondary" id="cancelProjectForm">Cancel</button>
+                    </div>
+                </form>
             </div>
         </div>
 

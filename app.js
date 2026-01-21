@@ -1987,6 +1987,7 @@ function updatePageTitle(page) {
         'tenants': 'Tenants',
         'leases': 'Leases',
         'finance': 'Finance',
+        'projects': 'Projects',
         'users': 'User Management',
         'profile': 'Profile'
     };
@@ -2044,6 +2045,8 @@ function showPage(page) {
         loadLeases();
     } else if (page === 'finance') {
         loadFinance();
+    } else if (page === 'projects') {
+        loadProjects();
     } else if (page === 'users') {
         loadUsers();
     } else if (page === 'profile') {
@@ -3245,6 +3248,51 @@ function setupEventListeners() {
             closeTenantModal();
             closeContactModal();
             closeOccupancyModal();
+            closeProjectModal();
+        }
+    });
+    
+    // Projects event listeners
+    const addProjectBtn = document.getElementById('addProjectBtn');
+    if (addProjectBtn) {
+        addProjectBtn.addEventListener('click', () => {
+            if (!canManageProjects()) {
+                alert('You do not have permission to create projects.');
+                return;
+            }
+            openProjectModal();
+        });
+    }
+
+    const projectForm = document.getElementById('projectForm');
+    if (projectForm) {
+        projectForm.addEventListener('submit', handleProjectSubmit);
+    }
+
+    const closeProjectModalBtn = document.getElementById('closeProjectModal');
+    if (closeProjectModalBtn) {
+        closeProjectModalBtn.addEventListener('click', closeProjectModal);
+    }
+
+    const cancelProjectFormBtn = document.getElementById('cancelProjectForm');
+    if (cancelProjectFormBtn) {
+        cancelProjectFormBtn.addEventListener('click', closeProjectModal);
+    }
+
+    // Project filters
+    const projectPropertyFilter = document.getElementById('projectPropertyFilter');
+    const projectStatusFilter = document.getElementById('projectStatusFilter');
+    const projectTypeFilter = document.getElementById('projectTypeFilter');
+    const projectDateFrom = document.getElementById('projectDateFrom');
+    const projectDateTo = document.getElementById('projectDateTo');
+    const projectSearch = document.getElementById('projectSearch');
+
+    [projectPropertyFilter, projectStatusFilter, projectTypeFilter, projectDateFrom, projectDateTo, projectSearch].forEach(filter => {
+        if (filter) {
+            filter.addEventListener('change', () => renderProjectsTable(projectsCache));
+            if (filter.type === 'text') {
+                filter.addEventListener('input', () => renderProjectsTable(projectsCache));
+            }
         }
     });
     
@@ -22748,3 +22796,534 @@ function renderHorizontalTable(tenantsData, tenants, units, buildings, year, mon
     
     return html;
 }
+
+
+// ============================================
+// PROJECTS CENTER
+// ============================================
+
+// Projects state
+let projectsUnsubscribe = null;
+let projectsCache = [];
+let projectsInitialized = false;
+
+// Permission check
+function canManageProjects() {
+    if (!currentUserProfile) return false;
+    const role = currentUserProfile.role;
+    return role === 'admin' || role === 'super_admin' || role === 'property_manager';
+}
+// Load projects
+async function loadProjects() {
+    if (!firebase.auth().currentUser) {
+        console.warn('⚠️ User not authenticated, cannot load projects');
+        return;
+    }
+
+    const tbody = document.getElementById('projectsTableBody');
+    if (!tbody) return;
+
+    // Show loading state
+    tbody.innerHTML = '<tr><td colspan="9" style="padding: 18px; color: #6B7280; text-align: center;">Loading projects...</td></tr>';
+
+    try {
+        // Unsubscribe from previous listener if exists
+        if (projectsUnsubscribe) {
+            projectsUnsubscribe();
+            projectsUnsubscribe = null;
+        }
+
+        let query = db.collection('projects').orderBy('startDate', 'desc');
+
+        // Apply property filter for maintenance/property_manager roles
+        if (currentUserProfile && (currentUserProfile.role === 'property_manager' || currentUserProfile.role === 'maintenance')) {
+            const assignedProperties = currentUserProfile.assignedProperties || [];
+            if (assignedProperties.length > 0 && selectedPropertyId) {
+                // If a property is selected, filter by that property
+                query = query.where('propertyId', '==', selectedPropertyId);
+            } else if (assignedProperties.length > 0) {
+                // If no property selected but user has assigned properties, filter by those
+                query = query.where('propertyId', 'in', assignedProperties.slice(0, 10)); // Firestore 'in' limit is 10
+            }
+        }
+
+        // Set up real-time listener
+        projectsUnsubscribe = query.onSnapshot((snapshot) => {
+            projectsCache = [];
+            snapshot.forEach((doc) => {
+                projectsCache.push({
+                    id: doc.id,
+                    ...doc.data()
+                });
+            });
+            renderProjectsTable(projectsCache);
+        }, (error) => {
+            console.error('❌ Error loading projects:', error);
+            tbody.innerHTML = '<tr><td colspan="9" style="padding: 18px; color: #DC2626; text-align: center;">Error loading projects. Please refresh the page.</td></tr>';
+        });
+
+        // Load properties for filter dropdown
+        await loadPropertiesForProjectFilter();
+        
+        // Populate property dropdown in modal
+        await loadPropertiesForProjectForm();
+
+        projectsInitialized = true;
+    } catch (error) {
+        console.error('❌ Error loading projects:', error);
+        tbody.innerHTML = '<tr><td colspan="9" style="padding: 18px; color: #DC2626; text-align: center;">Error loading projects. Please refresh the page.</td></tr>';
+    }
+}
+
+// Load properties for project filter dropdown
+async function loadPropertiesForProjectFilter() {
+    const propertyFilter = document.getElementById('projectPropertyFilter');
+    if (!propertyFilter) return;
+
+    try {
+        const propertiesSnapshot = await db.collection('properties').get();
+        const currentValue = propertyFilter.value;
+
+        propertyFilter.innerHTML = '<option value="">All Properties</option>';
+
+        const properties = [];
+        propertiesSnapshot.forEach((doc) => {
+            const data = doc.data();
+            properties.push({ id: doc.id, name: data.name || 'Unnamed Property' });
+        });
+
+        // Sort by name
+        properties.sort((a, b) => a.name.localeCompare(b.name));
+
+        properties.forEach((prop) => {
+            const option = document.createElement('option');
+            option.value = prop.id;
+            option.textContent = prop.name;
+            propertyFilter.appendChild(option);
+        });
+
+        // Restore previous selection if still valid
+        if (currentValue) {
+            propertyFilter.value = currentValue;
+        } else if (selectedPropertyId) {
+            propertyFilter.value = selectedPropertyId;
+        }
+    } catch (error) {
+        console.error('❌ Error loading properties for project filter:', error);
+    }
+}
+
+// Load properties for project form dropdown
+async function loadPropertiesForProjectForm() {
+    const projectProperty = document.getElementById('projectProperty');
+    if (!projectProperty) return;
+
+    try {
+        let query = db.collection('properties');
+
+        // Filter by assigned properties for property_manager/maintenance roles
+        if (currentUserProfile && (currentUserProfile.role === 'property_manager' || currentUserProfile.role === 'maintenance')) {
+            const assignedProperties = currentUserProfile.assignedProperties || [];
+            if (assignedProperties.length > 0) {
+                query = query.where(firebase.firestore.FieldPath.documentId(), 'in', assignedProperties.slice(0, 10));
+            } else {
+                // No assigned properties, show empty
+                projectProperty.innerHTML = '<option value="">No properties assigned</option>';
+                return;
+            }
+        }
+
+        const propertiesSnapshot = await query.get();
+        const currentValue = projectProperty.value;
+
+        projectProperty.innerHTML = '<option value="">Select a property...</option>';
+
+        const properties = [];
+        propertiesSnapshot.forEach((doc) => {
+            const data = doc.data();
+            properties.push({ id: doc.id, name: data.name || 'Unnamed Property' });
+        });
+
+        // Sort by name
+        properties.sort((a, b) => a.name.localeCompare(b.name));
+
+        properties.forEach((prop) => {
+            const option = document.createElement('option');
+            option.value = prop.id;
+            option.textContent = prop.name;
+            projectProperty.appendChild(option);
+        });
+
+        // Restore previous selection if still valid
+        if (currentValue) {
+            projectProperty.value = currentValue;
+        }
+    } catch (error) {
+        console.error('❌ Error loading properties for project form:', error);
+    }
+}
+
+// Render projects table
+function renderProjectsTable(projects) {
+    const tbody = document.getElementById('projectsTableBody');
+    if (!tbody) return;
+
+    const propertyFilter = document.getElementById('projectPropertyFilter')?.value || '';
+    const statusFilter = document.getElementById('projectStatusFilter')?.value || '';
+    const typeFilter = document.getElementById('projectTypeFilter')?.value || '';
+    const dateFrom = document.getElementById('projectDateFrom')?.value || '';
+    const dateTo = document.getElementById('projectDateTo')?.value || '';
+    const search = (document.getElementById('projectSearch')?.value || '').trim().toLowerCase();
+
+    const fromDate = dateFrom ? new Date(dateFrom) : null;
+    const toDate = dateTo ? new Date(dateTo) : null;
+
+    // Filter projects
+    const filtered = (projects || []).filter((p) => {
+        if (propertyFilter && p.propertyId !== propertyFilter) return false;
+        if (statusFilter && p.status !== statusFilter) return false;
+        if (typeFilter && p.projectType !== typeFilter) return false;
+
+        if (fromDate || toDate) {
+            const startDate = p.startDate?.toDate ? p.startDate.toDate() : (p.startDate ? new Date(p.startDate) : null);
+            if (!startDate) return false;
+            if (fromDate && startDate < fromDate) return false;
+            if (toDate && startDate > toDate) return false;
+        }
+
+        if (search) {
+            const hay = [
+                p.projectName,
+                p.description,
+                p.notes,
+                p.propertyName
+            ].filter(Boolean).join(' ').toLowerCase();
+            if (!hay.includes(search)) return false;
+        }
+
+        return true;
+    });
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="padding: 18px; color: #6B7280; text-align: center;">No projects found.</td></tr>';
+        return;
+    }
+
+    // Calculate budget metrics for each project
+    // For now, we'll use placeholder values (actual cost and variance will be calculated from invoices in Phase 2)
+    filtered.forEach((project) => {
+        project.revisedBudget = project.originalBudget || 0; // Will include change orders in Phase 3
+        project.totalInvoiced = 0; // Will be calculated from linked invoices in Phase 2
+        project.variance = project.revisedBudget - project.totalInvoiced;
+    });
+
+    tbody.innerHTML = filtered.map((project) => {
+        const startDate = project.startDate?.toDate ? project.startDate.toDate() : (project.startDate ? new Date(project.startDate) : null);
+        const startDateStr = startDate ? startDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A';
+
+        // Status badge
+        let statusBadge = '';
+        if (project.status === 'Planning') {
+            statusBadge = '<span class="badge" style="background: #6B7280; color: white;">Planning</span>';
+        } else if (project.status === 'In Progress') {
+            statusBadge = '<span class="badge" style="background: #2563EB; color: white;">In Progress</span>';
+        } else if (project.status === 'Closed') {
+            statusBadge = '<span class="badge" style="background: #16A34A; color: white;">Closed</span>';
+        }
+
+        // Variance display
+        const variance = project.variance || 0;
+        const varianceColor = variance >= 0 ? '#16A34A' : '#DC2626';
+        const varianceSign = variance >= 0 ? '+' : '';
+
+        const canEdit = canManageProjects();
+        const canDelete = canManageProjects() && project.status === 'Planning';
+
+        return `
+            <tr>
+                <td style="padding: 12px; font-weight: 500;">${escapeHtml(project.projectName || 'Unnamed Project')}</td>
+                <td style="padding: 12px;">${escapeHtml(project.propertyName || 'Unknown Property')}</td>
+                <td style="padding: 12px;">${escapeHtml(project.projectType || 'N/A')}</td>
+                <td style="padding: 12px;">${statusBadge}</td>
+                <td style="padding: 12px;">${startDateStr}</td>
+                <td style="padding: 12px; text-align: right; font-variant-numeric: tabular-nums;">$${(project.revisedBudget || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td style="padding: 12px; text-align: right; font-variant-numeric: tabular-nums;">$${(project.totalInvoiced || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td style="padding: 12px; text-align: right; font-variant-numeric: tabular-nums; color: ${varianceColor}; font-weight: 500;">${varianceSign}$${Math.abs(variance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td style="padding: 12px; text-align: right;">
+                    <div class="inspection-actions" style="display: flex; gap: 8px; justify-content: flex-end;">
+                        <button class="btn-small btn-secondary" onclick="viewProjectDetail('${project.id}')" title="View Details">View</button>
+                        ${canEdit ? `<button class="btn-small btn-secondary" onclick="editProject('${project.id}')" title="Edit">Edit</button>` : ''}
+                        ${project.status === 'In Progress' && canEdit ? `<button class="btn-small btn-secondary" onclick="closeProject('${project.id}')" title="Close Project">Close</button>` : ''}
+                        ${canDelete ? `<button class="btn-small btn-danger" onclick="deleteProject('${project.id}')" title="Delete">Delete</button>` : ''}
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// Open project modal
+function openProjectModal(projectId = null) {
+    const modal = document.getElementById('projectModal');
+    const form = document.getElementById('projectForm');
+    const title = document.getElementById('projectModalTitle');
+    
+    if (!modal || !form || !title) return;
+
+    form.reset();
+    document.getElementById('projectId').value = '';
+
+    if (projectId) {
+        // Edit mode
+        title.textContent = 'Edit Project';
+        const project = projectsCache.find(p => p.id === projectId);
+        if (project) {
+            document.getElementById('projectId').value = project.id;
+            document.getElementById('projectName').value = project.projectName || '';
+            document.getElementById('projectProperty').value = project.propertyId || '';
+            document.getElementById('projectType').value = project.projectType || '';
+            document.getElementById('projectStatus').value = project.status || 'Planning';
+            
+            if (project.startDate) {
+                const startDate = project.startDate?.toDate ? project.startDate.toDate() : new Date(project.startDate);
+                document.getElementById('projectStartDate').value = toDateInputValue(startDate);
+            }
+            
+            if (project.targetCompletionDate) {
+                const targetDate = project.targetCompletionDate?.toDate ? project.targetCompletionDate.toDate() : new Date(project.targetCompletionDate);
+                document.getElementById('projectTargetCompletionDate').value = toDateInputValue(targetDate);
+            }
+            
+            document.getElementById('projectOriginalBudget').value = project.originalBudget || '';
+            document.getElementById('projectDescription').value = project.description || '';
+            document.getElementById('projectNotes').value = project.notes || '';
+        }
+    } else {
+        // Add mode
+        title.textContent = 'Add Project';
+        document.getElementById('projectStatus').value = 'Planning';
+        
+        // Set default start date to today
+        const today = new Date();
+        document.getElementById('projectStartDate').value = toDateInputValue(today);
+    }
+
+    modal.classList.add('show');
+}
+
+// Close project modal
+function closeProjectModal() {
+    const modal = document.getElementById('projectModal');
+    if (modal) {
+        modal.classList.remove('show');
+    }
+    document.getElementById('projectForm')?.reset();
+    document.getElementById('projectId').value = '';
+}
+
+// Handle project form submission
+async function handleProjectSubmit(e) {
+    e.preventDefault();
+
+    if (!canManageProjects()) {
+        alert('You do not have permission to manage projects.');
+        return;
+    }
+
+    const projectId = document.getElementById('projectId').value;
+    const projectName = document.getElementById('projectName').value.trim();
+    const propertyId = document.getElementById('projectProperty').value;
+    const projectType = document.getElementById('projectType').value;
+    const status = document.getElementById('projectStatus').value;
+    const startDate = document.getElementById('projectStartDate').value;
+    const targetCompletionDate = document.getElementById('projectTargetCompletionDate').value;
+    const originalBudget = parseFloat(document.getElementById('projectOriginalBudget').value);
+    const description = document.getElementById('projectDescription').value.trim();
+    const notes = document.getElementById('projectNotes').value.trim();
+
+    if (!projectName || !propertyId || !projectType || !status || !startDate || isNaN(originalBudget) || originalBudget < 0) {
+        alert('Please fill in all required fields with valid values.');
+        return;
+    }
+
+    // Get property name
+    let propertyName = '';
+    try {
+        const propertyDoc = await db.collection('properties').doc(propertyId).get();
+        if (propertyDoc.exists) {
+            propertyName = propertyDoc.data().name || 'Unknown Property';
+        }
+    } catch (error) {
+        console.warn('Could not fetch property name:', error);
+    }
+
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Saving...';
+
+    try {
+        const now = firebase.firestore.FieldValue.serverTimestamp();
+        const userId = firebase.auth().currentUser?.uid || null;
+
+        const projectData = {
+            projectName,
+            propertyId,
+            propertyName,
+            projectType,
+            status,
+            startDate: firebase.firestore.Timestamp.fromDate(new Date(startDate)),
+            originalBudget,
+            description: description || null,
+            notes: notes || null,
+            updatedAt: now,
+            updatedBy: userId
+        };
+
+        if (targetCompletionDate) {
+            projectData.targetCompletionDate = firebase.firestore.Timestamp.fromDate(new Date(targetCompletionDate));
+        }
+
+        if (projectId) {
+            // Update existing project
+            await db.collection('projects').doc(projectId).update(projectData);
+            console.log('✅ Project updated:', projectId);
+        } else {
+            // Create new project
+            projectData.createdAt = now;
+            projectData.createdBy = userId;
+            
+            // Handle closed status
+            if (status === 'Closed') {
+                projectData.closedAt = now;
+                projectData.closedBy = userId;
+            }
+            
+            const docRef = await db.collection('projects').add(projectData);
+            console.log('✅ Project created:', docRef.id);
+        }
+
+        closeProjectModal();
+        // Projects will update automatically via real-time listener
+    } catch (error) {
+        console.error('❌ Error saving project:', error);
+        alert('Error saving project: ' + (error.message || 'Unknown error'));
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+    }
+}
+
+// Edit project
+window.editProject = function(projectId) {
+    if (!canManageProjects()) {
+        alert('You do not have permission to edit projects.');
+        return;
+    }
+    openProjectModal(projectId);
+};
+
+// View project detail (placeholder for Phase 2 - will show full detail modal with tabs)
+window.viewProjectDetail = function(projectId) {
+    const project = projectsCache.find(p => p.id === projectId);
+    if (!project) {
+        alert('Project not found.');
+        return;
+    }
+
+    // For Phase 1, just show basic info in an alert
+    // Phase 2 will implement full detail modal with tabs
+    const startDate = project.startDate?.toDate ? project.startDate.toDate() : (project.startDate ? new Date(project.startDate) : null);
+    const startDateStr = startDate ? startDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A';
+    
+    let detailText = `Project: ${project.projectName}\n`;
+    detailText += `Property: ${project.propertyName || 'Unknown'}\n`;
+    detailText += `Type: ${project.projectType || 'N/A'}\n`;
+    detailText += `Status: ${project.status || 'N/A'}\n`;
+    detailText += `Start Date: ${startDateStr}\n`;
+    detailText += `Original Budget: $${(project.originalBudget || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n`;
+    
+    if (project.description) {
+        detailText += `\nDescription:\n${project.description}\n`;
+    }
+    
+    if (project.notes) {
+        detailText += `\nNotes:\n${project.notes}\n`;
+    }
+
+    alert(detailText);
+};
+
+// Close project
+window.closeProject = async function(projectId) {
+    if (!canManageProjects()) {
+        alert('You do not have permission to close projects.');
+        return;
+    }
+
+    const project = projectsCache.find(p => p.id === projectId);
+    if (!project) {
+        alert('Project not found.');
+        return;
+    }
+
+    if (project.status !== 'In Progress') {
+        alert('Only projects with "In Progress" status can be closed.');
+        return;
+    }
+
+    if (!confirm(`Are you sure you want to close "${project.projectName}"? This action cannot be undone.`)) {
+        return;
+    }
+
+    try {
+        const now = firebase.firestore.FieldValue.serverTimestamp();
+        const userId = firebase.auth().currentUser?.uid || null;
+
+        await db.collection('projects').doc(projectId).update({
+            status: 'Closed',
+            closedAt: now,
+            closedBy: userId,
+            updatedAt: now,
+            updatedBy: userId
+        });
+
+        console.log('✅ Project closed:', projectId);
+        // Projects will update automatically via real-time listener
+    } catch (error) {
+        console.error('❌ Error closing project:', error);
+        alert('Error closing project: ' + (error.message || 'Unknown error'));
+    }
+};
+
+// Delete project
+window.deleteProject = async function(projectId) {
+    if (!canManageProjects()) {
+        alert('You do not have permission to delete projects.');
+        return;
+    }
+
+    const project = projectsCache.find(p => p.id === projectId);
+    if (!project) {
+        alert('Project not found.');
+        return;
+    }
+
+    if (project.status !== 'Planning') {
+        alert('Only projects with "Planning" status can be deleted.');
+        return;
+    }
+
+    if (!confirm(`Are you sure you want to delete "${project.projectName}"? This action cannot be undone.`)) {
+        return;
+    }
+
+    try {
+        await db.collection('projects').doc(projectId).delete();
+        console.log('✅ Project deleted:', projectId);
+        // Projects will update automatically via real-time listener
+    } catch (error) {
+        console.error('❌ Error deleting project:', error);
+        alert('Error deleting project: ' + (error.message || 'Unknown error'));
+    }
+};

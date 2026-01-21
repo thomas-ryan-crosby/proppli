@@ -361,6 +361,38 @@ service cloud.firestore {
                       getUserRole() == 'property_manager');
     }
     
+    // Projects collection
+    match /projects/{projectId} {
+      // All authenticated active users can read projects (subject to property access)
+      allow read: if isAuthenticated() && isUserActive();
+      
+      // Only admins, super admins, and property managers can write
+      allow write: if isAuthenticated() && isUserActive() && 
+                     (isSuperAdmin() ||
+                      isAdmin() || 
+                      getUserRole() == 'property_manager');
+      
+      // Change orders subcollection
+      match /changeOrders/{changeOrderId} {
+        // Same read/write rules as projects
+        allow read: if isAuthenticated() && isUserActive();
+        allow write: if isAuthenticated() && isUserActive() && 
+                       (isSuperAdmin() ||
+                        isAdmin() || 
+                        getUserRole() == 'property_manager');
+      }
+      
+      // Documents subcollection
+      match /documents/{documentId} {
+        // Same read/write rules as projects
+        allow read: if isAuthenticated() && isUserActive();
+        allow write: if isAuthenticated() && isUserActive() && 
+                       (isSuperAdmin() ||
+                        isAdmin() || 
+                        getUserRole() == 'property_manager');
+      }
+    }
+    
     // Super admin full access override (must be last, before default deny)
     // Super admins can access any document that doesn't match above rules
     match /{document=**} {
