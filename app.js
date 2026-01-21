@@ -19233,13 +19233,6 @@ window.editInvoice = function(invoiceId) {
         loadVendorsForInvoiceForm().then(() => {
             document.getElementById('invoiceVendor').value = invoice.vendorId || '';
         });
-        loadAllCostCodes();
-        if (invoice.costCode) {
-            // Set cost code after a brief delay to ensure dropdown is populated
-            setTimeout(() => {
-                document.getElementById('invoiceCostCode').value = invoice.costCode;
-            }, 100);
-        }
         
         // Show existing file if present
         if (invoice.fileUrl) {
@@ -19564,45 +19557,6 @@ async function loadVendorsForInvoiceForm() {
     return Promise.resolve();
 }
 
-// Load all cost codes into dropdown
-function loadAllCostCodes() {
-    const costCodeSelect = document.getElementById('invoiceCostCode');
-    if (!costCodeSelect) return;
-    
-    // Clear existing options
-    costCodeSelect.innerHTML = '<option value="">Select a cost code...</option>';
-    
-    // Combine all cost codes from all companies
-    const allCostCodes = [];
-    Object.keys(COST_CODES_BY_COMPANY).forEach(company => {
-        COST_CODES_BY_COMPANY[company].forEach(code => {
-            if (!allCostCodes.includes(code)) {
-                allCostCodes.push(code);
-            }
-        });
-    });
-    
-    // Sort cost codes
-    allCostCodes.sort((a, b) => {
-        // Try to sort numerically first, then alphabetically
-        const aNum = parseInt(a);
-        const bNum = parseInt(b);
-        if (!isNaN(aNum) && !isNaN(bNum)) {
-            return aNum - bNum;
-        }
-        return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
-    });
-    
-    // Add all cost codes to dropdown
-    allCostCodes.forEach(code => {
-        const option = document.createElement('option');
-        option.value = code;
-        option.textContent = code;
-        costCodeSelect.appendChild(option);
-    });
-    
-    console.log(`Loaded ${allCostCodes.length} cost codes from all companies`);
-}
 
 // Reset invoice file upload UI
 function resetInvoiceFileUpload() {
