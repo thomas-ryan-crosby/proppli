@@ -2699,6 +2699,10 @@
                                         <select id="invoiceVendorFilter" style="margin-left: 5px;">
                                             <option value="">All Vendors</option>
                                         </select>
+                                        <label for="invoiceProjectFilter" style="margin-left: 15px;">Project:</label>
+                                        <select id="invoiceProjectFilter" style="margin-left: 5px;">
+                                            <option value="">All Projects</option>
+                                        </select>
                                     </div>
                                     <div>
                                         <label for="invoiceDateFrom">From:</label>
@@ -2741,6 +2745,14 @@
                             <select id="invoiceProperty" required>
                                 <option value="">Select property...</option>
                             </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="invoiceProject">Project *</label>
+                            <select id="invoiceProject" required>
+                                <option value="">Select project...</option>
+                            </select>
+                            <small style="color: #666; font-size: 12px; display: block; margin-top: 5px;">All invoices must be linked to a project</small>
                         </div>
                         
                         <div class="form-group">
@@ -3023,6 +3035,68 @@
                         <button type="button" class="btn-secondary" id="cancelProjectForm">Cancel</button>
                     </div>
                 </form>
+            </div>
+        </div>
+
+        <!-- Project Detail Modal -->
+        <div id="projectDetailModal" class="modal">
+            <div class="modal-content" style="max-width: 1000px; max-height: 90vh; overflow-y: auto;">
+                <div class="modal-header">
+                    <h2 id="projectDetailTitle">Project Details</h2>
+                    <button class="close-btn" id="closeProjectDetailModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <!-- Project Detail Tabs -->
+                    <div class="finance-tabs" style="margin-bottom: 20px; border-bottom: 2px solid #e2e8f0;">
+                        <button class="tab-btn active" data-project-tab="overview">Overview</button>
+                        <button class="tab-btn" data-project-tab="invoices">Invoices</button>
+                        <button class="tab-btn" data-project-tab="changeOrders" style="display: none;">Change Orders</button>
+                        <button class="tab-btn" data-project-tab="documents" style="display: none;">Documents</button>
+                    </div>
+
+                    <!-- Overview Tab -->
+                    <div id="projectOverviewTab" class="tab-content active">
+                        <div id="projectOverviewContent"></div>
+                    </div>
+
+                    <!-- Invoices Tab -->
+                    <div id="projectInvoicesTab" class="tab-content" style="display: none;">
+                        <div style="margin-bottom: 15px;">
+                            <button id="addInvoiceToProjectBtn" class="btn-primary">+ Add Invoice</button>
+                        </div>
+                        <div class="inspection-reports-table">
+                            <div class="tenants-table-container" style="max-height: none;">
+                                <table class="rent-roll-table inspection-reports-table-inner" style="width: 100%;">
+                                    <thead>
+                                        <tr>
+                                            <th>Invoice #</th>
+                                            <th>Vendor</th>
+                                            <th>Date</th>
+                                            <th>Amount</th>
+                                            <th>Status</th>
+                                            <th style="text-align: right;">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="projectInvoicesTableBody">
+                                        <tr>
+                                            <td colspan="6" style="padding: 18px; color: #6B7280; text-align: center;">Loading invoices...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Change Orders Tab (Placeholder for Phase 3) -->
+                    <div id="projectChangeOrdersTab" class="tab-content" style="display: none;">
+                        <p>Change orders will be available in Phase 3.</p>
+                    </div>
+
+                    <!-- Documents Tab (Placeholder for Phase 4) -->
+                    <div id="projectDocumentsTab" class="tab-content" style="display: none;">
+                        <p>Document upload will be available in Phase 4.</p>
+                    </div>
+                </div>
             </div>
         </div>
 

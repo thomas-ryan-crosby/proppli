@@ -3289,12 +3289,62 @@ function setupEventListeners() {
 
     [projectPropertyFilter, projectStatusFilter, projectTypeFilter, projectDateFrom, projectDateTo, projectSearch].forEach(filter => {
         if (filter) {
-            filter.addEventListener('change', () => renderProjectsTable(projectsCache));
+            filter.addEventListener('change', () => {
+                renderProjectsTable(projectsCache).catch(err => console.error('Error rendering projects table:', err));
+            });
             if (filter.type === 'text') {
-                filter.addEventListener('input', () => renderProjectsTable(projectsCache));
+                filter.addEventListener('input', () => {
+                    renderProjectsTable(projectsCache).catch(err => console.error('Error rendering projects table:', err));
+                });
             }
         }
     });
+
+    // Project detail modal event listeners
+    const closeProjectDetailModalBtn = document.getElementById('closeProjectDetailModal');
+    if (closeProjectDetailModalBtn) {
+        closeProjectDetailModalBtn.addEventListener('click', closeProjectDetailModal);
+    }
+
+    // Project detail tab switching
+    document.querySelectorAll('[data-project-tab]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const tabName = e.target.getAttribute('data-project-tab');
+            switchProjectDetailTab(tabName);
+        });
+    });
+
+    // Add invoice from project detail
+    const addInvoiceToProjectBtn = document.getElementById('addInvoiceToProjectBtn');
+    if (addInvoiceToProjectBtn) {
+        addInvoiceToProjectBtn.addEventListener('click', () => {
+            // Get current project ID from the modal
+            const modal = document.getElementById('projectDetailModal');
+            if (modal && modal.classList.contains('show')) {
+                // Find the project ID from the title or cache
+                const title = document.getElementById('projectDetailTitle')?.textContent;
+                const project = projectsCache.find(p => p.projectName === title);
+                if (project) {
+                    closeProjectDetailModal();
+                    window.addInvoice(project.id);
+                } else {
+                    window.addInvoice();
+                }
+            } else {
+                window.addInvoice();
+            }
+        });
+    }
+
+    // Close project detail modal when clicking outside
+    const projectDetailModal = document.getElementById('projectDetailModal');
+    if (projectDetailModal) {
+        projectDetailModal.addEventListener('click', (e) => {
+            if (e.target === projectDetailModal) {
+                closeProjectDetailModal();
+            }
+        });
+    }
     
     // User management event listeners
     const userSearch = document.getElementById('userSearch');
@@ -20229,6 +20279,7 @@ async function loadInvoices() {
         const statusFilter = document.getElementById('invoiceStatusFilter')?.value || '';
         const propertyFilter = document.getElementById('invoicePropertyFilter')?.value || '';
         const vendorFilter = document.getElementById('invoiceVendorFilter')?.value || '';
+        const projectFilter = document.getElementById('invoiceProjectFilter')?.value || '';
         const dateFrom = document.getElementById('invoiceDateFrom')?.value || '';
         const dateTo = document.getElementById('invoiceDateTo')?.value || '';
         
@@ -20239,7 +20290,7 @@ async function loadInvoices() {
         
         const snapshot = await query.get();
         
-        // Load properties and vendors for display
+        // Load properties, vendors, and projects for display
         const propertiesSnapshot = await db.collection('properties').get();
         const properties = {};
         propertiesSnapshot.forEach((doc) => {
@@ -20250,6 +20301,12 @@ async function loadInvoices() {
         const vendors = {};
         vendorsSnapshot.forEach((doc) => {
             vendors[doc.id] = doc.data();
+        });
+        
+        const projectsSnapshot = await db.collection('projects').get();
+        const projects = {};
+        projectsSnapshot.forEach((doc) => {
+            projects[doc.id] = doc.data();
         });
         
         // Filter in memory to avoid Firestore composite indexes
@@ -20269,6 +20326,9 @@ async function loadInvoices() {
             // Apply vendor filter
             if (vendorFilter && invoice.vendorId !== vendorFilter) return;
 
+            // Apply project filter
+            if (projectFilter && invoice.projectId !== projectFilter) return;
+
             // Apply date filters
             if (dateFrom || dateTo) {
                 const invoiceDate = invoice.invoiceDate?.toDate ? invoice.invoiceDate.toDate() : null;
@@ -20283,10 +20343,10 @@ async function loadInvoices() {
         });
         
         // Render invoices
-        renderInvoicesList(invoices, properties, vendors);
+        renderInvoicesList(invoices, properties, vendors, projects);
         
         // Populate filters
-        await populateInvoiceFilters(properties, vendors);
+        await populateInvoiceFilters(properties, vendors, projects);
         
         // Show/hide add button based on permissions
         const addInvoiceBtn = document.getElementById('addInvoiceBtn');
@@ -20300,7 +20360,7 @@ async function loadInvoices() {
 }
 
 // Render invoices list
-function renderInvoicesList(invoices, properties, vendors) {
+function renderInvoicesList(invoices, properties, vendors, projects = {}) {
     const invoicesList = document.getElementById('invoicesList');
     if (!invoicesList) return;
     
@@ -20335,6 +20395,7 @@ function renderInvoicesList(invoices, properties, vendors) {
         
         const property = properties[invoice.propertyId];
         const vendor = vendors[invoice.vendorId];
+        const project = projects[invoice.projectId];
         const invoiceDate = formatDateForDisplay(invoice.invoiceDate, 'N/A');
         const amount = invoice.amount ? `$${parseFloat(invoice.amount).toFixed(2)}` : '$0.00';
         const approvedBy = invoice.approvedBy ? ` by ${escapeHtml(invoice.approvedByName || 'Unknown')}` : '';
@@ -20346,6 +20407,7 @@ function renderInvoicesList(invoices, properties, vendors) {
                 <div>
                     <h3 style="margin: 0 0 5px 0;">${escapeHtml(invoice.invoiceNumber || 'Unnamed Invoice')}</h3>
                     <p style="margin: 0; color: #666; font-size: 0.9em;">${vendor ? escapeHtml(vendor.name) : 'Unknown Vendor'} - ${property ? escapeHtml(property.name) : 'Unknown Property'}</p>
+                    ${project ? `<p style="margin: 5px 0 0 0; color: #2563EB; font-size: 0.85em; font-weight: 500;">📋 Project: ${escapeHtml(project.projectName || invoice.projectName || 'Unknown Project')}</p>` : ''}
                 </div>
                 ${statusBadge}
             </div>
@@ -20380,7 +20442,7 @@ function renderInvoicesList(invoices, properties, vendors) {
 }
 
 // Populate invoice filters
-async function populateInvoiceFilters(properties, vendors) {
+async function populateInvoiceFilters(properties, vendors, projects = {}) {
     // Populate property filter
     const propertyFilter = document.getElementById('invoicePropertyFilter');
     if (propertyFilter) {
@@ -20410,10 +20472,25 @@ async function populateInvoiceFilters(properties, vendors) {
         });
         if (currentValue) vendorFilter.value = currentValue;
     }
+    
+    // Populate project filter
+    const projectFilter = document.getElementById('invoiceProjectFilter');
+    if (projectFilter) {
+        const currentValue = projectFilter.value;
+        projectFilter.innerHTML = '<option value="">All Projects</option>';
+        Object.keys(projects).forEach(projectId => {
+            const project = projects[projectId];
+            const option = document.createElement('option');
+            option.value = projectId;
+            option.textContent = project.projectName || 'Unnamed Project';
+            projectFilter.appendChild(option);
+        });
+        if (currentValue) projectFilter.value = currentValue;
+    }
 }
 
 // Add invoice
-window.addInvoice = function() {
+window.addInvoice = function(projectId = null) {
     editingInvoiceId = null;
     const invoiceForm = document.getElementById('invoiceForm');
     if (invoiceForm) {
@@ -20425,6 +20502,12 @@ window.addInvoice = function() {
     document.getElementById('invoiceModalTitle').textContent = 'Add Invoice';
     loadPropertiesForInvoiceForm();
     loadVendorsForInvoiceForm();
+    loadProjectsForInvoiceForm().then(() => {
+        // Pre-select project if provided
+        if (projectId) {
+            document.getElementById('invoiceProject').value = projectId;
+        }
+    });
     // Reset company and cost code dropdowns
     document.getElementById('invoiceCompany').value = '';
     updateCostCodesForCompany();
@@ -20452,6 +20535,9 @@ window.editInvoice = function(invoiceId) {
         document.getElementById('invoiceId').value = invoiceId;
         document.getElementById('invoiceVendor').value = invoice.vendorId || '';
         document.getElementById('invoiceProperty').value = invoice.propertyId || '';
+        loadProjectsForInvoiceForm().then(() => {
+            document.getElementById('invoiceProject').value = invoice.projectId || '';
+        });
         document.getElementById('invoiceNumber').value = invoice.invoiceNumber || '';
         document.getElementById('invoiceDate').value = invoice.invoiceDate ? formatDateForInput(invoice.invoiceDate.toDate()) : '';
         document.getElementById('invoiceAmount').value = invoice.amount || '';
@@ -20796,6 +20882,43 @@ async function loadVendorsForInvoiceForm() {
         }
     } catch (error) {
         console.error('Error loading vendors for invoice form:', error);
+    }
+    
+    return Promise.resolve();
+}
+
+// Load projects for invoice form
+async function loadProjectsForInvoiceForm() {
+    const projectSelect = document.getElementById('invoiceProject');
+    if (!projectSelect) return Promise.resolve();
+    
+    projectSelect.innerHTML = '<option value="">Select project...</option>';
+    
+    try {
+        let query = db.collection('projects').orderBy('projectName');
+        
+        // Filter by assigned properties for property_manager/maintenance roles
+        if (currentUserProfile && (currentUserProfile.role === 'property_manager' || currentUserProfile.role === 'maintenance')) {
+            const assignedProperties = currentUserProfile.assignedProperties || [];
+            if (assignedProperties.length > 0) {
+                query = query.where('propertyId', 'in', assignedProperties.slice(0, 10));
+            } else {
+                // No assigned properties, show empty
+                projectSelect.innerHTML = '<option value="">No projects available</option>';
+                return Promise.resolve();
+            }
+        }
+        
+        const snapshot = await query.get();
+        snapshot.forEach((doc) => {
+            const project = doc.data();
+            const option = document.createElement('option');
+            option.value = doc.id;
+            option.textContent = project.projectName || 'Unnamed Project';
+            projectSelect.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error loading projects for invoice form:', error);
     }
     
     return Promise.resolve();
@@ -21179,6 +21302,7 @@ async function handleInvoiceSubmit(e) {
     const id = invoiceForm.querySelector('#invoiceId').value;
     const vendorId = invoiceForm.querySelector('#invoiceVendor').value;
     const propertyId = invoiceForm.querySelector('#invoiceProperty').value;
+    const projectId = invoiceForm.querySelector('#invoiceProject').value;
     const invoiceNumber = invoiceForm.querySelector('#invoiceNumber').value.trim();
     const invoiceDate = invoiceForm.querySelector('#invoiceDate').value;
     const amount = invoiceForm.querySelector('#invoiceAmount').value;
@@ -21188,7 +21312,7 @@ async function handleInvoiceSubmit(e) {
     const costCode = invoiceForm.querySelector('#invoiceCostCode').value.trim() || null;
     const fileInput = invoiceForm.querySelector('#invoiceFile');
     
-    if (!vendorId || !propertyId || !invoiceNumber || !invoiceDate || !amount || !company || !costCode) {
+    if (!vendorId || !propertyId || !projectId || !invoiceNumber || !invoiceDate || !amount || !company || !costCode) {
         alert('Please fill in all required fields.');
         resetButtonState();
         return;
@@ -21230,9 +21354,22 @@ async function handleInvoiceSubmit(e) {
             throw new Error('Invalid date format');
         }
         
+        // Get project name
+        let projectName = '';
+        try {
+            const projectDoc = await db.collection('projects').doc(projectId).get();
+            if (projectDoc.exists) {
+                projectName = projectDoc.data().projectName || 'Unknown Project';
+            }
+        } catch (error) {
+            console.warn('Could not fetch project name:', error);
+        }
+
         const invoiceData = {
             vendorId: vendorId,
             propertyId: propertyId,
+            projectId: projectId,
+            projectName: projectName,
             invoiceNumber: invoiceNumber,
             invoiceDate: firebase.firestore.Timestamp.fromDate(invoiceDateObj),
             amount: amountNum,
@@ -22848,7 +22985,7 @@ async function loadProjects() {
         }
 
         // Set up real-time listener
-        projectsUnsubscribe = query.onSnapshot((snapshot) => {
+        projectsUnsubscribe = query.onSnapshot(async (snapshot) => {
             projectsCache = [];
             snapshot.forEach((doc) => {
                 projectsCache.push({
@@ -22856,7 +22993,7 @@ async function loadProjects() {
                     ...doc.data()
                 });
             });
-            renderProjectsTable(projectsCache);
+            await renderProjectsTable(projectsCache);
         }, (error) => {
             console.error('❌ Error loading projects:', error);
             tbody.innerHTML = '<tr><td colspan="9" style="padding: 18px; color: #DC2626; text-align: center;">Error loading projects. Please refresh the page.</td></tr>';
@@ -22964,7 +23101,7 @@ async function loadPropertiesForProjectForm() {
 }
 
 // Render projects table
-function renderProjectsTable(projects) {
+async function renderProjectsTable(projects) {
     const tbody = document.getElementById('projectsTableBody');
     if (!tbody) return;
 
@@ -23009,13 +23146,39 @@ function renderProjectsTable(projects) {
         return;
     }
 
-    // Calculate budget metrics for each project
-    // For now, we'll use placeholder values (actual cost and variance will be calculated from invoices in Phase 2)
-    filtered.forEach((project) => {
-        project.revisedBudget = project.originalBudget || 0; // Will include change orders in Phase 3
-        project.totalInvoiced = 0; // Will be calculated from linked invoices in Phase 2
-        project.variance = project.revisedBudget - project.totalInvoiced;
-    });
+    // Calculate budget metrics for each project from linked invoices
+    // Load all invoices to calculate totals
+    try {
+        const invoicesSnapshot = await db.collection('invoices').get();
+        const invoicesByProject = {};
+        invoicesSnapshot.forEach((doc) => {
+            const invoice = doc.data();
+            if (invoice.projectId) {
+                if (!invoicesByProject[invoice.projectId]) {
+                    invoicesByProject[invoice.projectId] = [];
+                }
+                invoicesByProject[invoice.projectId].push(invoice);
+            }
+        });
+
+        filtered.forEach((project) => {
+            project.revisedBudget = project.originalBudget || 0; // Will include change orders in Phase 3
+            // Calculate total invoiced from linked invoices
+            const projectInvoices = invoicesByProject[project.id] || [];
+            project.totalInvoiced = projectInvoices.reduce((sum, inv) => {
+                return sum + (parseFloat(inv.amount) || 0);
+            }, 0);
+            project.variance = project.revisedBudget - project.totalInvoiced;
+        });
+    } catch (error) {
+        console.warn('Error loading invoices for budget calculation:', error);
+        // Fallback to placeholder values
+        filtered.forEach((project) => {
+            project.revisedBudget = project.originalBudget || 0;
+            project.totalInvoiced = 0;
+            project.variance = project.revisedBudget - project.totalInvoiced;
+        });
+    }
 
     tbody.innerHTML = filtered.map((project) => {
         const startDate = project.startDate?.toDate ? project.startDate.toDate() : (project.startDate ? new Date(project.startDate) : null);
@@ -23223,36 +23386,250 @@ window.editProject = function(projectId) {
     openProjectModal(projectId);
 };
 
-// View project detail (placeholder for Phase 2 - will show full detail modal with tabs)
-window.viewProjectDetail = function(projectId) {
+// View project detail
+window.viewProjectDetail = async function(projectId) {
     const project = projectsCache.find(p => p.id === projectId);
     if (!project) {
         alert('Project not found.');
         return;
     }
 
-    // For Phase 1, just show basic info in an alert
-    // Phase 2 will implement full detail modal with tabs
+    const modal = document.getElementById('projectDetailModal');
+    if (!modal) return;
+
+    // Set title
+    const title = document.getElementById('projectDetailTitle');
+    if (title) title.textContent = project.projectName || 'Project Details';
+
+    // Show/hide tabs based on project status
+    const changeOrdersTab = document.querySelector('[data-project-tab="changeOrders"]');
+    const documentsTab = document.querySelector('[data-project-tab="documents"]');
+    if (changeOrdersTab) {
+        changeOrdersTab.style.display = (project.status === 'In Progress' || project.status === 'Closed') ? 'block' : 'none';
+    }
+    if (documentsTab) {
+        documentsTab.style.display = 'block'; // Always show for now
+    }
+
+    // Load and render overview
+    await renderProjectOverview(project);
+
+    // Load and render invoices
+    await loadProjectInvoices(projectId);
+
+    // Switch to overview tab
+    switchProjectDetailTab('overview');
+
+    modal.classList.add('show');
+};
+
+// Render project overview
+async function renderProjectOverview(project) {
+    const content = document.getElementById('projectOverviewContent');
+    if (!content) return;
+
     const startDate = project.startDate?.toDate ? project.startDate.toDate() : (project.startDate ? new Date(project.startDate) : null);
     const startDateStr = startDate ? startDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A';
     
-    let detailText = `Project: ${project.projectName}\n`;
-    detailText += `Property: ${project.propertyName || 'Unknown'}\n`;
-    detailText += `Type: ${project.projectType || 'N/A'}\n`;
-    detailText += `Status: ${project.status || 'N/A'}\n`;
-    detailText += `Start Date: ${startDateStr}\n`;
-    detailText += `Original Budget: $${(project.originalBudget || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n`;
+    const targetDate = project.targetCompletionDate?.toDate ? project.targetCompletionDate.toDate() : (project.targetCompletionDate ? new Date(project.targetCompletionDate) : null);
+    const targetDateStr = targetDate ? targetDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Not set';
+
+    // Calculate budget metrics
+    let totalInvoiced = 0;
+    let totalChangeOrders = 0;
     
-    if (project.description) {
-        detailText += `\nDescription:\n${project.description}\n`;
-    }
-    
-    if (project.notes) {
-        detailText += `\nNotes:\n${project.notes}\n`;
+    try {
+        // Load invoices for this project
+        const invoicesSnapshot = await db.collection('invoices').where('projectId', '==', project.id).get();
+        invoicesSnapshot.forEach((doc) => {
+            const invoice = doc.data();
+            totalInvoiced += parseFloat(invoice.amount) || 0;
+        });
+
+        // Load change orders (Phase 3 - placeholder for now)
+        // const changeOrdersSnapshot = await db.collection('projects').doc(project.id).collection('changeOrders').get();
+        // changeOrdersSnapshot.forEach((doc) => {
+        //     const co = doc.data();
+        //     if (co.status === 'Approved') {
+        //         totalChangeOrders += parseFloat(co.amount) || 0;
+        //     }
+        // });
+    } catch (error) {
+        console.warn('Error loading project financials:', error);
     }
 
-    alert(detailText);
-};
+    const revisedBudget = (project.originalBudget || 0) + totalChangeOrders;
+    const remainingBudget = revisedBudget - totalInvoiced;
+    const variance = revisedBudget - totalInvoiced;
+
+    const statusBadge = project.status === 'Planning' 
+        ? '<span class="badge" style="background: #6B7280; color: white;">Planning</span>'
+        : project.status === 'In Progress'
+        ? '<span class="badge" style="background: #2563EB; color: white;">In Progress</span>'
+        : '<span class="badge" style="background: #16A34A; color: white;">Closed</span>';
+
+    content.innerHTML = `
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+            <div>
+                <h3 style="margin-top: 0;">Project Information</h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: 600; color: #6B7280; width: 40%;">Project Name:</td>
+                        <td style="padding: 8px 0;">${escapeHtml(project.projectName || 'N/A')}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: 600; color: #6B7280;">Property:</td>
+                        <td style="padding: 8px 0;">${escapeHtml(project.propertyName || 'Unknown')}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: 600; color: #6B7280;">Type:</td>
+                        <td style="padding: 8px 0;">${escapeHtml(project.projectType || 'N/A')}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: 600; color: #6B7280;">Status:</td>
+                        <td style="padding: 8px 0;">${statusBadge}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: 600; color: #6B7280;">Start Date:</td>
+                        <td style="padding: 8px 0;">${startDateStr}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: 600; color: #6B7280;">Target Completion:</td>
+                        <td style="padding: 8px 0;">${targetDateStr}</td>
+                    </tr>
+                </table>
+                ${project.description ? `<div style="margin-top: 20px;"><strong>Description:</strong><p style="color: #6B7280; margin-top: 5px;">${escapeHtml(project.description)}</p></div>` : ''}
+                ${project.notes ? `<div style="margin-top: 20px;"><strong>Notes:</strong><p style="color: #6B7280; margin-top: 5px;">${escapeHtml(project.notes)}</p></div>` : ''}
+            </div>
+            <div>
+                <h3 style="margin-top: 0;">Budget Summary</h3>
+                <div style="background: #F9FAFB; padding: 20px; border-radius: 10px;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                            <td style="padding: 8px 0; font-weight: 600; color: #6B7280;">Original Budget:</td>
+                            <td style="padding: 8px 0; text-align: right; font-variant-numeric: tabular-nums;">$${(project.originalBudget || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; font-weight: 600; color: #6B7280;">Total Change Orders:</td>
+                            <td style="padding: 8px 0; text-align: right; font-variant-numeric: tabular-nums;">$${totalChangeOrders.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        </tr>
+                        <tr style="border-top: 2px solid #E5E7EB; border-bottom: 2px solid #E5E7EB;">
+                            <td style="padding: 12px 0; font-weight: 700; color: #1F2937;">Revised Budget:</td>
+                            <td style="padding: 12px 0; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums;">$${revisedBudget.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; font-weight: 600; color: #6B7280;">Total Invoiced:</td>
+                            <td style="padding: 8px 0; text-align: right; font-variant-numeric: tabular-nums;">$${totalInvoiced.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; font-weight: 600; color: #6B7280;">Remaining Budget:</td>
+                            <td style="padding: 8px 0; text-align: right; font-variant-numeric: tabular-nums; color: ${remainingBudget >= 0 ? '#16A34A' : '#DC2626'}; font-weight: 600;">$${remainingBudget.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        </tr>
+                        <tr style="border-top: 2px solid #E5E7EB;">
+                            <td style="padding: 12px 0; font-weight: 700; color: #1F2937;">Variance:</td>
+                            <td style="padding: 12px 0; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; color: ${variance >= 0 ? '#16A34A' : '#DC2626'};">
+                                ${variance >= 0 ? '+' : ''}$${variance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Load project invoices
+async function loadProjectInvoices(projectId) {
+    const tbody = document.getElementById('projectInvoicesTableBody');
+    if (!tbody) return;
+
+    try {
+        const invoicesSnapshot = await db.collection('invoices').where('projectId', '==', projectId).orderBy('invoiceDate', 'desc').get();
+        
+        // Load vendors for display
+        const vendorsSnapshot = await db.collection('vendors').get();
+        const vendors = {};
+        vendorsSnapshot.forEach((doc) => {
+            vendors[doc.id] = doc.data();
+        });
+
+        if (invoicesSnapshot.empty) {
+            tbody.innerHTML = '<tr><td colspan="6" style="padding: 18px; color: #6B7280; text-align: center;">No invoices found for this project.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = invoicesSnapshot.docs.map((doc) => {
+            const invoice = doc.data();
+            const vendor = vendors[invoice.vendorId];
+            const invoiceDate = invoice.invoiceDate?.toDate ? invoice.invoiceDate.toDate() : (invoice.invoiceDate ? new Date(invoice.invoiceDate) : null);
+            const invoiceDateStr = invoiceDate ? invoiceDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A';
+            
+            const status = invoice.status || 'pending';
+            let statusBadge = '';
+            if (status === 'approved') {
+                statusBadge = '<span class="badge" style="background: #16A34A; color: white;">Approved</span>';
+            } else if (status === 'processed') {
+                statusBadge = '<span class="badge" style="background: #2563EB; color: white;">Processed</span>';
+            } else if (status === 'rejected') {
+                statusBadge = '<span class="badge" style="background: #DC2626; color: white;">Rejected</span>';
+            } else {
+                statusBadge = '<span class="badge" style="background: #F59E0B; color: white;">Pending</span>';
+            }
+
+            return `
+                <tr>
+                    <td style="padding: 12px; font-weight: 500;">${escapeHtml(invoice.invoiceNumber || 'N/A')}</td>
+                    <td style="padding: 12px;">${escapeHtml(vendor ? vendor.name : 'Unknown Vendor')}</td>
+                    <td style="padding: 12px;">${invoiceDateStr}</td>
+                    <td style="padding: 12px; text-align: right; font-variant-numeric: tabular-nums;">$${(parseFloat(invoice.amount) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td style="padding: 12px;">${statusBadge}</td>
+                    <td style="padding: 12px; text-align: right;">
+                        <div class="inspection-actions" style="display: flex; gap: 8px; justify-content: flex-end;">
+                            <button class="btn-small btn-secondary" onclick="viewInvoiceDetail('${doc.id}')" title="View">View</button>
+                            ${canManageInvoices() ? `<button class="btn-small btn-secondary" onclick="editInvoice('${doc.id}')" title="Edit">Edit</button>` : ''}
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('Error loading project invoices:', error);
+        tbody.innerHTML = '<tr><td colspan="6" style="padding: 18px; color: #DC2626; text-align: center;">Error loading invoices.</td></tr>';
+    }
+}
+
+// Switch project detail tab
+function switchProjectDetailTab(tabName) {
+    // Update tab buttons
+    document.querySelectorAll('[data-project-tab]').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.getAttribute('data-project-tab') === tabName) {
+            btn.classList.add('active');
+        }
+    });
+
+    // Update tab content
+    document.querySelectorAll('[id$="Tab"]').forEach(tab => {
+        if (tab.id.includes('project')) {
+            tab.style.display = 'none';
+            tab.classList.remove('active');
+        }
+    });
+
+    const activeTab = document.getElementById(`project${tabName.charAt(0).toUpperCase() + tabName.slice(1)}Tab`);
+    if (activeTab) {
+        activeTab.style.display = 'block';
+        activeTab.classList.add('active');
+    }
+}
+
+// Close project detail modal
+function closeProjectDetailModal() {
+    const modal = document.getElementById('projectDetailModal');
+    if (modal) {
+        modal.classList.remove('show');
+    }
+}
 
 // Close project
 window.closeProject = async function(projectId) {
