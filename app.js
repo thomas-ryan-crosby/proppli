@@ -3279,6 +3279,20 @@ function setupEventListeners() {
         cancelProjectFormBtn.addEventListener('click', closeProjectModal);
     }
 
+    // Invoice: Add vendor inline from invoice form
+    const invoiceAddVendorBtn = document.getElementById('invoiceAddVendorBtn');
+    if (invoiceAddVendorBtn) {
+        invoiceAddVendorBtn.addEventListener('click', () => {
+            // Open the existing vendor modal in "add" mode
+            if (typeof window.addVendor === 'function') {
+                window.addVendor();
+            } else {
+                // Fallback: navigate to vendors page if needed
+                switchPage('vendors');
+            }
+        });
+    }
+
     // Project filters
     const projectPropertyFilter = document.getElementById('projectPropertyFilter');
     const projectStatusFilter = document.getElementById('projectStatusFilter');
@@ -23080,8 +23094,12 @@ async function loadPropertiesForProjectFilter() {
         // Restore previous selection if still valid
         if (currentValue) {
             propertyFilter.value = currentValue;
-        } else if (selectedPropertyId) {
-            propertyFilter.value = selectedPropertyId;
+        } else {
+            // IMPORTANT: Do NOT auto-select the global selectedPropertyId here.
+            // Projects should default to "All Properties" unless the user explicitly chooses a property.
+            // Auto-selecting selectedPropertyId can make it look like there are "no projects" when the
+            // global property context doesn't match the project's property.
+            propertyFilter.value = '';
         }
     } catch (error) {
         console.error('❌ Error loading properties for project filter:', error);
