@@ -23544,7 +23544,26 @@ async function loadProjectInvoices(projectId) {
     if (!tbody) return;
 
     try {
-        const invoicesSnapshot = await db.collection('invoices').where('projectId', '==', projectId).orderBy('invoiceDate', 'desc').get();
+        // Fetch all invoices and filter in memory to avoid Firestore index requirements
+        // This is consistent with how we handle invoice filtering elsewhere in the app
+        console.log('🔍 loadProjectInvoices: Loading all invoices to filter for projectId:', projectId);
+        
+        // Fetch invoices ordered by date (this query doesn't require projectId index)
+        const allInvoicesSnapshot = await db.collection('invoices').orderBy('invoiceDate', 'desc').limit(1000).get();
+        
+        // Filter invoices by projectId in memory
+        const invoices = [];
+        allInvoicesSnapshot.forEach((doc) => {
+            const invoice = doc.data();
+            if (invoice.projectId === projectId) {
+                invoices.push({
+                    id: doc.id,
+                    ...invoice
+                });
+            }
+        });
+        
+        console.log('✅ loadProjectInvoices: Found', invoices.length, 'invoices for project');
         
         // Load vendors for display
         const vendorsSnapshot = await db.collection('vendors').get();
@@ -23553,13 +23572,14 @@ async function loadProjectInvoices(projectId) {
             vendors[doc.id] = doc.data();
         });
 
-        if (invoicesSnapshot.empty) {
+        if (invoices.length === 0) {
             tbody.innerHTML = '<tr><td colspan="6" style="padding: 18px; color: #6B7280; text-align: center;">No invoices found for this project.</td></tr>';
             return;
         }
 
-        tbody.innerHTML = invoicesSnapshot.docs.map((doc) => {
-            const invoice = doc.data();
+        // Invoices are already sorted by date (descending) from the query
+
+        tbody.innerHTML = invoices.map((invoice) => {
             const vendor = vendors[invoice.vendorId];
             const invoiceDate = invoice.invoiceDate?.toDate ? invoice.invoiceDate.toDate() : (invoice.invoiceDate ? new Date(invoice.invoiceDate) : null);
             const invoiceDateStr = invoiceDate ? invoiceDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A';
@@ -23585,8 +23605,8 @@ async function loadProjectInvoices(projectId) {
                     <td style="padding: 12px;">${statusBadge}</td>
                     <td style="padding: 12px; text-align: right;">
                         <div class="inspection-actions" style="display: flex; gap: 8px; justify-content: flex-end;">
-                            <button class="btn-small btn-secondary" onclick="viewInvoiceDetail('${doc.id}')" title="View">View</button>
-                            ${canManageInvoices() ? `<button class="btn-small btn-secondary" onclick="editInvoice('${doc.id}')" title="Edit">Edit</button>` : ''}
+                            <button class="btn-small btn-secondary" onclick="viewInvoiceDetail('${invoice.id}')" title="View">View</button>
+                            ${canManageInvoices() ? `<button class="btn-small btn-secondary" onclick="editInvoice('${invoice.id}')" title="Edit">Edit</button>` : ''}
                         </div>
                     </td>
                 </tr>
