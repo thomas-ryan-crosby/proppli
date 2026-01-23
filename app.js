@@ -3280,15 +3280,28 @@ function setupEventListeners() {
     }
 
     // Invoice: Add vendor inline from invoice form
-    const invoiceAddVendorBtn = document.getElementById('invoiceAddVendorBtn');
-    if (invoiceAddVendorBtn) {
-        invoiceAddVendorBtn.addEventListener('click', () => {
-            // Open the existing vendor modal in "add" mode
-            if (typeof window.addVendor === 'function') {
-                window.addVendor();
-            } else {
-                // Fallback: navigate to vendors page if needed
+    // Use event delegation on the invoice modal to handle button clicks
+    const invoiceModal = document.getElementById('invoiceModal');
+    if (invoiceModal) {
+        invoiceModal.addEventListener('click', (e) => {
+            // Check if the clicked element is the invoiceAddVendorBtn or a child of it
+            if (e.target.id === 'invoiceAddVendorBtn' || e.target.closest('#invoiceAddVendorBtn')) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('🔍 invoiceAddVendorBtn clicked (via event delegation)');
+                
+                // Close invoice modal and navigate to vendors page, then open vendor modal
+                invoiceModal.classList.remove('show');
                 switchPage('vendors');
+                // Small delay to ensure page switch completes before opening modal
+                setTimeout(() => {
+                    if (typeof window.addVendor === 'function') {
+                        console.log('✅ Opening vendor modal');
+                        window.addVendor();
+                    } else {
+                        console.warn('⚠️ window.addVendor function not found');
+                    }
+                }, 200);
             }
         });
     }
@@ -20522,6 +20535,34 @@ window.addInvoice = function(projectId = null) {
             document.getElementById('invoiceProject').value = projectId;
         }
     });
+    
+    // Set up invoice vendor button listener (backup in case setupEventListeners ran before modal existed)
+    // Use event delegation or ensure listener is attached when modal opens
+    const invoiceAddVendorBtn = document.getElementById('invoiceAddVendorBtn');
+    if (invoiceAddVendorBtn && !invoiceAddVendorBtn.hasAttribute('data-listener-attached')) {
+        invoiceAddVendorBtn.setAttribute('data-listener-attached', 'true');
+        invoiceAddVendorBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('🔍 invoiceAddVendorBtn clicked (from addInvoice)');
+            
+            // Close invoice modal and navigate to vendors page, then open vendor modal
+            const invoiceModal = document.getElementById('invoiceModal');
+            if (invoiceModal) {
+                invoiceModal.classList.remove('show');
+            }
+            switchPage('vendors');
+            // Small delay to ensure page switch completes before opening modal
+            setTimeout(() => {
+                if (typeof window.addVendor === 'function') {
+                    console.log('✅ Opening vendor modal');
+                    window.addVendor();
+                } else {
+                    console.warn('⚠️ window.addVendor function not found');
+                }
+            }, 200);
+        });
+    }
     // Reset company and cost code dropdowns
     document.getElementById('invoiceCompany').value = '';
     updateCostCodesForCompany();
