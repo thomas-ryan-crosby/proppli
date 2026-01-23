@@ -22970,33 +22970,71 @@ async function loadProjects() {
             projectsUnsubscribe = null;
         }
 
-        let query = db.collection('projects').orderBy('startDate', 'desc');
+        console.log('🔍 loadProjects: Starting load, currentUserProfile:', currentUserProfile?.role, 'selectedPropertyId:', selectedPropertyId);
 
-        // Apply property filter for maintenance/property_manager roles
+        // Build query - fetch all projects and filter/sort in memory to avoid index issues
+        // This is the safest approach that works for all roles and scenarios
+        let query = db.collection('projects');
+        let needsPropertyFilter = false;
+        let propertyFilterIds = [];
+
+        // Determine if we need to filter by property
         if (currentUserProfile && (currentUserProfile.role === 'property_manager' || currentUserProfile.role === 'maintenance')) {
             const assignedProperties = currentUserProfile.assignedProperties || [];
-            if (assignedProperties.length > 0 && selectedPropertyId) {
-                // If a property is selected, filter by that property
-                query = query.where('propertyId', '==', selectedPropertyId);
-            } else if (assignedProperties.length > 0) {
-                // If no property selected but user has assigned properties, filter by those
-                query = query.where('propertyId', 'in', assignedProperties.slice(0, 10)); // Firestore 'in' limit is 10
+            if (assignedProperties.length > 0) {
+                needsPropertyFilter = true;
+                if (selectedPropertyId && assignedProperties.includes(selectedPropertyId)) {
+                    propertyFilterIds = [selectedPropertyId];
+                } else {
+                    propertyFilterIds = assignedProperties.slice(0, 10); // Firestore 'in' limit is 10
+                }
+            }
+        }
+
+        console.log('🔍 loadProjects: needsPropertyFilter:', needsPropertyFilter, 'propertyFilterIds:', propertyFilterIds);
+
+        // Fetch all projects (or filtered by property if needed)
+        if (needsPropertyFilter && propertyFilterIds.length > 0) {
+            if (propertyFilterIds.length === 1) {
+                query = query.where('propertyId', '==', propertyFilterIds[0]);
+            } else {
+                query = query.where('propertyId', 'in', propertyFilterIds);
             }
         }
 
         // Set up real-time listener
         projectsUnsubscribe = query.onSnapshot(async (snapshot) => {
+            console.log('📊 loadProjects: Received', snapshot.size, 'projects from Firestore');
             projectsCache = [];
             snapshot.forEach((doc) => {
+                const data = doc.data();
                 projectsCache.push({
                     id: doc.id,
-                    ...doc.data()
+                    ...data
                 });
             });
+            
+            console.log('📊 loadProjects: Cached', projectsCache.length, 'projects');
+            console.log('📊 loadProjects: Sample project:', projectsCache[0] ? {
+                id: projectsCache[0].id,
+                name: projectsCache[0].projectName,
+                propertyId: projectsCache[0].propertyId,
+                status: projectsCache[0].status
+            } : 'none');
+            
+            // Always sort in memory by startDate (descending)
+            projectsCache.sort((a, b) => {
+                const dateA = a.startDate?.toDate ? a.startDate.toDate() : (a.startDate ? new Date(a.startDate) : new Date(0));
+                const dateB = b.startDate?.toDate ? b.startDate.toDate() : (b.startDate ? new Date(b.startDate) : new Date(0));
+                return dateB.getTime() - dateA.getTime(); // Descending order
+            });
+            
+            console.log('📊 loadProjects: After sorting, rendering', projectsCache.length, 'projects');
             await renderProjectsTable(projectsCache);
         }, (error) => {
             console.error('❌ Error loading projects:', error);
-            tbody.innerHTML = '<tr><td colspan="9" style="padding: 18px; color: #DC2626; text-align: center;">Error loading projects. Please refresh the page.</td></tr>';
+            console.error('❌ Error details:', error.message, error.code);
+            tbody.innerHTML = `<tr><td colspan="9" style="padding: 18px; color: #DC2626; text-align: center;">Error loading projects: ${error.message || 'Unknown error'}. Please check console for details.</td></tr>`;
         });
 
         // Load properties for filter dropdown
@@ -23116,16 +23154,55 @@ async function renderProjectsTable(projects) {
     const toDate = dateTo ? new Date(dateTo) : null;
 
     // Filter projects
+    console.log('🔍 renderProjectsTable: Starting with', projects.length, 'projects');
+    console.log('🔍 renderProjectsTable: Filter values:', {
+        propertyFilter,
+        statusFilter,
+        typeFilter,
+        dateFrom,
+        dateTo,
+        search
+    });
+
     const filtered = (projects || []).filter((p) => {
-        if (propertyFilter && p.propertyId !== propertyFilter) return false;
-        if (statusFilter && p.status !== statusFilter) return false;
-        if (typeFilter && p.projectType !== typeFilter) return false;
+        // Log each project being filtered
+        if (projects.length <= 5) {
+            console.log('🔍 Filtering project:', {
+                id: p.id,
+                name: p.projectName,
+                propertyId: p.propertyId,
+                status: p.status,
+                type: p.projectType
+            });
+        }
+
+        if (propertyFilter && p.propertyId !== propertyFilter) {
+            if (projects.length <= 5) console.log('  ❌ Filtered out by property:', p.propertyId, '!==', propertyFilter);
+            return false;
+        }
+        if (statusFilter && p.status !== statusFilter) {
+            if (projects.length <= 5) console.log('  ❌ Filtered out by status:', p.status, '!==', statusFilter);
+            return false;
+        }
+        if (typeFilter && p.projectType !== typeFilter) {
+            if (projects.length <= 5) console.log('  ❌ Filtered out by type:', p.projectType, '!==', typeFilter);
+            return false;
+        }
 
         if (fromDate || toDate) {
             const startDate = p.startDate?.toDate ? p.startDate.toDate() : (p.startDate ? new Date(p.startDate) : null);
-            if (!startDate) return false;
-            if (fromDate && startDate < fromDate) return false;
-            if (toDate && startDate > toDate) return false;
+            if (!startDate) {
+                if (projects.length <= 5) console.log('  ❌ Filtered out: no startDate');
+                return false;
+            }
+            if (fromDate && startDate < fromDate) {
+                if (projects.length <= 5) console.log('  ❌ Filtered out: startDate before fromDate');
+                return false;
+            }
+            if (toDate && startDate > toDate) {
+                if (projects.length <= 5) console.log('  ❌ Filtered out: startDate after toDate');
+                return false;
+            }
         }
 
         if (search) {
@@ -23135,14 +23212,32 @@ async function renderProjectsTable(projects) {
                 p.notes,
                 p.propertyName
             ].filter(Boolean).join(' ').toLowerCase();
-            if (!hay.includes(search)) return false;
+            if (!hay.includes(search)) {
+                if (projects.length <= 5) console.log('  ❌ Filtered out by search:', hay, 'does not include', search);
+                return false;
+            }
         }
 
+        if (projects.length <= 5) console.log('  ✅ Project passed all filters');
         return true;
     });
 
+    console.log('✅ renderProjectsTable: Input projects:', projects.length, 'After filtering:', filtered.length);
+    console.log('✅ renderProjectsTable: Filter values - property:', propertyFilter, 'status:', statusFilter, 'type:', typeFilter, 'search:', search);
+
     if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" style="padding: 18px; color: #6B7280; text-align: center;">No projects found.</td></tr>';
+        console.warn('⚠️ renderProjectsTable: No projects found after filtering');
+        console.warn('⚠️ renderProjectsTable: Original projects count:', projects.length);
+        if (projects.length > 0) {
+            console.warn('⚠️ renderProjectsTable: Sample unfiltered project:', {
+                id: projects[0].id,
+                name: projects[0].projectName,
+                propertyId: projects[0].propertyId,
+                status: projects[0].status,
+                type: projects[0].projectType
+            });
+        }
+        tbody.innerHTML = '<tr><td colspan="9" style="padding: 18px; color: #6B7280; text-align: center;">No projects found. Check filters or create a new project.</td></tr>';
         return;
     }
 
