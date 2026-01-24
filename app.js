@@ -20883,7 +20883,7 @@ window.viewInvoiceDetail = async function(invoiceId) {
             <div style="margin-bottom: 20px;">
                 <p><strong>Status History:</strong></p>
                 <div style="background: #f8f9fa; padding: 15px; border-radius: 4px;">
-                    <p><strong>Created:</strong> ${createdAt}${invoice.createdBy ? ` by ${escapeHtml(createdByName)}` : ''}</p>
+                    <p><strong>Created:</strong> ${createdAt}${invoice.createdBy ? ` by ${escapeHtml(invoice.createdByName || 'Unknown')}` : ''}</p>
                     ${approvedAt ? `<p style="color: #27ae60;"><strong>Approved:</strong> ${approvedAt}${invoice.approvedBy ? ` by ${escapeHtml(invoice.approvedByName || 'Unknown')}` : ''}</p>` : ''}
                     ${processedAt ? `<p style="color: #3498db;"><strong>Processed:</strong> ${processedAt}${invoice.processedBy ? ` by ${escapeHtml(invoice.processedByName || 'Unknown')}` : ''}</p>` : ''}
                     ${status === 'rejected' && approvedAt ? `<p style="color: #e74c3c;"><strong>Rejected:</strong> ${approvedAt}${invoice.approvedBy ? ` by ${escapeHtml(invoice.approvedByName || 'Unknown')}` : ''}</p>` : ''}
