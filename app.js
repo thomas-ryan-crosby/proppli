@@ -20444,6 +20444,7 @@ function renderInvoicesList(invoices, properties, vendors, projects = {}) {
                 ${invoice.accountCode ? `<p><strong>📊 Account Code:</strong> ${escapeHtml(invoice.accountCode)}</p>` : ''}
                 ${invoice.costCode ? `<p><strong>🏷️ Cost Code:</strong> ${escapeHtml(invoice.costCode)}</p>` : ''}
                 <p><strong>📝 Description:</strong> ${invoice.description ? escapeHtml(invoice.description) : '<span style="color: #999; font-style: italic;">No description provided</span>'}</p>
+                ${invoice.excludeFromTotal ? `<p style="color: #6B7280; font-size: 0.85em;"><em>Excluded from project total</em></p>` : ''}
                 ${status === 'approved' && approvedAt ? `<p style="color: #27ae60;"><strong>✅ Approved${approvedBy}</strong> on ${approvedAt}</p>` : ''}
                 ${status === 'rejected' && approvedAt ? `<p style="color: #e74c3c;"><strong>❌ Rejected${approvedBy}</strong> on ${approvedAt}</p>` : ''}
                 ${rejectionReason}
@@ -20633,6 +20634,8 @@ window.editInvoice = function(invoiceId) {
         document.getElementById('invoiceAmount').value = invoice.amount || '';
         document.getElementById('invoiceDescription').value = invoice.description || '';
         document.getElementById('invoiceAccountCode').value = invoice.accountCode || '';
+        const excludeCheck = document.getElementById('invoiceExcludeFromTotal');
+        if (excludeCheck) excludeCheck.checked = invoice.excludeFromTotal === true;
         
         // Set company value first, then load cost codes
         const companySelect = document.getElementById('invoiceCompany');
@@ -20888,6 +20891,7 @@ window.viewInvoiceDetail = async function(invoiceId) {
                     ${processedAt ? `<p style="color: #3498db;"><strong>Processed:</strong> ${processedAt}${invoice.processedBy ? ` by ${escapeHtml(invoice.processedByName || 'Unknown')}` : ''}</p>` : ''}
                     ${status === 'rejected' && approvedAt ? `<p style="color: #e74c3c;"><strong>Rejected:</strong> ${approvedAt}${invoice.approvedBy ? ` by ${escapeHtml(invoice.approvedByName || 'Unknown')}` : ''}</p>` : ''}
                     ${invoice.rejectionReason ? `<p style="color: #e74c3c; margin-top: 10px;"><strong>Rejection Reason:</strong> ${escapeHtml(invoice.rejectionReason)}</p>` : ''}
+                    ${invoice.excludeFromTotal ? `<p style="color: #6B7280; margin-top: 10px;"><strong>Excluded from project total</strong> (not counted toward Actual Cost)</p>` : ''}
                 </div>
             </div>
             
@@ -21444,6 +21448,7 @@ async function handleInvoiceSubmit(e) {
     const accountCode = invoiceForm.querySelector('#invoiceAccountCode').value.trim() || null;
     const company = invoiceForm.querySelector('#invoiceCompany').value || null;
     const costCode = invoiceForm.querySelector('#invoiceCostCode').value.trim() || null;
+    const excludeFromTotal = !!(invoiceForm.querySelector('#invoiceExcludeFromTotal') && invoiceForm.querySelector('#invoiceExcludeFromTotal').checked);
     const fileInput = invoiceForm.querySelector('#invoiceFile');
     
     // Cost codes are optional during planning phase (or in general)
@@ -21500,6 +21505,7 @@ async function handleInvoiceSubmit(e) {
             accountCode: accountCode,
             company: company,
             costCode: costCode,
+            excludeFromTotal: excludeFromTotal,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
 
@@ -23390,6 +23396,7 @@ async function renderProjectsTable(projects) {
             // Calculate total invoiced from linked invoices
             const projectInvoices = invoicesByProject[project.id] || [];
             project.totalInvoiced = projectInvoices.reduce((sum, inv) => {
+                if (inv.excludeFromTotal === true) return sum;
                 return sum + (parseFloat(inv.amount) || 0);
             }, 0);
             project.variance = project.revisedBudget - project.totalInvoiced;
@@ -23667,6 +23674,7 @@ async function renderProjectOverview(project) {
         const invoicesSnapshot = await db.collection('invoices').where('projectId', '==', project.id).get();
         invoicesSnapshot.forEach((doc) => {
             const invoice = doc.data();
+            if (invoice.excludeFromTotal === true) return;
             totalInvoiced += parseFloat(invoice.amount) || 0;
         });
 
@@ -23797,7 +23805,7 @@ async function loadProjectInvoices(projectId) {
         });
 
         if (invoices.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" style="padding: 18px; color: #6B7280; text-align: center;">No invoices found for this project.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" style="padding: 18px; color: #6B7280; text-align: center;">No invoices found for this project.</td></tr>';
             return;
         }
 
@@ -23822,6 +23830,10 @@ async function loadProjectInvoices(projectId) {
                 statusBadge = '<span class="badge" style="background: #F59E0B; color: white;">Pending</span>';
             }
 
+            const inTotal = invoice.excludeFromTotal === true
+                ? '<span style="color: #9CA3AF;">No</span>'
+                : 'Yes';
+
             return `
                 <tr>
                     <td style="padding: 12px; font-weight: 500;">${escapeHtml(invoice.invoiceNumber || 'N/A')}</td>
@@ -23830,6 +23842,7 @@ async function loadProjectInvoices(projectId) {
                     <td style="padding: 12px; text-align: right; font-variant-numeric: tabular-nums;">$${(parseFloat(invoice.amount) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     <td style="padding: 12px; max-width: 300px; word-wrap: break-word;">${description}</td>
                     <td style="padding: 12px;">${statusBadge}</td>
+                    <td style="padding: 12px;">${inTotal}</td>
                     <td style="padding: 12px; text-align: right;">
                         <div class="inspection-actions" style="display: flex; gap: 8px; justify-content: flex-end;">
                             <button class="btn-small btn-secondary" onclick="viewInvoiceDetail('${invoice.id}')" title="View">View</button>
@@ -23841,7 +23854,7 @@ async function loadProjectInvoices(projectId) {
         }).join('');
     } catch (error) {
         console.error('Error loading project invoices:', error);
-        tbody.innerHTML = '<tr><td colspan="7" style="padding: 18px; color: #DC2626; text-align: center;">Error loading invoices.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="padding: 18px; color: #DC2626; text-align: center;">Error loading invoices.</td></tr>';
     }
 }
 

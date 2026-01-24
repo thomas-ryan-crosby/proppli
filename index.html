@@ -2825,6 +2825,14 @@
                             <small style="color: #666; font-size: 12px; display: block; margin-top: 8px;">Upload PDF, Word document, or image file</small>
                         </div>
                         
+                        <div class="form-group">
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="checkbox" id="invoiceExcludeFromTotal" name="invoiceExcludeFromTotal">
+                                <span>Exclude from project total</span>
+                            </label>
+                            <small style="color: #666; font-size: 12px; display: block; margin-top: 5px;">Use during planning when reviewing multiple bids; excluded invoices won't count toward Actual Cost.</small>
+                        </div>
+                        
                         <div class="form-actions">
                             <button type="submit" class="btn-primary">Save Invoice</button>
                             <button type="button" class="btn-secondary" id="cancelInvoiceForm">Cancel</button>
@@ -3079,12 +3087,13 @@
                                             <th>Amount</th>
                                             <th>Description</th>
                                             <th>Status</th>
+                                            <th>In total</th>
                                             <th style="text-align: right;">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody id="projectInvoicesTableBody">
                                         <tr>
-                                            <td colspan="7" style="padding: 18px; color: #6B7280; text-align: center;">Loading invoices...</td>
+                                            <td colspan="8" style="padding: 18px; color: #6B7280; text-align: center;">Loading invoices...</td>
                                         </tr>
                                     </tbody>
                                 </table>
