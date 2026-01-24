@@ -20600,13 +20600,21 @@ window.editInvoice = function(invoiceId) {
         document.getElementById('invoiceAccountCode').value = invoice.accountCode || '';
         document.getElementById('invoiceCompany').value = invoice.company || '';
         // Update cost codes dropdown, then set the value
-        updateCostCodesForCompany();
-        if (invoice.costCode) {
-            // Set cost code after a brief delay to ensure dropdown is populated
-            setTimeout(() => {
-                document.getElementById('invoiceCostCode').value = invoice.costCode;
-            }, 100);
-        }
+        // Wait for cost codes to load before setting the value
+        updateCostCodesForCompany().then(() => {
+            if (invoice.costCode) {
+                const costCodeSelect = document.getElementById('invoiceCostCode');
+                if (costCodeSelect) {
+                    costCodeSelect.value = invoice.costCode;
+                    // If the value didn't set (e.g., cost code doesn't exist anymore), log a warning
+                    if (costCodeSelect.value !== invoice.costCode) {
+                        console.warn(`Cost code "${invoice.costCode}" not found in dropdown for company "${invoice.company}"`);
+                    }
+                }
+            }
+        }).catch((error) => {
+            console.error('Error loading cost codes for edit:', error);
+        });
         
         // Load dropdowns first, then set values
         loadPropertiesForInvoiceForm().then(() => {
@@ -21367,7 +21375,8 @@ async function handleInvoiceSubmit(e) {
     const costCode = invoiceForm.querySelector('#invoiceCostCode').value.trim() || null;
     const fileInput = invoiceForm.querySelector('#invoiceFile');
     
-    if (!vendorId || !propertyId || !projectId || !invoiceNumber || !invoiceDate || !amount || !company || !costCode) {
+    // Cost codes are optional during planning phase (or in general)
+    if (!vendorId || !propertyId || !projectId || !invoiceNumber || !invoiceDate || !amount || !company) {
         alert('Please fill in all required fields.');
         resetButtonState();
         return;
