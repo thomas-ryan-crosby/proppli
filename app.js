@@ -20443,7 +20443,7 @@ function renderInvoicesList(invoices, properties, vendors, projects = {}) {
                 <p><strong>💰 Amount:</strong> ${amount}</p>
                 ${invoice.accountCode ? `<p><strong>📊 Account Code:</strong> ${escapeHtml(invoice.accountCode)}</p>` : ''}
                 ${invoice.costCode ? `<p><strong>🏷️ Cost Code:</strong> ${escapeHtml(invoice.costCode)}</p>` : ''}
-                ${invoice.description ? `<p><strong>📝 Description:</strong> ${escapeHtml(invoice.description)}</p>` : ''}
+                <p><strong>📝 Description:</strong> ${invoice.description ? escapeHtml(invoice.description) : '<span style="color: #999; font-style: italic;">No description provided</span>'}</p>
                 ${status === 'approved' && approvedAt ? `<p style="color: #27ae60;"><strong>✅ Approved${approvedBy}</strong> on ${approvedAt}</p>` : ''}
                 ${status === 'rejected' && approvedAt ? `<p style="color: #e74c3c;"><strong>❌ Rejected${approvedBy}</strong> on ${approvedAt}</p>` : ''}
                 ${rejectionReason}
@@ -21373,19 +21373,7 @@ async function handleInvoiceSubmit(e) {
         return;
     }
 
-    // Require an invoice file only if creating a new invoice OR editing without an existing file
-    const hasNewFile = !!(fileInput && fileInput.files && fileInput.files.length > 0);
-    const hasExistingFile = !!(invoiceForm.dataset.existingInvoiceFileUrl);
-    if (!id && !hasNewFile) {
-        alert('Please upload an invoice file.');
-        resetButtonState();
-        return;
-    }
-    if (id && !hasNewFile && !hasExistingFile) {
-        alert('Please upload an invoice file (existing file missing).');
-        resetButtonState();
-        return;
-    }
+    // File upload is optional - no validation required
     
     // Validate amount
     const amountNum = parseFloat(amount);
@@ -21589,9 +21577,11 @@ function setupInvoiceFileDragDrop() {
         });
     }
     
-    // Click on drop zone to trigger file input
+    // Click on drop zone to trigger file input (but not when clicking the label or file input itself)
     dropZone.addEventListener('click', function(e) {
-        if (e.target !== removeBtn && e.target !== fileInput) {
+        // Don't trigger if clicking the label (which already triggers the input), remove button, or the input itself
+        const isLabel = e.target.tagName === 'LABEL' || e.target.closest('label');
+        if (e.target !== removeBtn && e.target !== fileInput && !isLabel) {
             fileInput.click();
         }
     });
@@ -23727,7 +23717,7 @@ async function loadProjectInvoices(projectId) {
         });
 
         if (invoices.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" style="padding: 18px; color: #6B7280; text-align: center;">No invoices found for this project.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" style="padding: 18px; color: #6B7280; text-align: center;">No invoices found for this project.</td></tr>';
             return;
         }
 
@@ -23737,6 +23727,8 @@ async function loadProjectInvoices(projectId) {
             const vendor = vendors[invoice.vendorId];
             const invoiceDate = invoice.invoiceDate?.toDate ? invoice.invoiceDate.toDate() : (invoice.invoiceDate ? new Date(invoice.invoiceDate) : null);
             const invoiceDateStr = invoiceDate ? invoiceDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A';
+            const amount = invoice.amount ? `$${parseFloat(invoice.amount).toFixed(2)}` : '$0.00';
+            const description = invoice.description ? escapeHtml(invoice.description) : '<span style="color: #999; font-style: italic;">No description</span>';
             
             const status = invoice.status || 'pending';
             let statusBadge = '';
@@ -23756,6 +23748,7 @@ async function loadProjectInvoices(projectId) {
                     <td style="padding: 12px;">${escapeHtml(vendor ? vendor.name : 'Unknown Vendor')}</td>
                     <td style="padding: 12px;">${invoiceDateStr}</td>
                     <td style="padding: 12px; text-align: right; font-variant-numeric: tabular-nums;">$${(parseFloat(invoice.amount) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td style="padding: 12px; max-width: 300px; word-wrap: break-word;">${description}</td>
                     <td style="padding: 12px;">${statusBadge}</td>
                     <td style="padding: 12px; text-align: right;">
                         <div class="inspection-actions" style="display: flex; gap: 8px; justify-content: flex-end;">
@@ -23768,7 +23761,7 @@ async function loadProjectInvoices(projectId) {
         }).join('');
     } catch (error) {
         console.error('Error loading project invoices:', error);
-        tbody.innerHTML = '<tr><td colspan="6" style="padding: 18px; color: #DC2626; text-align: center;">Error loading invoices.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="padding: 18px; color: #DC2626; text-align: center;">Error loading invoices.</td></tr>';
     }
 }
 
