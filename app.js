@@ -20529,10 +20529,24 @@ window.addInvoice = function(projectId = null) {
     document.getElementById('invoiceModalTitle').textContent = 'Add Invoice';
     loadPropertiesForInvoiceForm();
     loadVendorsForInvoiceForm();
-    loadProjectsForInvoiceForm().then(() => {
+    loadProjectsForInvoiceForm().then(async () => {
         // Pre-select project if provided
         if (projectId) {
             document.getElementById('invoiceProject').value = projectId;
+            
+            // Check if project is in Planning phase and update help text
+            try {
+                const projectDoc = await db.collection('projects').doc(projectId).get();
+                if (projectDoc.exists) {
+                    const project = projectDoc.data();
+                    const costCodeHelpText = document.querySelector('#invoiceCostCode')?.nextElementSibling;
+                    if (costCodeHelpText && project.status === 'Planning') {
+                        costCodeHelpText.textContent = 'Cost center or project code (with description) - Optional during Planning phase';
+                    }
+                }
+            } catch (error) {
+                console.warn('Could not fetch project status:', error);
+            }
         }
     });
     
@@ -20590,31 +20604,60 @@ window.editInvoice = function(invoiceId) {
         document.getElementById('invoiceId').value = invoiceId;
         document.getElementById('invoiceVendor').value = invoice.vendorId || '';
         document.getElementById('invoiceProperty').value = invoice.propertyId || '';
-        loadProjectsForInvoiceForm().then(() => {
+        loadProjectsForInvoiceForm().then(async () => {
             document.getElementById('invoiceProject').value = invoice.projectId || '';
+            
+            // Check project status to determine if cost codes are optional (Planning phase)
+            let isPlanningPhase = false;
+            if (invoice.projectId) {
+                try {
+                    const projectDoc = await db.collection('projects').doc(invoice.projectId).get();
+                    if (projectDoc.exists) {
+                        const project = projectDoc.data();
+                        isPlanningPhase = project.status === 'Planning';
+                    }
+                } catch (error) {
+                    console.warn('Could not fetch project status:', error);
+                }
+            }
+            
+            // Update cost code help text if in planning phase
+            const costCodeHelpText = document.querySelector('#invoiceCostCode')?.nextElementSibling;
+            if (costCodeHelpText && isPlanningPhase) {
+                costCodeHelpText.textContent = 'Cost center or project code (with description) - Optional during Planning phase';
+            }
         });
+        
         document.getElementById('invoiceNumber').value = invoice.invoiceNumber || '';
         document.getElementById('invoiceDate').value = invoice.invoiceDate ? formatDateForInput(invoice.invoiceDate.toDate()) : '';
         document.getElementById('invoiceAmount').value = invoice.amount || '';
         document.getElementById('invoiceDescription').value = invoice.description || '';
         document.getElementById('invoiceAccountCode').value = invoice.accountCode || '';
-        document.getElementById('invoiceCompany').value = invoice.company || '';
-        // Update cost codes dropdown, then set the value
-        // Wait for cost codes to load before setting the value
-        updateCostCodesForCompany().then(() => {
-            if (invoice.costCode) {
-                const costCodeSelect = document.getElementById('invoiceCostCode');
-                if (costCodeSelect) {
-                    costCodeSelect.value = invoice.costCode;
-                    // If the value didn't set (e.g., cost code doesn't exist anymore), log a warning
-                    if (costCodeSelect.value !== invoice.costCode) {
-                        console.warn(`Cost code "${invoice.costCode}" not found in dropdown for company "${invoice.company}"`);
+        
+        // Set company value first, then load cost codes
+        const companySelect = document.getElementById('invoiceCompany');
+        if (companySelect) {
+            companySelect.value = invoice.company || '';
+            // Use a small delay to ensure DOM is updated, then load cost codes
+            setTimeout(async () => {
+                try {
+                    await updateCostCodesForCompany();
+                    // Now set the cost code value after dropdown is populated
+                    if (invoice.costCode) {
+                        const costCodeSelect = document.getElementById('invoiceCostCode');
+                        if (costCodeSelect) {
+                            costCodeSelect.value = invoice.costCode;
+                            // If the value didn't set (e.g., cost code doesn't exist anymore), log a warning
+                            if (costCodeSelect.value !== invoice.costCode) {
+                                console.warn(`Cost code "${invoice.costCode}" not found in dropdown for company "${invoice.company}"`);
+                            }
+                        }
                     }
+                } catch (error) {
+                    console.error('Error loading cost codes for edit:', error);
                 }
-            }
-        }).catch((error) => {
-            console.error('Error loading cost codes for edit:', error);
-        });
+            }, 100);
+        }
         
         // Load dropdowns first, then set values
         loadPropertiesForInvoiceForm().then(() => {
@@ -20980,6 +21023,34 @@ async function loadProjectsForInvoiceForm() {
             option.textContent = project.projectName || 'Unnamed Project';
             projectSelect.appendChild(option);
         });
+        
+        // Add change listener once to check project status and update cost code help text
+        if (!projectSelect.hasAttribute('data-cost-code-help-listener')) {
+            projectSelect.setAttribute('data-cost-code-help-listener', 'true');
+            projectSelect.addEventListener('change', async function() {
+                const selectedProjectId = this.value;
+                const costCodeHelpText = document.querySelector('#invoiceCostCode')?.nextElementSibling;
+                
+                if (selectedProjectId && costCodeHelpText) {
+                    try {
+                        const projectDoc = await db.collection('projects').doc(selectedProjectId).get();
+                        if (projectDoc.exists) {
+                            const project = projectDoc.data();
+                            if (project.status === 'Planning') {
+                                costCodeHelpText.textContent = 'Cost center or project code (with description) - Optional during Planning phase';
+                            } else {
+                                costCodeHelpText.textContent = 'Cost center or project code (with description) - Optional';
+                            }
+                        }
+                    } catch (error) {
+                        console.warn('Could not fetch project status:', error);
+                    }
+                } else if (costCodeHelpText) {
+                    // No project selected, reset to default
+                    costCodeHelpText.textContent = 'Cost center or project code (with description) - Optional';
+                }
+            });
+        }
     } catch (error) {
         console.error('Error loading projects for invoice form:', error);
     }
