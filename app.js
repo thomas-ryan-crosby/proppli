@@ -24239,7 +24239,7 @@ function renderAuditCenter() {
             (v.name || '').toLowerCase().includes(searchQuery)
         );
         tenantsWithStatus = tenantsWithStatus.filter(t => 
-            (t.name || '').toLowerCase().includes(searchQuery)
+            (t.tenantName || '').toLowerCase().includes(searchQuery)
         );
     }
     
@@ -24384,8 +24384,8 @@ function renderTenantCOITable(tenants, expirationThreshold) {
     
     // Sort by name
     tenants.sort((a, b) => {
-        const nameA = (a.name || '').toLowerCase();
-        const nameB = (b.name || '').toLowerCase();
+        const nameA = (a.tenantName || '').toLowerCase();
+        const nameB = (b.tenantName || '').toLowerCase();
         return nameA.localeCompare(nameB);
     });
     
@@ -24421,7 +24421,7 @@ function renderTenantCOITable(tenants, expirationThreshold) {
         
         return `
             <tr>
-                <td style="padding: 12px; font-weight: 500;">${escapeHtml(tenant.name || 'Unnamed Tenant')}</td>
+                <td style="padding: 12px; font-weight: 500;">${escapeHtml(tenant.tenantName || 'Unnamed Tenant')}</td>
                 <td style="padding: 12px;">${escapeHtml(propertyName)}</td>
                 <td style="padding: 12px;">
                     <span class="badge" style="background: ${statusColor}; color: white;">${statusBadge}</span>
