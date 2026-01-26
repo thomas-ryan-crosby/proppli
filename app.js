@@ -1988,6 +1988,7 @@ function updatePageTitle(page) {
         'leases': 'Leases',
         'finance': 'Finance',
         'projects': 'Projects',
+        'audit': 'Audit Center',
         'users': 'User Management',
         'profile': 'Profile'
     };
@@ -2047,6 +2048,8 @@ function showPage(page) {
         loadFinance();
     } else if (page === 'projects') {
         loadProjects();
+    } else if (page === 'audit') {
+        loadAuditCenter();
     } else if (page === 'users') {
         loadUsers();
     } else if (page === 'profile') {
@@ -3326,6 +3329,26 @@ function setupEventListeners() {
             }
         }
     });
+
+    // Audit Center filters
+    const auditPropertyFilter = document.getElementById('auditPropertyFilter');
+    const auditExpirationThreshold = document.getElementById('auditExpirationThreshold');
+    const auditStatusFilter = document.getElementById('auditStatusFilter');
+    const auditSearch = document.getElementById('auditSearch');
+
+    [auditPropertyFilter, auditExpirationThreshold, auditStatusFilter].forEach(filter => {
+        if (filter) {
+            filter.addEventListener('change', () => {
+                renderAuditCenter();
+            });
+        }
+    });
+
+    if (auditSearch) {
+        auditSearch.addEventListener('input', () => {
+            renderAuditCenter();
+        });
+    }
 
     // Project detail modal event listeners
     const closeProjectDetailModalBtn = document.getElementById('closeProjectDetailModal');
@@ -23964,3 +23987,451 @@ window.deleteProject = async function(projectId) {
         alert('Error deleting project: ' + (error.message || 'Unknown error'));
     }
 };
+
+// ============================================
+// AUDIT CENTER
+// ============================================
+
+// Audit Center state
+let auditVendorsUnsubscribe = null;
+let auditTenantsUnsubscribe = null;
+let auditVendorsCache = [];
+let auditTenantsCache = [];
+let auditPropertiesCache = {};
+let auditInitialized = false;
+
+// Calculate COI status for a vendor or tenant
+function calculateCOIStatus(cois, expirationThresholdDays = 30) {
+    if (!cois || cois.length === 0) {
+        return { status: 'missing', endDate: null, daysUntilExpiration: null };
+    }
+    
+    // Find the most recent COI (by endDate descending)
+    const sortedCOIs = [...cois].sort((a, b) => {
+        const dateA = toStandardDate(a.endDate) || new Date(0);
+        const dateB = toStandardDate(b.endDate) || new Date(0);
+        return dateB.getTime() - dateA.getTime();
+    });
+    
+    const mostRecentCOI = sortedCOIs[0];
+    const endDate = toStandardDate(mostRecentCOI.endDate);
+    
+    if (!endDate) {
+        return { status: 'missing', endDate: null, daysUntilExpiration: null };
+    }
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const endDateOnly = new Date(endDate);
+    endDateOnly.setHours(0, 0, 0, 0);
+    
+    const daysUntilExpiration = Math.ceil((endDateOnly - today) / (1000 * 60 * 60 * 24));
+    
+    if (daysUntilExpiration < 0) {
+        return { status: 'expired', endDate: endDate, daysUntilExpiration: daysUntilExpiration };
+    } else if (daysUntilExpiration <= expirationThresholdDays) {
+        return { status: 'expiring_soon', endDate: endDate, daysUntilExpiration: daysUntilExpiration };
+    } else {
+        return { status: 'valid', endDate: endDate, daysUntilExpiration: daysUntilExpiration };
+    }
+}
+
+// Get days until expiration (helper function)
+function getDaysUntilExpiration(endDate) {
+    if (!endDate) return null;
+    const endDateObj = toStandardDate(endDate);
+    if (!endDateObj) return null;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const endDateOnly = new Date(endDateObj);
+    endDateOnly.setHours(0, 0, 0, 0);
+    
+    return Math.ceil((endDateOnly - today) / (1000 * 60 * 60 * 24));
+}
+
+// Load Audit Center
+async function loadAuditCenter() {
+    if (!firebase.auth().currentUser) {
+        console.warn('⚠️ User not authenticated, cannot load audit center');
+        return;
+    }
+    
+    // Load properties for filtering
+    try {
+        const propertiesSnapshot = await db.collection('properties').get();
+        auditPropertiesCache = {};
+        propertiesSnapshot.forEach((doc) => {
+            auditPropertiesCache[doc.id] = doc.data();
+        });
+        loadPropertiesForAuditFilter();
+    } catch (error) {
+        console.error('Error loading properties for audit:', error);
+    }
+    
+    // Set up real-time listeners for vendors and tenants
+    setupAuditListeners();
+    
+    // Initial render
+    renderAuditCenter();
+}
+
+// Set up real-time Firestore listeners for vendors and tenants
+function setupAuditListeners() {
+    // Unsubscribe from previous listeners
+    if (auditVendorsUnsubscribe) {
+        auditVendorsUnsubscribe();
+    }
+    if (auditTenantsUnsubscribe) {
+        auditTenantsUnsubscribe();
+    }
+    
+    // Determine property filter
+    const propertyFilter = document.getElementById('auditPropertyFilter')?.value || '';
+    const assignedProperties = currentUserProfile?.assignedProperties || [];
+    
+    // Vendor listener
+    let vendorQuery = db.collection('vendors');
+    
+    // Apply property filter if user is property_manager/maintenance
+    if (currentUserProfile && (currentUserProfile.role === 'property_manager' || currentUserProfile.role === 'maintenance')) {
+        if (assignedProperties.length > 0) {
+            if (assignedProperties.length <= 10) {
+                vendorQuery = vendorQuery.where('assignedProperties', 'array-contains-any', assignedProperties);
+            } else {
+                // If more than 10, we'll filter in memory
+                vendorQuery = vendorQuery;
+            }
+        } else {
+            // No assigned properties, show empty
+            auditVendorsCache = [];
+            auditTenantsCache = [];
+            renderAuditCenter();
+            return;
+        }
+    }
+    
+    auditVendorsUnsubscribe = vendorQuery.onSnapshot((snapshot) => {
+        auditVendorsCache = [];
+        snapshot.forEach((doc) => {
+            const data = doc.data();
+            auditVendorsCache.push({
+                id: doc.id,
+                ...data
+            });
+        });
+        renderAuditCenter();
+    }, (error) => {
+        console.error('Error loading vendors for audit:', error);
+    });
+    
+    // Tenant listener
+    let tenantQuery = db.collection('tenants');
+    
+    // Apply property filter if user is property_manager/maintenance
+    if (currentUserProfile && (currentUserProfile.role === 'property_manager' || currentUserProfile.role === 'maintenance')) {
+        if (assignedProperties.length > 0) {
+            if (assignedProperties.length <= 10) {
+                tenantQuery = tenantQuery.where('propertyId', 'in', assignedProperties.slice(0, 10));
+            } else {
+                // If more than 10, we'll filter in memory
+                tenantQuery = tenantQuery;
+            }
+        } else {
+            // No assigned properties, show empty
+            auditVendorsCache = [];
+            auditTenantsCache = [];
+            renderAuditCenter();
+            return;
+        }
+    }
+    
+    auditTenantsUnsubscribe = tenantQuery.onSnapshot((snapshot) => {
+        auditTenantsCache = [];
+        snapshot.forEach((doc) => {
+            const data = doc.data();
+            auditTenantsCache.push({
+                id: doc.id,
+                ...data
+            });
+        });
+        renderAuditCenter();
+    }, (error) => {
+        console.error('Error loading tenants for audit:', error);
+    });
+}
+
+// Load properties for audit filter dropdown
+function loadPropertiesForAuditFilter() {
+    const propertyFilter = document.getElementById('auditPropertyFilter');
+    if (!propertyFilter) return;
+    
+    const currentValue = propertyFilter.value;
+    propertyFilter.innerHTML = '<option value="">All Properties</option>';
+    
+    // Filter by assigned properties if property_manager/maintenance
+    const assignedProperties = currentUserProfile?.assignedProperties || [];
+    let propertiesToShow = Object.keys(auditPropertiesCache);
+    
+    if (currentUserProfile && (currentUserProfile.role === 'property_manager' || currentUserProfile.role === 'maintenance')) {
+        if (assignedProperties.length > 0) {
+            propertiesToShow = propertiesToShow.filter(id => assignedProperties.includes(id));
+        } else {
+            propertiesToShow = [];
+        }
+    }
+    
+    propertiesToShow.forEach(propertyId => {
+        const property = auditPropertiesCache[propertyId];
+        if (property) {
+            const option = document.createElement('option');
+            option.value = propertyId;
+            option.textContent = property.name || 'Unnamed Property';
+            propertyFilter.appendChild(option);
+        }
+    });
+    
+    if (currentValue) {
+        propertyFilter.value = currentValue;
+    }
+}
+
+// Render Audit Center (main function)
+function renderAuditCenter() {
+    const expirationThreshold = parseInt(document.getElementById('auditExpirationThreshold')?.value || '30');
+    const propertyFilter = document.getElementById('auditPropertyFilter')?.value || '';
+    const statusFilter = document.getElementById('auditStatusFilter')?.value || '';
+    const searchQuery = (document.getElementById('auditSearch')?.value || '').toLowerCase().trim();
+    
+    // Filter vendors and tenants
+    let filteredVendors = [...auditVendorsCache];
+    let filteredTenants = [...auditTenantsCache];
+    
+    // Apply property filter
+    if (propertyFilter) {
+        filteredVendors = filteredVendors.filter(vendor => {
+            const assignedProps = vendor.assignedProperties || [];
+            return assignedProps.includes(propertyFilter);
+        });
+        filteredTenants = filteredTenants.filter(tenant => tenant.propertyId === propertyFilter);
+    }
+    
+    // Calculate COI status for each
+    let vendorsWithStatus = filteredVendors.map(vendor => {
+        const coiStatus = calculateCOIStatus(vendor.cois, expirationThreshold);
+        return { ...vendor, coiStatus };
+    });
+    
+    let tenantsWithStatus = filteredTenants.map(tenant => {
+        const coiStatus = calculateCOIStatus(tenant.cois, expirationThreshold);
+        return { ...tenant, coiStatus };
+    });
+    
+    // Apply status filter
+    if (statusFilter) {
+        vendorsWithStatus = vendorsWithStatus.filter(v => v.coiStatus.status === statusFilter);
+        tenantsWithStatus = tenantsWithStatus.filter(t => t.coiStatus.status === statusFilter);
+    }
+    
+    // Apply search filter
+    if (searchQuery) {
+        vendorsWithStatus = vendorsWithStatus.filter(v => 
+            (v.name || '').toLowerCase().includes(searchQuery)
+        );
+        tenantsWithStatus = tenantsWithStatus.filter(t => 
+            (t.name || '').toLowerCase().includes(searchQuery)
+        );
+    }
+    
+    // Render summary cards
+    renderAuditSummaryCards(vendorsWithStatus, tenantsWithStatus, expirationThreshold);
+    
+    // Render tables
+    renderVendorCOITable(vendorsWithStatus, expirationThreshold);
+    renderTenantCOITable(tenantsWithStatus, expirationThreshold);
+}
+
+// Render summary cards
+function renderAuditSummaryCards(vendors, tenants, expirationThreshold) {
+    const cardsContainer = document.getElementById('auditSummaryCards');
+    if (!cardsContainer) return;
+    
+    const totalVendors = vendors.length;
+    const vendorsWithValid = vendors.filter(v => v.coiStatus.status === 'valid').length;
+    const vendorsMissing = vendors.filter(v => v.coiStatus.status === 'missing' || v.coiStatus.status === 'expired').length;
+    
+    const totalTenants = tenants.length;
+    const tenantsWithValid = tenants.filter(t => t.coiStatus.status === 'valid').length;
+    const tenantsMissing = tenants.filter(t => t.coiStatus.status === 'missing' || t.coiStatus.status === 'expired').length;
+    
+    const expiringSoon = vendors.filter(v => v.coiStatus.status === 'expiring_soon').length +
+                        tenants.filter(t => t.coiStatus.status === 'expiring_soon').length;
+    
+    const vendorValidPercent = totalVendors > 0 ? Math.round((vendorsWithValid / totalVendors) * 100) : 0;
+    const tenantValidPercent = totalTenants > 0 ? Math.round((tenantsWithValid / totalTenants) * 100) : 0;
+    
+    cardsContainer.innerHTML = `
+        <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <div style="font-size: 12px; color: #6B7280; margin-bottom: 8px; font-weight: 500;">Total Vendors</div>
+            <div style="font-size: 24px; font-weight: 600; color: #1F2937;">${totalVendors}</div>
+        </div>
+        <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <div style="font-size: 12px; color: #6B7280; margin-bottom: 8px; font-weight: 500;">Vendors with Valid COI</div>
+            <div style="font-size: 24px; font-weight: 600; color: #16A34A;">${vendorsWithValid}</div>
+            <div style="font-size: 12px; color: #6B7280; margin-top: 4px;">${vendorValidPercent}%</div>
+        </div>
+        <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <div style="font-size: 12px; color: #6B7280; margin-bottom: 8px; font-weight: 500;">Vendors Missing COI</div>
+            <div style="font-size: 24px; font-weight: 600; color: #DC2626;">${vendorsMissing}</div>
+        </div>
+        <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <div style="font-size: 12px; color: #6B7280; margin-bottom: 8px; font-weight: 500;">Total Tenants</div>
+            <div style="font-size: 24px; font-weight: 600; color: #1F2937;">${totalTenants}</div>
+        </div>
+        <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <div style="font-size: 12px; color: #6B7280; margin-bottom: 8px; font-weight: 500;">Tenants with Valid COI</div>
+            <div style="font-size: 24px; font-weight: 600; color: #16A34A;">${tenantsWithValid}</div>
+            <div style="font-size: 12px; color: #6B7280; margin-top: 4px;">${tenantValidPercent}%</div>
+        </div>
+        <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <div style="font-size: 12px; color: #6B7280; margin-bottom: 8px; font-weight: 500;">Tenants Missing COI</div>
+            <div style="font-size: 24px; font-weight: 600; color: #DC2626;">${tenantsMissing}</div>
+        </div>
+        <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <div style="font-size: 12px; color: #6B7280; margin-bottom: 8px; font-weight: 500;">COIs Expiring Soon (${expirationThreshold} days)</div>
+            <div style="font-size: 24px; font-weight: 600; color: #F59E0B;">${expiringSoon}</div>
+        </div>
+    `;
+}
+
+// Render Vendor COI Table
+function renderVendorCOITable(vendors, expirationThreshold) {
+    const tbody = document.getElementById('vendorCOITableBody');
+    if (!tbody) return;
+    
+    if (vendors.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="padding: 18px; color: #6B7280; text-align: center;">No vendors found.</td></tr>';
+        return;
+    }
+    
+    // Sort by name
+    vendors.sort((a, b) => {
+        const nameA = (a.name || '').toLowerCase();
+        const nameB = (b.name || '').toLowerCase();
+        return nameA.localeCompare(nameB);
+    });
+    
+    tbody.innerHTML = vendors.map(vendor => {
+        const status = vendor.coiStatus.status;
+        let statusBadge = '';
+        let statusColor = '';
+        
+        if (status === 'valid') {
+            statusBadge = 'Valid';
+            statusColor = '#16A34A';
+        } else if (status === 'expiring_soon') {
+            statusBadge = 'Expiring Soon';
+            statusColor = '#F59E0B';
+        } else if (status === 'expired') {
+            statusBadge = 'Expired';
+            statusColor = '#DC2626';
+        } else {
+            statusBadge = 'Missing';
+            statusColor = '#6B7280';
+        }
+        
+        const expirationDate = vendor.coiStatus.endDate 
+            ? formatDateForDisplay(vendor.coiStatus.endDate, 'N/A')
+            : 'N/A';
+        
+        const daysUntil = vendor.coiStatus.daysUntilExpiration !== null
+            ? vendor.coiStatus.daysUntilExpiration
+            : 'N/A';
+        
+        // Get property names for vendor
+        const assignedProps = vendor.assignedProperties || [];
+        const propertyNames = assignedProps
+            .map(propId => auditPropertiesCache[propId]?.name)
+            .filter(Boolean)
+            .join(', ') || 'Not assigned';
+        
+        return `
+            <tr>
+                <td style="padding: 12px; font-weight: 500;">${escapeHtml(vendor.name || 'Unnamed Vendor')}</td>
+                <td style="padding: 12px;">${escapeHtml(propertyNames)}</td>
+                <td style="padding: 12px;">
+                    <span class="badge" style="background: ${statusColor}; color: white;">${statusBadge}</span>
+                </td>
+                <td style="padding: 12px;">${expirationDate}</td>
+                <td style="padding: 12px;">${daysUntil !== 'N/A' ? `${daysUntil} days` : 'N/A'}</td>
+                <td style="padding: 12px; text-align: right;">
+                    <button class="btn-small btn-secondary" onclick="viewVendorDetail('${vendor.id}')" title="View Vendor">View</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// Render Tenant COI Table
+function renderTenantCOITable(tenants, expirationThreshold) {
+    const tbody = document.getElementById('tenantCOITableBody');
+    if (!tbody) return;
+    
+    if (tenants.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="padding: 18px; color: #6B7280; text-align: center;">No tenants found.</td></tr>';
+        return;
+    }
+    
+    // Sort by name
+    tenants.sort((a, b) => {
+        const nameA = (a.name || '').toLowerCase();
+        const nameB = (b.name || '').toLowerCase();
+        return nameA.localeCompare(nameB);
+    });
+    
+    tbody.innerHTML = tenants.map(tenant => {
+        const status = tenant.coiStatus.status;
+        let statusBadge = '';
+        let statusColor = '';
+        
+        if (status === 'valid') {
+            statusBadge = 'Valid';
+            statusColor = '#16A34A';
+        } else if (status === 'expiring_soon') {
+            statusBadge = 'Expiring Soon';
+            statusColor = '#F59E0B';
+        } else if (status === 'expired') {
+            statusBadge = 'Expired';
+            statusColor = '#DC2626';
+        } else {
+            statusBadge = 'Missing';
+            statusColor = '#6B7280';
+        }
+        
+        const expirationDate = tenant.coiStatus.endDate 
+            ? formatDateForDisplay(tenant.coiStatus.endDate, 'N/A')
+            : 'N/A';
+        
+        const daysUntil = tenant.coiStatus.daysUntilExpiration !== null
+            ? tenant.coiStatus.daysUntilExpiration
+            : 'N/A';
+        
+        const property = auditPropertiesCache[tenant.propertyId];
+        const propertyName = property ? property.name : 'Unknown Property';
+        
+        return `
+            <tr>
+                <td style="padding: 12px; font-weight: 500;">${escapeHtml(tenant.name || 'Unnamed Tenant')}</td>
+                <td style="padding: 12px;">${escapeHtml(propertyName)}</td>
+                <td style="padding: 12px;">
+                    <span class="badge" style="background: ${statusColor}; color: white;">${statusBadge}</span>
+                </td>
+                <td style="padding: 12px;">${expirationDate}</td>
+                <td style="padding: 12px;">${daysUntil !== 'N/A' ? `${daysUntil} days` : 'N/A'}</td>
+                <td style="padding: 12px; text-align: right;">
+                    <button class="btn-small btn-secondary" onclick="viewTenantDetail('${tenant.id}')" title="View Tenant">View</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
