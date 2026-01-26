@@ -5825,10 +5825,18 @@ function createTicketCard(ticket, isDeleted = false) {
     // Get assigned to display name
     const assignedToDisplay = ticket.assignedTo || 'Unassigned';
 
+    // Format ticket number from ID (use last 8 characters for readability)
+    const ticketNumber = ticket.id ? `#${ticket.id.substring(ticket.id.length - 8).toUpperCase()}` : '';
+
     card.innerHTML = `
         <div class="ticket-header">
-            <div class="ticket-title">${escapeHtml(ticket.workDescription)}</div>
-            <span class="ticket-status ${statusClass}">${escapeHtml(ticket.status)}</span>
+            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <div style="flex: 1;">
+                    <div class="ticket-title">${escapeHtml(ticket.workDescription)}</div>
+                    ${ticketNumber ? `<div style="font-size: 0.75rem; color: #6B7280; margin-top: 4px; font-weight: 500;">Ticket ${ticketNumber}</div>` : ''}
+                </div>
+                <span class="ticket-status ${statusClass}">${escapeHtml(ticket.status)}</span>
+            </div>
         </div>
         ${ticket.assignedTo ? `
             <div class="ticket-assigned-badge" style="text-align: center; margin: 8px 0; padding: 6px 12px; background: #e0e7ff; border-radius: 16px; display: inline-block; max-width: fit-content; margin-left: auto; margin-right: auto;">
@@ -5910,6 +5918,12 @@ function createTicketCard(ticket, isDeleted = false) {
                 <span class="ticket-detail-label">Managed By</span>
                 <span class="ticket-detail-value">${escapeHtml(ticket.managedBy)}</span>
             </div>
+            ${ticket.vendorName ? `
+                <div class="ticket-detail">
+                    <span class="ticket-detail-label">Vendor</span>
+                    <span class="ticket-detail-value" style="font-weight: 600; color: #2563EB;">${escapeHtml(ticket.vendorName)}</span>
+                </div>
+            ` : ''}
             ${isCompleted && ticket.completedBy ? `
                 <div class="ticket-detail">
                     <span class="ticket-detail-label">Completed By</span>
@@ -6232,6 +6246,9 @@ function openTicketModal(ticketId = null) {
             document.getElementById('requestedBy').value = currentUserProfile.id;
         }
     });
+    
+    // Load vendors for ticket form
+    loadVendorsForTicketForm();
     document.getElementById('customDateCreated').value = '';
     document.getElementById('customDateCompleted').value = '';
     // Before photo is always visible, so no need to hide it
@@ -6381,6 +6398,13 @@ function loadTicketForEdit(ticketId) {
                     document.getElementById('tenantName').style.display = 'block';
                 }
             }
+            // Load vendors and set selected vendor
+            loadVendorsForTicketForm().then(() => {
+                if (ticket.vendorId) {
+                    document.getElementById('ticketVendor').value = ticket.vendorId;
+                }
+            });
+            
             document.getElementById('workDescription').value = ticket.workDescription || '';
             document.getElementById('detailedDescription').value = ticket.detailedDescription || '';
             document.getElementById('workUpdates').value = ticket.workUpdates || '';
@@ -6867,6 +6891,11 @@ function handleTicketSubmit(e) {
         : (assignedToSelect?.value ? (usersForDropdowns[assignedToSelect.value]?.displayName || '') : '');
     const assignedToUserId = assignedToSelect?.value && assignedToSelect.value !== '__other__' ? assignedToSelect.value : null;
     
+    // Get vendor assignment
+    const ticketVendorSelect = document.getElementById('ticketVendor');
+    const vendorId = ticketVendorSelect?.value || null;
+    const vendorName = vendorId && ticketVendorSelect?.selectedOptions[0]?.text ? ticketVendorSelect.selectedOptions[0].text : null;
+    
     const status = document.getElementById('ticketStatus').value;
     
     const completedBySelect = document.getElementById('completedBy');
@@ -6967,6 +6996,8 @@ function handleTicketSubmit(e) {
                     buildingNumber: buildingNumber || null,
                     floorNumber: floorNumber || null,
                     tenantName: tenantName || null,
+                    vendorId: vendorId || null,
+                    vendorName: vendorName || null,
                     tenantId: ticketTenantId || null,
                     workDescription,
                     detailedDescription: detailedDescription || null,
@@ -7107,6 +7138,8 @@ function handleTicketSubmit(e) {
                 managedByUserId: managedByUserId || null,
                 assignedTo: assignedTo || null,
                 assignedToUserId: assignedToUserId || null,
+                vendorId: vendorId || null,
+                vendorName: vendorName || null,
                 createdBy: createdBy,
                 createdByUserId: createdByUserId || null,
                 status: status || 'Not Started',
@@ -21015,6 +21048,35 @@ async function loadVendorsForInvoiceForm() {
         }
     } catch (error) {
         console.error('Error loading vendors for invoice form:', error);
+    }
+    
+    return Promise.resolve();
+}
+
+// Load vendors for ticket form
+async function loadVendorsForTicketForm() {
+    const vendorSelect = document.getElementById('ticketVendor');
+    if (!vendorSelect) return Promise.resolve();
+    
+    const currentValue = vendorSelect.value;
+    vendorSelect.innerHTML = '<option value="">No vendor assigned</option>';
+    
+    try {
+        const snapshot = await db.collection('vendors').orderBy('name').get();
+        snapshot.forEach((doc) => {
+            const vendor = doc.data();
+            const option = document.createElement('option');
+            option.value = doc.id;
+            option.textContent = vendor.name || 'Unnamed Vendor';
+            vendorSelect.appendChild(option);
+        });
+        
+        // Restore previous selection if editing
+        if (currentValue) {
+            vendorSelect.value = currentValue;
+        }
+    } catch (error) {
+        console.error('Error loading vendors for ticket form:', error);
     }
     
     return Promise.resolve();
