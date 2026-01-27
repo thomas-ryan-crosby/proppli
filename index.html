@@ -3096,7 +3096,7 @@
                         <button class="tab-btn active" data-project-tab="overview">Overview</button>
                         <button class="tab-btn" data-project-tab="invoices">Invoices</button>
                         <button class="tab-btn" data-project-tab="changeOrders" style="display: none;">Change Orders</button>
-                        <button class="tab-btn" data-project-tab="documents" style="display: none;">Documents</button>
+                        <button class="tab-btn" data-project-tab="documents">Documents</button>
                     </div>
 
                     <!-- Overview Tab -->
@@ -3139,10 +3139,84 @@
                         <p>Change orders will be available in Phase 3.</p>
                     </div>
 
-                    <!-- Documents Tab (Placeholder for Phase 4) -->
+                    <!-- Documents Tab -->
                     <div id="projectDocumentsTab" class="tab-content" style="display: none;">
-                        <p>Document upload will be available in Phase 4.</p>
+                        <div style="margin-bottom: 15px;">
+                            <button id="addProjectDocumentBtn" class="btn-primary">+ Add Document</button>
+                        </div>
+                        <div class="inspection-reports-table">
+                            <div class="tenants-table-container" style="max-height: none;">
+                                <table class="rent-roll-table inspection-reports-table-inner" style="width: 100%;">
+                                    <thead>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Description</th>
+                                            <th>File</th>
+                                            <th>Uploaded</th>
+                                            <th style="text-align: right;">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="projectDocumentsTableBody">
+                                        <tr>
+                                            <td colspan="5" style="padding: 18px; color: #6B7280; text-align: center;">Loading documents...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Project Document Modal -->
+        <div id="projectDocumentModal" class="modal">
+            <div class="modal-content" style="max-width: 600px;">
+                <div class="modal-header">
+                    <h2 id="projectDocumentModalTitle">Add Document</h2>
+                    <button class="close-btn" id="closeProjectDocumentModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="projectDocumentForm">
+                        <input type="hidden" id="projectDocumentId">
+                        <input type="hidden" id="projectDocumentProjectId">
+                        
+                        <div class="form-group">
+                            <label for="projectDocumentName">Document Name *</label>
+                            <input type="text" id="projectDocumentName" required placeholder="e.g., Contract, Permit, Blueprint">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="projectDocumentDescription">Description</label>
+                            <textarea id="projectDocumentDescription" rows="3" placeholder="Optional description of the document..."></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Document File *</label>
+                            <div id="projectDocumentFileDropZone" style="border: 2px dashed #ccc; border-radius: 8px; padding: 30px; text-align: center; background-color: #f9f9f9; cursor: pointer; transition: all 0.3s ease; margin-top: 10px;">
+                                <div id="projectDocumentFileDropZoneContent">
+                                    <p style="margin: 0 0 10px 0; color: #666; font-size: 14px;">
+                                        <strong>Drag and drop a file here</strong>
+                                    </p>
+                                    <p style="margin: 0; color: #999; font-size: 12px;">or</p>
+                                    <label for="projectDocumentFile" style="display: inline-block; margin-top: 10px; padding: 8px 16px; background-color: #2563EB; color: white; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                                        Browse Files
+                                    </label>
+                                    <input type="file" id="projectDocumentFile" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.dwg,.dwgx" style="display: none;">
+                                </div>
+                                <div id="projectDocumentFileName" style="display: none; margin-top: 10px; padding: 8px; background-color: #e8f4f8; border-radius: 4px;">
+                                    <span id="projectDocumentFileNameText" style="color: #2563EB; font-weight: 500;"></span>
+                                    <button type="button" id="projectDocumentFileRemoveBtn" style="margin-left: 10px; padding: 4px 8px; background-color: #dc2626; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Remove</button>
+                                </div>
+                            </div>
+                            <small style="color: #666; font-size: 12px; display: block; margin-top: 8px;">Upload PDF, Word document, image, or CAD file</small>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="submit" class="btn-primary">Save Document</button>
+                            <button type="button" class="btn-secondary" id="cancelProjectDocumentForm">Cancel</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>

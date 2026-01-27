@@ -3389,6 +3389,44 @@ function setupEventListeners() {
             }
         });
     }
+    
+    // Project document management
+    const addProjectDocumentBtn = document.getElementById('addProjectDocumentBtn');
+    const projectDocumentForm = document.getElementById('projectDocumentForm');
+    const closeProjectDocumentModalBtn = document.getElementById('closeProjectDocumentModal');
+    const cancelProjectDocumentFormBtn = document.getElementById('cancelProjectDocumentForm');
+    
+    if (addProjectDocumentBtn) {
+        addProjectDocumentBtn.addEventListener('click', () => {
+            // Get current project ID from the modal
+            const modal = document.getElementById('projectDetailModal');
+            if (modal && modal.classList.contains('show')) {
+                const title = document.getElementById('projectDetailTitle')?.textContent;
+                const project = projectsCache.find(p => p.projectName === title);
+                if (project) {
+                    window.addProjectDocument(project.id);
+                } else {
+                    alert('Error: Could not determine project ID.');
+                }
+            }
+        });
+    }
+    
+    if (projectDocumentForm) {
+        projectDocumentForm.addEventListener('submit', handleProjectDocumentSubmit);
+    }
+    
+    if (closeProjectDocumentModalBtn) {
+        closeProjectDocumentModalBtn.addEventListener('click', () => {
+            document.getElementById('projectDocumentModal').classList.remove('show');
+        });
+    }
+    
+    if (cancelProjectDocumentFormBtn) {
+        cancelProjectDocumentFormBtn.addEventListener('click', () => {
+            document.getElementById('projectDocumentModal').classList.remove('show');
+        });
+    }
 
     // Close project detail modal when clicking outside
     const projectDetailModal = document.getElementById('projectDetailModal');
@@ -23926,6 +23964,9 @@ window.viewProjectDetail = async function(projectId) {
 
     // Load and render invoices
     await loadProjectInvoices(projectId);
+    
+    // Load and render documents
+    await loadProjectDocuments(projectId);
 
     // Switch to overview tab
     switchProjectDetailTab('overview');
@@ -24160,6 +24201,21 @@ function switchProjectDetailTab(tabName) {
         activeTab.style.display = 'block';
         activeTab.classList.add('active');
     }
+    
+    // Load data for specific tabs
+    const modal = document.getElementById('projectDetailModal');
+    if (modal && modal.classList.contains('show')) {
+        // Get project ID from modal or cache
+        const title = document.getElementById('projectDetailTitle')?.textContent;
+        const project = projectsCache.find(p => p.projectName === title);
+        if (project) {
+            if (tabName === 'documents') {
+                loadProjectDocuments(project.id);
+            } else if (tabName === 'invoices') {
+                loadProjectInvoices(project.id);
+            }
+        }
+    }
 }
 
 // Close project detail modal
@@ -24243,6 +24299,424 @@ window.deleteProject = async function(projectId) {
         alert('Error deleting project: ' + (error.message || 'Unknown error'));
     }
 };
+
+// ============================================
+// PROJECT DOCUMENTS MANAGEMENT
+// ============================================
+
+// Load project documents
+async function loadProjectDocuments(projectId) {
+    const tbody = document.getElementById('projectDocumentsTableBody');
+    if (!tbody) return;
+
+    try {
+        // Load documents from subcollection
+        const documentsSnapshot = await db.collection('projects').doc(projectId).collection('documents').orderBy('uploadedAt', 'desc').get();
+        
+        const documents = [];
+        documentsSnapshot.forEach((doc) => {
+            documents.push({
+                id: doc.id,
+                ...doc.data()
+            });
+        });
+
+        if (documents.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="padding: 18px; color: #6B7280; text-align: center;">No documents found for this project.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = documents.map((doc) => {
+            const uploadedDate = doc.uploadedAt?.toDate ? doc.uploadedAt.toDate() : (doc.uploadedAt ? new Date(doc.uploadedAt) : null);
+            const uploadedDateStr = uploadedDate ? uploadedDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A';
+            
+            const fileIcon = getFileIcon(doc.fileName);
+            const fileSize = doc.fileSize ? formatFileSize(doc.fileSize) : '';
+
+            return `
+                <tr>
+                    <td style="padding: 12px; font-weight: 500;">${escapeHtml(doc.name || 'Unnamed Document')}</td>
+                    <td style="padding: 12px; max-width: 300px; word-wrap: break-word;">${doc.description ? escapeHtml(doc.description) : '<span style="color: #999; font-style: italic;">No description</span>'}</td>
+                    <td style="padding: 12px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 20px;">${fileIcon}</span>
+                            <div>
+                                <div style="font-weight: 500;">${escapeHtml(doc.fileName || 'Unknown file')}</div>
+                                ${fileSize ? `<div style="font-size: 0.85em; color: #6B7280;">${fileSize}</div>` : ''}
+                            </div>
+                        </div>
+                    </td>
+                    <td style="padding: 12px;">${uploadedDateStr}</td>
+                    <td style="padding: 12px; text-align: right;">
+                        <div class="inspection-actions" style="display: flex; gap: 8px; justify-content: flex-end;">
+                            ${doc.fileUrl ? `<a href="${escapeHtml(doc.fileUrl)}" target="_blank" class="btn-small btn-secondary" title="View">View</a>` : ''}
+                            ${canManageProjects() ? `
+                                <button class="btn-small btn-secondary" onclick="editProjectDocument('${projectId}', '${doc.id}')" title="Edit">Edit</button>
+                                <button class="btn-small btn-danger" onclick="deleteProjectDocument('${projectId}', '${doc.id}')" title="Delete">Delete</button>
+                            ` : ''}
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('Error loading project documents:', error);
+        tbody.innerHTML = '<tr><td colspan="5" style="padding: 18px; color: #DC2626; text-align: center;">Error loading documents.</td></tr>';
+    }
+}
+
+// Add project document
+window.addProjectDocument = function(projectId) {
+    const modal = document.getElementById('projectDocumentModal');
+    const form = document.getElementById('projectDocumentForm');
+    const title = document.getElementById('projectDocumentModalTitle');
+    
+    if (!modal || !form || !title) return;
+    
+    form.reset();
+    document.getElementById('projectDocumentId').value = '';
+    document.getElementById('projectDocumentProjectId').value = projectId;
+    title.textContent = 'Add Document';
+    
+    // Reset file upload UI
+    resetProjectDocumentFileUpload();
+    
+    // Setup drag and drop
+    setupProjectDocumentDragDrop();
+    
+    modal.classList.add('show');
+};
+
+// Edit project document
+window.editProjectDocument = async function(projectId, documentId) {
+    const modal = document.getElementById('projectDocumentModal');
+    const form = document.getElementById('projectDocumentForm');
+    const title = document.getElementById('projectDocumentModalTitle');
+    
+    if (!modal || !form || !title) return;
+    
+    try {
+        const docSnapshot = await db.collection('projects').doc(projectId).collection('documents').doc(documentId).get();
+        if (!docSnapshot.exists) {
+            alert('Document not found');
+            return;
+        }
+        
+        const docData = docSnapshot.data();
+        document.getElementById('projectDocumentId').value = documentId;
+        document.getElementById('projectDocumentProjectId').value = projectId;
+        document.getElementById('projectDocumentName').value = docData.name || '';
+        document.getElementById('projectDocumentDescription').value = docData.description || '';
+        title.textContent = 'Edit Document';
+        
+        // Show existing file
+        if (docData.fileUrl) {
+            const fileNameDiv = document.getElementById('projectDocumentFileName');
+            const fileNameText = document.getElementById('projectDocumentFileNameText');
+            const dropZoneContent = document.getElementById('projectDocumentFileDropZoneContent');
+            if (fileNameDiv && fileNameText) {
+                fileNameText.textContent = docData.fileName || 'Existing file';
+                fileNameDiv.style.display = 'block';
+                if (dropZoneContent) dropZoneContent.style.display = 'none';
+            }
+            form.dataset.existingDocumentFileUrl = docData.fileUrl;
+            form.dataset.existingDocumentFileName = docData.fileName || '';
+        } else {
+            resetProjectDocumentFileUpload();
+        }
+        
+        // Setup drag and drop
+        setupProjectDocumentDragDrop();
+        
+        modal.classList.add('show');
+    } catch (error) {
+        console.error('Error loading document:', error);
+        alert('Error loading document: ' + error.message);
+    }
+};
+
+// Delete project document
+window.deleteProjectDocument = async function(projectId, documentId) {
+    if (!canManageProjects()) {
+        alert('You do not have permission to delete documents.');
+        return;
+    }
+    
+    if (!confirm('Are you sure you want to delete this document?')) {
+        return;
+    }
+    
+    try {
+        // Get document to delete file from storage
+        const docSnapshot = await db.collection('projects').doc(projectId).collection('documents').doc(documentId).get();
+        if (docSnapshot.exists) {
+            const docData = docSnapshot.data();
+            if (docData.fileUrl) {
+                try {
+                    const storageRef = firebase.storage().refFromURL(docData.fileUrl);
+                    await storageRef.delete();
+                } catch (storageError) {
+                    console.warn('Error deleting file from storage:', storageError);
+                    // Continue with Firestore deletion even if storage delete fails
+                }
+            }
+        }
+        
+        // Delete document from Firestore
+        await db.collection('projects').doc(projectId).collection('documents').doc(documentId).delete();
+        console.log('✅ Project document deleted:', documentId);
+        
+        // Reload documents
+        await loadProjectDocuments(projectId);
+    } catch (error) {
+        console.error('❌ Error deleting project document:', error);
+        alert('Error deleting document: ' + (error.message || 'Unknown error'));
+    }
+};
+
+// Handle project document form submission
+async function handleProjectDocumentSubmit(e) {
+    e.preventDefault();
+    
+    const form = document.getElementById('projectDocumentForm');
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const resetButtonState = () => {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save Document';
+            submitBtn.classList.remove('saving');
+        }
+    };
+    
+    if (!form) {
+        console.error('Project document form not found');
+        alert('Error: Form not found. Please refresh the page.');
+        resetButtonState();
+        return;
+    }
+    
+    const documentId = form.querySelector('#projectDocumentId').value;
+    const projectId = form.querySelector('#projectDocumentProjectId').value;
+    const name = form.querySelector('#projectDocumentName').value.trim();
+    const description = form.querySelector('#projectDocumentDescription').value.trim() || null;
+    const fileInput = form.querySelector('#projectDocumentFile');
+    
+    if (!projectId || !name) {
+        alert('Please fill in all required fields.');
+        resetButtonState();
+        return;
+    }
+    
+    // Check if file is required (new document or no existing file)
+    const hasNewFile = !!(fileInput && fileInput.files && fileInput.files.length > 0);
+    const hasExistingFile = !!(form.dataset.existingDocumentFileUrl);
+    if (!documentId && !hasNewFile) {
+        alert('Please upload a document file.');
+        resetButtonState();
+        return;
+    }
+    if (documentId && !hasNewFile && !hasExistingFile) {
+        alert('Please upload a document file (existing file missing).');
+        resetButtonState();
+        return;
+    }
+    
+    // Update button state
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
+        submitBtn.classList.add('saving');
+    }
+    
+    try {
+        let fileUrl = null;
+        let fileName = null;
+        let fileSize = null;
+        
+        // Handle file upload
+        if (hasNewFile) {
+            const file = fileInput.files[0];
+            const storageRef = firebase.storage().ref();
+            const fileRef = storageRef.child(`projects/${projectId}/documents/${Date.now()}_${file.name}`);
+            
+            // Upload file
+            const uploadTask = fileRef.put(file);
+            await new Promise((resolve, reject) => {
+                uploadTask.on('state_changed',
+                    (snapshot) => {
+                        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                        console.log(`Project document upload progress: ${progress}%`);
+                    },
+                    (error) => {
+                        console.error('Project document upload error:', error);
+                        reject(error);
+                    },
+                    () => {
+                        resolve();
+                    }
+                );
+            });
+            
+            fileUrl = await fileRef.getDownloadURL();
+            fileName = file.name;
+            fileSize = file.size;
+        } else if (documentId && hasExistingFile) {
+            // Keep existing file
+            const docSnapshot = await db.collection('projects').doc(projectId).collection('documents').doc(documentId).get();
+            if (docSnapshot.exists) {
+                const existing = docSnapshot.data();
+                fileUrl = existing.fileUrl;
+                fileName = existing.fileName;
+                fileSize = existing.fileSize;
+            }
+        }
+        
+        const documentData = {
+            name: name,
+            description: description,
+            fileUrl: fileUrl,
+            fileName: fileName,
+            fileSize: fileSize,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        
+        if (documentId) {
+            // Update existing document
+            await db.collection('projects').doc(projectId).collection('documents').doc(documentId).update(documentData);
+            console.log('✅ Project document updated:', documentId);
+        } else {
+            // Create new document
+            documentData.uploadedAt = firebase.firestore.Timestamp.now();
+            documentData.uploadedBy = currentUser ? currentUser.uid : null;
+            await db.collection('projects').doc(projectId).collection('documents').add(documentData);
+            console.log('✅ Project document created');
+        }
+        
+        // Close modal and reload documents
+        document.getElementById('projectDocumentModal').classList.remove('show');
+        form.reset();
+        resetProjectDocumentFileUpload();
+        await loadProjectDocuments(projectId);
+        resetButtonState();
+    } catch (error) {
+        console.error('Error saving project document:', error);
+        alert('Error saving document: ' + error.message);
+        resetButtonState();
+    }
+}
+
+// Reset project document file upload UI
+function resetProjectDocumentFileUpload() {
+    const dropZoneContent = document.getElementById('projectDocumentFileDropZoneContent');
+    const fileNameDiv = document.getElementById('projectDocumentFileName');
+    if (dropZoneContent) dropZoneContent.style.display = 'block';
+    if (fileNameDiv) fileNameDiv.style.display = 'none';
+    const fileInput = document.getElementById('projectDocumentFile');
+    if (fileInput) fileInput.value = '';
+    const form = document.getElementById('projectDocumentForm');
+    if (form) {
+        form.dataset.existingDocumentFileUrl = '';
+        form.dataset.existingDocumentFileName = '';
+    }
+}
+
+// Setup drag and drop for project document file upload
+function setupProjectDocumentDragDrop() {
+    const dropZone = document.getElementById('projectDocumentFileDropZone');
+    const fileInput = document.getElementById('projectDocumentFile');
+    const dropZoneContent = document.getElementById('projectDocumentFileDropZoneContent');
+    const fileNameDiv = document.getElementById('projectDocumentFileName');
+    const fileNameText = document.getElementById('projectDocumentFileNameText');
+    const removeBtn = document.getElementById('projectDocumentFileRemoveBtn');
+    
+    if (!dropZone || !fileInput) return;
+    
+    // Handle file selection from input
+    fileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            handleProjectDocumentFileSelect(file);
+        }
+    });
+    
+    // Prevent default drag behaviors
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, preventDefaults, false);
+        document.body.addEventListener(eventName, preventDefaults, false);
+    });
+    
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    
+    // Highlight drop zone when item is dragged over it
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+            dropZone.style.borderColor = '#2563EB';
+            dropZone.style.backgroundColor = '#EBF5FF';
+        }, false);
+    });
+    
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+            dropZone.style.borderColor = '#ccc';
+            dropZone.style.backgroundColor = '#f9f9f9';
+        }, false);
+    });
+    
+    // Handle dropped files
+    dropZone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        
+        if (files.length > 0) {
+            const file = files[0];
+            handleProjectDocumentFileSelect(file);
+            // Update the file input
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(file);
+            fileInput.files = dataTransfer.files;
+        }
+    }, false);
+    
+    // Handle remove button
+    if (removeBtn) {
+        removeBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            fileInput.value = '';
+            const form = document.getElementById('projectDocumentForm');
+            if (form) {
+                form.dataset.existingDocumentFileUrl = '';
+                form.dataset.existingDocumentFileName = '';
+            }
+            if (dropZoneContent) dropZoneContent.style.display = 'block';
+            if (fileNameDiv) fileNameDiv.style.display = 'none';
+        });
+    }
+    
+    // Click on drop zone to trigger file input (but not when clicking the label)
+    dropZone.addEventListener('click', function(e) {
+        const isLabel = e.target.tagName === 'LABEL' || e.target.closest('label');
+        if (!isLabel && e.target !== fileInput && e.target !== removeBtn) {
+            fileInput.click();
+        }
+    });
+}
+
+// Handle project document file selection
+function handleProjectDocumentFileSelect(file) {
+    const dropZoneContent = document.getElementById('projectDocumentFileDropZoneContent');
+    const fileNameDiv = document.getElementById('projectDocumentFileName');
+    const fileNameText = document.getElementById('projectDocumentFileNameText');
+    
+    if (dropZoneContent) dropZoneContent.style.display = 'none';
+    if (fileNameDiv) fileNameDiv.style.display = 'block';
+    if (fileNameText) {
+        fileNameText.textContent = file.name;
+    }
+}
 
 // ============================================
 // AUDIT CENTER
