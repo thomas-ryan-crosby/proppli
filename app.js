@@ -2724,11 +2724,15 @@ function setupEventListeners() {
             // Load documents if documents tab is clicked
             if (tabName === 'documents' && currentTenantIdForDetail) {
                 loadTenantDocuments(currentTenantIdForDetail);
+                // Setup drag and drop for documents tab
+                setupTenantDocumentDragDrop();
             }
             
             // Load COIs if COIs tab is clicked
             if (tabName === 'cois' && currentTenantIdForDetail) {
                 loadTenantCOIs(currentTenantIdForDetail);
+                // Setup drag and drop for COI tab
+                setupTenantCOITabDragDrop();
             }
             
             updateFABsVisibility();
@@ -16323,6 +16327,196 @@ function handleTenantCOIFileSelect(file) {
     if (fileNameDiv) fileNameDiv.style.display = 'block';
     if (fileNameText) {
         fileNameText.textContent = file.name;
+    }
+}
+
+// Setup drag and drop for tenant documents tab (in tenant detail modal)
+function setupTenantDocumentDragDrop() {
+    const dropZone = document.getElementById('tenantDocumentDropZone');
+    const fileInput = document.getElementById('tenantDocumentInput');
+    
+    if (!dropZone || !fileInput) return;
+    
+    // Prevent default drag behaviors
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, preventDefaults, false);
+        document.body.addEventListener(eventName, preventDefaults, false);
+    });
+    
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    
+    // Highlight drop zone when item is dragged over it
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+            dropZone.style.borderColor = '#2563EB';
+            dropZone.style.backgroundColor = '#EBF5FF';
+        }, false);
+    });
+    
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+            dropZone.style.borderColor = '#ccc';
+            dropZone.style.backgroundColor = '#f9f9f9';
+        }, false);
+    });
+    
+    // Handle dropped files
+    dropZone.addEventListener('drop', async (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        
+        if (files.length > 0 && currentTenantIdForDetail) {
+            const uploadBtn = document.getElementById('uploadDocumentBtn');
+            const originalText = uploadBtn ? uploadBtn.textContent : 'Upload Document';
+            
+            try {
+                if (uploadBtn) {
+                    uploadBtn.disabled = true;
+                    uploadBtn.textContent = 'Uploading...';
+                }
+                
+                // Upload all dropped files
+                let uploadedCount = 0;
+                for (let i = 0; i < files.length; i++) {
+                    try {
+                        await uploadTenantDocument(currentTenantIdForDetail, files[i]);
+                        uploadedCount++;
+                    } catch (uploadError) {
+                        console.error(`Error uploading file ${files[i].name}:`, uploadError);
+                        // Continue with other files
+                    }
+                }
+                
+                // Reload documents
+                loadTenantDocuments(currentTenantIdForDetail);
+                
+                if (uploadedCount > 0) {
+                    alert(`Successfully uploaded ${uploadedCount} document(s)`);
+                } else {
+                    alert('No documents were uploaded. Please try again.');
+                }
+            } catch (error) {
+                console.error('Error uploading documents:', error);
+                alert('Error uploading documents: ' + error.message);
+            } finally {
+                if (uploadBtn) {
+                    uploadBtn.disabled = false;
+                    uploadBtn.textContent = originalText;
+                }
+            }
+        }
+    }, false);
+    
+    // Click on drop zone to trigger file input (but not when clicking the label)
+    dropZone.addEventListener('click', function(e) {
+        const isLabel = e.target.tagName === 'LABEL' || e.target.closest('label');
+        if (!isLabel && e.target !== fileInput) {
+            fileInput.click();
+        }
+    });
+}
+
+// Setup drag and drop for tenant COI tab (in tenant detail modal)
+function setupTenantCOITabDragDrop() {
+    const dropZone = document.getElementById('tenantCOIDropZone');
+    const fileInput = document.getElementById('tenantCOIInput');
+    
+    if (!dropZone || !fileInput) return;
+    
+    // Prevent default drag behaviors
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, preventDefaults, false);
+        document.body.addEventListener(eventName, preventDefaults, false);
+    });
+    
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    
+    // Highlight drop zone when item is dragged over it
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+            dropZone.style.borderColor = '#2563EB';
+            dropZone.style.backgroundColor = '#EBF5FF';
+        }, false);
+    });
+    
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+            dropZone.style.borderColor = '#ccc';
+            dropZone.style.backgroundColor = '#f9f9f9';
+        }, false);
+    });
+    
+    // Handle dropped files
+    dropZone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        
+        if (files.length > 0 && currentTenantIdForDetail) {
+            const file = files[0];
+            // Validate file type
+            const validTypes = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png'];
+            const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+            
+            if (validTypes.includes(fileExtension)) {
+                // Open COI upload modal with file pre-selected
+                const tenantId = currentTenantIdForDetail;
+                const tenantCOIUploadModal = document.getElementById('tenantCOIUploadModal');
+                if (tenantCOIUploadModal) {
+                    document.getElementById('tenantCOITenantId').value = tenantId;
+                    // Set the file in the modal's file input
+                    const modalFileInput = document.getElementById('tenantCOIFile');
+                    if (modalFileInput) {
+                        const dataTransfer = new DataTransfer();
+                        dataTransfer.items.add(file);
+                        modalFileInput.files = dataTransfer.files;
+                        // Trigger the file select handler to show the file name
+                        handleTenantCOIFileSelect(file);
+                    }
+                    tenantCOIUploadModal.classList.add('show');
+                }
+            } else {
+                alert('Please upload a PDF, Word document, or image file (PDF, DOC, DOCX, JPG, JPEG, PNG).');
+            }
+        }
+    }, false);
+    
+    // Click on drop zone to trigger file input (but not when clicking the label)
+    dropZone.addEventListener('click', function(e) {
+        const isLabel = e.target.tagName === 'LABEL' || e.target.closest('label');
+        if (!isLabel && e.target !== fileInput) {
+            fileInput.click();
+        }
+    });
+    
+    // Handle file selection from input (opens modal)
+    if (fileInput) {
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file && currentTenantIdForDetail) {
+                const tenantId = currentTenantIdForDetail;
+                const tenantCOIUploadModal = document.getElementById('tenantCOIUploadModal');
+                if (tenantCOIUploadModal) {
+                    document.getElementById('tenantCOITenantId').value = tenantId;
+                    // Set the file in the modal's file input
+                    const modalFileInput = document.getElementById('tenantCOIFile');
+                    if (modalFileInput) {
+                        const dataTransfer = new DataTransfer();
+                        dataTransfer.items.add(file);
+                        modalFileInput.files = dataTransfer.files;
+                        handleTenantCOIFileSelect(file);
+                    }
+                    tenantCOIUploadModal.classList.add('show');
+                }
+                // Reset the tab input
+                fileInput.value = '';
+            }
+        });
     }
 }
 

@@ -1416,16 +1416,38 @@
                                 <h4 style="margin: 0;">Documents</h4>
                                 <button id="uploadDocumentBtn" class="btn-primary btn-small">+ Upload Document</button>
                             </div>
+                            <div id="tenantDocumentDropZone" style="border: 2px dashed #ccc; border-radius: 8px; padding: 30px; text-align: center; background-color: #f9f9f9; cursor: pointer; transition: all 0.3s ease; margin-bottom: 20px;">
+                                <div id="tenantDocumentDropZoneContent">
+                                    <p style="margin: 0 0 10px 0; color: #666; font-size: 14px;">
+                                        <strong>Drag and drop files here</strong>
+                                    </p>
+                                    <p style="margin: 0; color: #999; font-size: 12px;">or</p>
+                                    <label for="tenantDocumentInput" style="display: inline-block; margin-top: 10px; padding: 8px 16px; background-color: #2563EB; color: white; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                                        Browse Files
+                                    </label>
+                                    <input type="file" id="tenantDocumentInput" style="display: none;" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.jpg,.jpeg,.png">
+                                </div>
+                            </div>
                             <div id="documentsList" class="documents-list"></div>
-                            <input type="file" id="tenantDocumentInput" style="display: none;" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.jpg,.jpeg,.png">
                         </div>
                         <div id="coisTab" class="tab-content" style="display: none;">
                             <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                                 <h4 style="margin: 0;">Certificates of Insurance</h4>
                                 <button id="uploadTenantCOIBtn" class="btn-primary btn-small" style="display: none;">+ Upload COI</button>
                             </div>
+                            <div id="tenantCOIDropZone" style="border: 2px dashed #ccc; border-radius: 8px; padding: 30px; text-align: center; background-color: #f9f9f9; cursor: pointer; transition: all 0.3s ease; margin-bottom: 20px;">
+                                <div id="tenantCOIDropZoneContent">
+                                    <p style="margin: 0 0 10px 0; color: #666; font-size: 14px;">
+                                        <strong>Drag and drop COI file here</strong>
+                                    </p>
+                                    <p style="margin: 0; color: #999; font-size: 12px;">or</p>
+                                    <label for="tenantCOIInput" style="display: inline-block; margin-top: 10px; padding: 8px 16px; background-color: #2563EB; color: white; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                                        Browse Files
+                                    </label>
+                                    <input type="file" id="tenantCOIInput" style="display: none;" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
+                                </div>
+                            </div>
                             <div id="tenantCOIsList" class="documents-list"></div>
-                            <input type="file" id="tenantCOIInput" style="display: none;" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
                         </div>
                     </div>
                 </div>
