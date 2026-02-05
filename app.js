@@ -12553,8 +12553,19 @@ async function compileAndDraftEmail(tenants) {
         email: cb.getAttribute('data-email'),
         tenantId: cb.getAttribute('data-tenant-id')
     }));
+
+    // Only include broker contacts in draft when "Show Brokers" is checked
+    const showBrokersToggle = document.getElementById('showBrokersToggle');
+    const includeBrokers = showBrokersToggle && showBrokersToggle.checked;
     
     const emailSet = new Set();
+    
+    function shouldAddContactEmail(contact) {
+        if (!contact.contactEmail) return false;
+        const isBroker = contact.classifications && contact.classifications.includes('Tenant Representative');
+        if (isBroker && !includeBrokers) return false;
+        return true;
+    }
     
     // Add emails from selected buildings (find tenants via occupancies and units)
     if (selectedBuildings.length > 0) {
@@ -12583,7 +12594,7 @@ async function compileAndDraftEmail(tenants) {
                 }
             });
             
-            // Get contacts for tenants in selected buildings
+            // Get contacts for tenants in selected buildings (exclude brokers unless Show Brokers is checked)
             const allTenantIds = Array.from(tenantIdsInBuildings);
             const batchSize = 10;
             for (let i = 0; i < allTenantIds.length; i += batchSize) {
@@ -12594,7 +12605,7 @@ async function compileAndDraftEmail(tenants) {
                 
                 contactsSnapshot.forEach(doc => {
                     const contact = doc.data();
-                    if (contact.contactEmail) {
+                    if (shouldAddContactEmail(contact)) {
                         emailSet.add(contact.contactEmail);
                     }
                 });
@@ -12602,7 +12613,7 @@ async function compileAndDraftEmail(tenants) {
         }
     }
     
-    // Add emails from selected tenants
+    // Add emails from selected tenants (exclude brokers unless Show Brokers is checked)
     if (selectedTenants.length > 0) {
         const batchSize = 10;
         for (let i = 0; i < selectedTenants.length; i += batchSize) {
@@ -12613,7 +12624,7 @@ async function compileAndDraftEmail(tenants) {
             
             contactsSnapshot.forEach(doc => {
                 const contact = doc.data();
-                if (contact.contactEmail) {
+                if (shouldAddContactEmail(contact)) {
                     emailSet.add(contact.contactEmail);
                 }
             });
